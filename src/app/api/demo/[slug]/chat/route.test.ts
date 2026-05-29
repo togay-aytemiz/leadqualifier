@@ -1141,14 +1141,14 @@ describe('demo chat API route', () => {
                 source_url: 'https://example.edu.tr/sbf.pdf',
             },
             {
-                content: 'Tıbbi Laboratuvar Teknikleri Programı öğrencileri Eczane Hizmetleri Programında çift anadal yapabilir.',
-                document_id: 'doc-tlt-cap',
-                document_title: 'TLT Çift Anadal',
-                source_url: 'https://example.edu.tr/tlt-cap.pdf',
+                content: 'Sağlık Hizmetleri Meslek Yüksekokulu kampüsü Karakaya Mahallesi Bağlum Bulvarı No:1, 06291 Keçiören/Ankara adresindedir.',
+                document_id: 'doc-shmyo',
+                document_title: 'Sağlık Hizmetleri Meslek Yüksekokulu',
+                source_url: 'https://example.edu.tr/shmyo.pdf',
             }
         ]
         searchKnowledgeBaseMock.mockImplementation(async (query: string) => {
-            if (query.includes('TLT') || query.includes('Tıbbi Laboratuvar')) return [chunks[1]!]
+            if (query.includes('SHMYO') || query.includes('Sağlık Hizmetleri')) return [chunks[1]!]
             return [chunks[0]!]
         })
         buildRagContextMock.mockReturnValueOnce({
@@ -1157,17 +1157,17 @@ describe('demo chat API route', () => {
             tokenCount: 32,
         })
         repairLinkOnlyRagAnswerMock.mockReturnValueOnce(
-            'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir. Tıbbi Laboratuvar Teknikleri Programında çift anadal mümkündür.'
+            'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir. Sağlık Hizmetleri Meslek Yüksekokulu Karakaya Mahallesi Bağlum Bulvarı No:1 adresindedir.'
         )
         polishGroundedRagAnswerMock.mockResolvedValueOnce({
-            answer: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesinde yer alıyor. Tıbbi Laboratuvar Teknikleri Programında da Eczane Hizmetleri ile çift anadal yapılabiliyor.\n\nİstersen çift anadal başvuru koşullarını da kısaca çıkarabilirim.',
+            answer: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesinde yer alıyor. Sağlık Hizmetleri Meslek Yüksekokulu ise Karakaya Mahallesi Bağlum Bulvarı No:1, 06291 Keçiören/Ankara adresinde.\n\nİstersen bu yerleşkelerin bağlı olduğu akademik birimleri de kısaca çıkarabilirim.',
             usedPolish: true,
             addedEngagement: true,
             usage: { inputTokens: 80, outputTokens: 30, totalTokens: 110 },
             model: 'gpt-4o-mini',
         })
         appendCanonicalRagSourceLinksMock.mockReturnValueOnce(
-            'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesinde yer alıyor. Tıbbi Laboratuvar Teknikleri Programında da Eczane Hizmetleri ile çift anadal yapılabiliyor.\n\nİstersen çift anadal başvuru koşullarını da kısaca çıkarabilirim.\nhttps://example.edu.tr/sbf.pdf\nhttps://example.edu.tr/tlt-cap.pdf'
+            'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesinde yer alıyor. Sağlık Hizmetleri Meslek Yüksekokulu ise Karakaya Mahallesi Bağlum Bulvarı No:1, 06291 Keçiören/Ankara adresinde.\n\nİstersen bu yerleşkelerin bağlı olduğu akademik birimleri de kısaca çıkarabilirim.\nhttps://example.edu.tr/sbf.pdf\nhttps://example.edu.tr/shmyo.pdf'
         )
 
         const conversationChain = {
@@ -1193,7 +1193,7 @@ describe('demo chat API route', () => {
             maybeSingle: vi.fn(async () => ({
                 data: {
                     id: 'contact-message-1',
-                    content: 'SBF kampüsü nerede ve TLT çift anadal yapabilir mi?',
+                    content: 'SBF ve SHMYO kampüsleri nerede?',
                 },
                 error: null,
             })),
@@ -1241,18 +1241,18 @@ describe('demo chat API route', () => {
         const res = await GET(createGetRequest({
             sessionId: 'session-1',
             messageId: 'message-1',
-            message: 'SBF kampüsü nerede ve TLT çift anadal yapabilir mi?',
+            message: 'SBF ve SHMYO kampüsleri nerede?',
         }), createContext())
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({
             pending: false,
-            response: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesinde yer alıyor. Tıbbi Laboratuvar Teknikleri Programında da Eczane Hizmetleri ile çift anadal yapılabiliyor.\n\nİstersen çift anadal başvuru koşullarını da kısaca çıkarabilirim.\nhttps://example.edu.tr/sbf.pdf\nhttps://example.edu.tr/tlt-cap.pdf',
+            response: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesinde yer alıyor. Sağlık Hizmetleri Meslek Yüksekokulu ise Karakaya Mahallesi Bağlum Bulvarı No:1, 06291 Keçiören/Ankara adresinde.\n\nİstersen bu yerleşkelerin bağlı olduğu akademik birimleri de kısaca çıkarabilirim.\nhttps://example.edu.tr/sbf.pdf\nhttps://example.edu.tr/shmyo.pdf',
             skillImage: null,
         })
         expect(polishGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
-            answer: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir. Tıbbi Laboratuvar Teknikleri Programında çift anadal mümkündür.',
-            userMessage: 'SBF kampüsü nerede ve TLT çift anadal yapabilir mi?',
+            answer: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir. Sağlık Hizmetleri Meslek Yüksekokulu Karakaya Mahallesi Bağlum Bulvarı No:1 adresindedir.',
+            userMessage: 'SBF ve SHMYO kampüsleri nerede?',
             chunks,
         }))
         expect(getOrgAiSettingsMock).toHaveBeenCalledWith('org-1', {
@@ -1260,39 +1260,39 @@ describe('demo chat API route', () => {
             locale: 'tr'
         })
         expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalledWith(
-            'SBF kampüsü nerede ve TLT çift anadal yapabilir mi?',
+            'SBF ve SHMYO kampüsleri nerede?',
             expect.any(String),
             expect.any(Number),
             expect.any(Object)
         )
         expect(searchKnowledgeBaseFocusedEvidenceMock).toHaveBeenCalledWith(
-            'SBF kampüsü nerede?',
+            'SBF kampüsleri nerede?',
             'org-1',
             6,
             expect.objectContaining({ supabase: expect.any(Object) })
         )
         expect(searchKnowledgeBaseFocusedEvidenceMock).toHaveBeenCalledWith(
-            'TLT çift anadal yapabilir mi?',
+            'SHMYO kampüsleri nerede?',
             'org-1',
             6,
             expect.objectContaining({ supabase: expect.any(Object) })
         )
         expect(searchKnowledgeBaseMock).toHaveBeenCalledWith(
-            'SBF kampüsü nerede?',
+            'SBF kampüsleri nerede?',
             'org-1',
             0.5,
             6,
             expect.objectContaining({ supabase: expect.any(Object) })
         )
         expect(searchKnowledgeBaseMock).toHaveBeenCalledWith(
-            'TLT çift anadal yapabilir mi?',
+            'SHMYO kampüsleri nerede?',
             'org-1',
             0.5,
             6,
             expect.objectContaining({ supabase: expect.any(Object) })
         )
         expect(appendCanonicalRagSourceLinksMock).toHaveBeenCalledWith(
-            expect.stringContaining('İstersen çift anadal başvuru koşullarını'),
+            expect.stringContaining('İstersen bu yerleşkelerin bağlı olduğu akademik birimleri'),
             chunks,
             expect.objectContaining({ force: true, limit: 2 })
         )

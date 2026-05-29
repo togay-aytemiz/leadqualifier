@@ -175,6 +175,52 @@ function hasDemoCompoundQuestionSignal(part: string) {
     return /\b(?:adres|anadal|başvuru|basvuru|çap|cap|çift|cift|ders|e-?posta|eğitim|egitim|final|hak|hangi|iletişim|iletisim|izin|kaç|kac|kampüs|kampus|kim|mail|mazeret|nerede|not|program|rapor|sınav|sinav|sorumlu|staj|telefon|var mı|var mi|yapabilir)\b/iu.test(normalized)
 }
 
+function findDemoSharedPredicateIndex(part: string) {
+    const tokens = part.split(/\s+/u).filter(Boolean)
+    return tokens.findIndex((token, index) => {
+        if (index === 0) return false
+        const normalizedToken = token.replace(/[^\p{L}\p{N}-]/gu, '')
+        return /^(?:adres|anadal|başvuru|basvuru|çap|cap|çift|cift|ders|e-?posta|eğitim|egitim|final|hak|hangi|iletişim|iletisim|izin|kaç|kac|kampüs|kampus|kim|mail|mazeret|nerede|not|program|rapor|sınav|sinav|sorumlu|staj|telefon|var|yapabilir)/iu.test(normalizedToken)
+    })
+}
+
+function splitDemoSharedPredicateCompoundQueries(trimmed: string, hasQuestionMark: boolean) {
+    const rawParts = trimmed
+        .replace(/[?？]\s*$/u, '')
+        .split(/\s+(?:ve|ayrıca|ayrica|and)\s+/iu)
+        .map((part) => part.trim())
+        .filter(Boolean)
+    if (rawParts.length < 2) return []
+
+    const lastPart = rawParts[rawParts.length - 1] ?? ''
+    const lastTokens = lastPart.split(/\s+/u).filter(Boolean)
+    const predicateIndex = findDemoSharedPredicateIndex(lastPart)
+    if (predicateIndex <= 0) return []
+
+    const lastEntity = lastTokens.slice(0, predicateIndex).join(' ').trim()
+    const sharedPredicate = lastTokens.slice(predicateIndex).join(' ').trim()
+    if (!lastEntity || !sharedPredicate) return []
+
+    const entityParts = [
+        ...rawParts.slice(0, -1),
+        lastEntity
+    ]
+
+    const seen = new Set<string>()
+    const queries = entityParts
+        .map((entity) => `${entity} ${sharedPredicate}`.trim())
+        .map((query) => hasQuestionMark && !/[?？]\s*$/.test(query) ? `${query}?` : query)
+        .filter(hasDemoCompoundQuestionSignal)
+        .filter((query) => {
+            const key = demoKnowledgeQueryKey(query)
+            if (!key || seen.has(key)) return false
+            seen.add(key)
+            return true
+        })
+
+    return queries.length >= 2 ? queries : []
+}
+
 function splitDemoCompoundKnowledgeQueries(message: string) {
     const trimmed = normalizeDemoKnowledgeQuery(message)
     if (!/\s+(?:ve|ayrıca|ayrica|and)\s+/iu.test(trimmed)) return []
@@ -188,7 +234,9 @@ function splitDemoCompoundKnowledgeQueries(message: string) {
         .map((part) => hasQuestionMark && !/[?？]\s*$/.test(part) ? `${part}?` : part)
         .filter(hasDemoCompoundQuestionSignal)
 
-    return parts.length >= 2 ? parts : []
+    if (parts.length >= 2) return parts
+
+    return splitDemoSharedPredicateCompoundQueries(trimmed, hasQuestionMark)
 }
 
 function buildDemoKnowledgeSearchQueries(message: string) {
