@@ -759,8 +759,83 @@ async function buildExtractiveDemoChatReply(input: {
         }
 
         if (generatedAnswer.usedGeneration && generatedAnswer.answer.trim() && !isNoAnswerReply(generatedAnswer.answer)) {
+            const repairedGeneratedAnswer = repairLinkOnlyRagAnswer({
+                response: generatedAnswer.answer,
+                userMessage: message,
+                responseLanguage,
+                chunks
+            })
+            const generatedAnswerWasRepaired = Boolean(
+                repairedGeneratedAnswer
+                && !isNoAnswerReply(repairedGeneratedAnswer)
+                && repairedGeneratedAnswer.trim() !== generatedAnswer.answer.trim()
+            )
+            let generatedAnswerForReply = repairedGeneratedAnswer && !isNoAnswerReply(repairedGeneratedAnswer)
+                ? repairedGeneratedAnswer
+                : generatedAnswer.answer
+            let generatedPolishMetadata = {
+                usedPolish: false,
+                addedEngagement: false,
+                model: generatedAnswer.model
+            }
+
+            if (!generatedAnswer.addedEngagement || generatedAnswerWasRepaired) {
+                const polishedGeneratedAnswer = await polishGroundedRagAnswer({
+                    answer: generatedAnswerForReply,
+                    userMessage: message,
+                    responseLanguage,
+                    chunks,
+                    settings: aiSettings,
+                    timeoutMs: readFastRagPolishTimeoutMs()
+                })
+
+                if (polishedGeneratedAnswer.usage) {
+                    try {
+                        await recordAiUsage({
+                            organizationId: input.channel.organizationId,
+                            category: 'rag',
+                            model: polishedGeneratedAnswer.model,
+                            inputTokens: polishedGeneratedAnswer.usage.inputTokens,
+                            outputTokens: polishedGeneratedAnswer.usage.outputTokens,
+                            totalTokens: polishedGeneratedAnswer.usage.totalTokens,
+                            metadata: {
+                                source: 'demo_chat_rag_generate_polish',
+                                response_kind: 'rag_grounded_generate_polish',
+                                demo_chat_channel_id: input.channel.id,
+                                document_count: chunks.length
+                            },
+                            supabase: input.supabase
+                        })
+                    } catch (error) {
+                        console.error('Demo Chat: generated RAG polish usage recording failed; continuing reply flow', error)
+                    }
+                }
+
+                generatedPolishMetadata = {
+                    usedPolish: polishedGeneratedAnswer.usedPolish,
+                    addedEngagement: polishedGeneratedAnswer.addedEngagement,
+                    model: polishedGeneratedAnswer.model
+                }
+
+                if (
+                    polishedGeneratedAnswer.usedPolish
+                    && polishedGeneratedAnswer.answer.trim()
+                    && !isNoAnswerReply(polishedGeneratedAnswer.answer)
+                ) {
+                    const repairedPolishedGeneratedAnswer = repairLinkOnlyRagAnswer({
+                        response: polishedGeneratedAnswer.answer,
+                        userMessage: message,
+                        responseLanguage,
+                        chunks
+                    })
+                    generatedAnswerForReply = repairedPolishedGeneratedAnswer && !isNoAnswerReply(repairedPolishedGeneratedAnswer)
+                        ? repairedPolishedGeneratedAnswer
+                        : polishedGeneratedAnswer.answer
+                }
+            }
+
             return {
-                replyText: appendCanonicalRagSourceLinks(generatedAnswer.answer, chunks, {
+                replyText: appendCanonicalRagSourceLinks(generatedAnswerForReply, chunks, {
                     force: true,
                     limit: 2
                 }),
@@ -771,11 +846,7 @@ async function buildExtractiveDemoChatReply(input: {
                     addedEngagement: generatedAnswer.addedEngagement,
                     model: generatedAnswer.model
                 },
-                polish: {
-                    usedPolish: false,
-                    addedEngagement: false,
-                    model: generatedAnswer.model
-                }
+                polish: generatedPolishMetadata
             }
         }
 

@@ -1601,16 +1601,29 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                     && groundedGeneratedRagResponse.answer.trim()
                     && !isRagNoAnswerResponse(groundedGeneratedRagResponse.answer)
                 ) {
-                    let generatedAnswerForReply = groundedGeneratedRagResponse.answer
+                    const repairedGeneratedRagAnswer = repairLinkOnlyRagAnswer({
+                        response: groundedGeneratedRagResponse.answer,
+                        userMessage: options.text,
+                        responseLanguage,
+                        chunks: repairChunks
+                    })
+                    const generatedAnswerWasRepaired = Boolean(
+                        repairedGeneratedRagAnswer
+                        && !isRagNoAnswerResponse(repairedGeneratedRagAnswer)
+                        && repairedGeneratedRagAnswer.trim() !== groundedGeneratedRagResponse.answer.trim()
+                    )
+                    let generatedAnswerForReply = repairedGeneratedRagAnswer && !isRagNoAnswerResponse(repairedGeneratedRagAnswer)
+                        ? repairedGeneratedRagAnswer
+                        : groundedGeneratedRagResponse.answer
                     let generatedRagPolishMetadata: {
                         usedPolish: boolean
                         addedEngagement: boolean
                         model: string
                     } | null = null
 
-                    if (!groundedGeneratedRagResponse.addedEngagement) {
+                    if (!groundedGeneratedRagResponse.addedEngagement || generatedAnswerWasRepaired) {
                         const polishedGeneratedRagResponse = await polishGroundedRagAnswer({
-                            answer: groundedGeneratedRagResponse.answer,
+                            answer: generatedAnswerForReply,
                             userMessage: options.text,
                             responseLanguage,
                             chunks: repairChunks,
@@ -1644,7 +1657,15 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                             && polishedGeneratedRagResponse.answer.trim()
                             && !isRagNoAnswerResponse(polishedGeneratedRagResponse.answer)
                         ) {
-                            generatedAnswerForReply = polishedGeneratedRagResponse.answer
+                            const repairedPolishedGeneratedRagAnswer = repairLinkOnlyRagAnswer({
+                                response: polishedGeneratedRagResponse.answer,
+                                userMessage: options.text,
+                                responseLanguage,
+                                chunks: repairChunks
+                            })
+                            generatedAnswerForReply = repairedPolishedGeneratedRagAnswer && !isRagNoAnswerResponse(repairedPolishedGeneratedRagAnswer)
+                                ? repairedPolishedGeneratedRagAnswer
+                                : polishedGeneratedRagResponse.answer
                         }
                     }
 

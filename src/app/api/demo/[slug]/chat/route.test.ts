@@ -770,7 +770,7 @@ describe('demo chat API route', () => {
             usage: null,
             model: 'gpt-4o-mini',
         })
-        repairLinkOnlyRagAnswerMock.mockReturnValueOnce('Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.')
+        repairLinkOnlyRagAnswerMock.mockReturnValueOnce(null)
         appendCanonicalRagSourceLinksMock.mockReturnValueOnce(
             'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.\nhttps://example.edu.tr/tlt.pdf'
         )
@@ -1215,7 +1215,7 @@ describe('demo chat API route', () => {
             usage: { inputTokens: 120, outputTokens: 45, totalTokens: 165 },
             model: 'gpt-4o-mini',
         })
-        repairLinkOnlyRagAnswerMock.mockReturnValueOnce('Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.')
+        repairLinkOnlyRagAnswerMock.mockReturnValueOnce(null)
         appendCanonicalRagSourceLinksMock.mockReturnValueOnce(
             'Evet, Tıbbi Laboratuvar Teknikleri programında yaz stajı var; süresi 20 iş günü.\n\nİstersen stajın dönem ve başvuru koşullarını da kısaca çıkarabilirim.\nhttps://example.edu.tr/tlt.pdf'
         )
@@ -1310,7 +1310,12 @@ describe('demo chat API route', () => {
             },
             timeoutMs: 3500,
         }))
-        expect(repairLinkOnlyRagAnswerMock).not.toHaveBeenCalled()
+        expect(repairLinkOnlyRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
+            response: 'Evet, Tıbbi Laboratuvar Teknikleri programında yaz stajı var; süresi 20 iş günü.\n\nİstersen stajın dönem ve başvuru koşullarını da kısaca çıkarabilirim.',
+            userMessage: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı?',
+            responseLanguage: 'tr',
+            chunks: [chunk],
+        }))
         expect(polishGroundedRagAnswerMock).not.toHaveBeenCalled()
         expect(recordAiUsageMock).toHaveBeenCalledWith(expect.objectContaining({
             organizationId: 'org-1',
@@ -1333,6 +1338,131 @@ describe('demo chat API route', () => {
                 }
             })
         }))
+    })
+
+    it('repairs grounded generated demo answers before appending source links', async () => {
+        const chunk = {
+            content: [
+                'Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer.',
+                'Bütünleme sınavından alınan not final notu yerine geçer.',
+                'Dönem içi kurul notu 80 ve üzerinde olan öğrenciler final sınavına girmeksizin dönemi başarıyla tamamlamış kabul edilir.'
+            ].join('\n'),
+            document_id: 'doc-tip',
+            document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+            source_url: 'https://example.edu.tr/tip.pdf',
+        }
+        searchKnowledgeBaseFocusedEvidenceMock.mockResolvedValueOnce([chunk])
+        buildRagContextMock.mockReturnValueOnce({
+            context: chunk.content,
+            chunks: [chunk],
+            tokenCount: 40,
+        })
+        generateGroundedRagAnswerMock.mockResolvedValueOnce({
+            answer: 'Evet, final sınavına girmeden bütünlemeye girebilirsiniz. Eğer dönem içi kurul notunuz 80 ve üzerinde ise final sınavına girmeksizin dönemi başarıyla tamamlarsınız.',
+            usedGeneration: true,
+            addedEngagement: false,
+            usage: null,
+            model: 'gpt-4o-mini',
+        })
+        repairLinkOnlyRagAnswerMock.mockReturnValueOnce(
+            'Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.'
+        )
+        polishGroundedRagAnswerMock.mockResolvedValueOnce({
+            answer: 'Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.',
+            usedPolish: false,
+            addedEngagement: false,
+            usage: null,
+            model: 'gpt-4o-mini',
+        })
+        appendCanonicalRagSourceLinksMock.mockReturnValueOnce(
+            'Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.\nhttps://example.edu.tr/tip.pdf'
+        )
+
+        const conversationChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: { id: 'conversation-1' },
+                error: null,
+            })),
+        }
+        conversationChain.eq.mockReturnValue(conversationChain)
+
+        const completedMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(async () => ({
+                data: [],
+                error: null,
+            })),
+        }
+        completedMessagesChain.eq.mockReturnValue(completedMessagesChain)
+
+        const inboundMessagesChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: {
+                    id: 'contact-message-1',
+                    content: 'Tıp fakültesinde finale girmeden bütünlemeye girebilir miyim?',
+                },
+                error: null,
+            })),
+        }
+        inboundMessagesChain.eq.mockReturnValue(inboundMessagesChain)
+
+        const botInsertChain = {
+            insert: vi.fn(async () => ({ error: null })),
+        }
+        const duplicateReplyChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: null,
+                error: null,
+            })),
+        }
+        duplicateReplyChain.eq.mockReturnValue(duplicateReplyChain)
+        const conversationUpdateChain = {
+            update: vi.fn(() => conversationUpdateChain),
+            eq: vi.fn(async () => ({ error: null })),
+        }
+
+        const conversations = [conversationChain, conversationChain, conversationChain, conversationChain, conversationChain]
+        const messagesTable = {
+            select: vi.fn((columns: string) => {
+                if (columns.includes('id, content')) return inboundMessagesChain
+                if (columns.includes('content, metadata')) return completedMessagesChain
+                if (columns === 'id') return duplicateReplyChain
+                return completedMessagesChain
+            }),
+            insert: botInsertChain.insert,
+        }
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                const chain = conversations.shift()
+                if (!chain) return conversationUpdateChain
+                return { select: vi.fn(() => chain), update: conversationUpdateChain.update }
+            }
+            if (table === 'messages') return messagesTable
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+        processInboundAiPipelineMock.mockImplementationOnce(async () => undefined)
+
+        const res = await GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+            message: 'Tıp fakültesinde finale girmeden bütünlemeye girebilir miyim?',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: 'Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.\nhttps://example.edu.tr/tip.pdf',
+            skillImage: null,
+        })
+        expect(appendCanonicalRagSourceLinksMock).toHaveBeenCalledWith(
+            'Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.',
+            [chunk],
+            expect.objectContaining({ force: true, limit: 2 })
+        )
     })
 
     it('repairs polished deterministic demo replies before appending sources', async () => {

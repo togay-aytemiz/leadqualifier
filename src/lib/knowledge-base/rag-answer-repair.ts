@@ -909,6 +909,80 @@ function finishDurationEvidenceList(values: string[]) {
     return finishDurationEvidenceSentence(cleanedValues.join('; '))
 }
 
+function cleanDurationBulletItem(value: string) {
+    const cleaned = cleanDurationEvidenceSentence(value.replace(/^\s*(?:[•*]|[-–—])\s*/u, ''))
+    const firstSentence = cleaned.split(/(?<=[.!?])\s+/u)[0]?.trim() ?? cleaned
+    return firstSentence
+        .replace(/[.!?]+$/u, '')
+        .trim()
+}
+
+function extractDurationBulletItems(section: string) {
+    return section
+        .split(/[•*]/u)
+        .slice(1)
+        .map(cleanDurationBulletItem)
+        .filter((item) => item.length >= 12)
+        .filter((item) => extractDurationValues(item).length > 0)
+}
+
+function formatDurationBulletItems(items: string[]) {
+    const cleaned = items
+        .map(cleanDurationBulletItem)
+        .filter(Boolean)
+    if (cleaned.length === 0) return null
+
+    return `${cleaned.join('; ')}.`
+}
+
+function extractGroupedAnnualLeaveDurationAnswer(content: string, userMessage: string) {
+    const normalizedUserMessage = normalizeSearch(userMessage)
+    if (!normalizedUserMessage.includes('yillik') || !normalizedUserMessage.includes('izin')) return null
+    if (extractDurationValues(userMessage).length > 0) return null
+
+    const flattened = content
+        .replace(/^(?:Page|Document) Title:\s*.*$/gim, ' ')
+        .replace(/^Source URL:\s*.*$/gim, ' ')
+        .replace(/^Section:\s*.*$/gim, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    const separatorMatch = flattened.match(/\b([\p{L}\p{N}\s,()'-]{8,180}?\biçin ise)\s*;?/iu)
+    if (!separatorMatch?.[0] || !separatorMatch.index) return null
+
+    const separatorIndex = separatorMatch.index
+    const groupLabel = separatorMatch[1]
+        ?.replace(/\biçin ise\b/iu, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+    if (!groupLabel) return null
+
+    const beforeItems = extractDurationBulletItems(flattened.slice(0, separatorIndex))
+    const afterItems = extractDurationBulletItems(flattened.slice(separatorIndex + separatorMatch[0].length))
+    const generalList = formatDurationBulletItems(beforeItems)
+    const exceptionList = formatDurationBulletItems(afterItems)
+    if (!generalList || !exceptionList) return null
+
+    return [
+        'Kaynakta yıllık izin süreleri iki grup halinde verilmiş:',
+        `- Genel akademik ve idari personel: ${generalList}`,
+        `- ${groupLabel}: ${exceptionList}`
+    ].join('\n')
+}
+
+function extractGroupedPolicyDurationAnswer(chunks: RagAnswerRepairChunk[], userMessage: string) {
+    return chunks
+        .map((chunk) => extractGroupedAnnualLeaveDurationAnswer(chunk.content, userMessage))
+        .find((value): value is string => Boolean(value)) ?? null
+}
+
+function responsePreservesGroupedDurationContext(response: string) {
+    const normalized = normalizeSearch(response)
+    return normalized.includes('iki grup')
+        || normalized.includes('genel akademik')
+        || normalized.includes('18 ve daha kucuk')
+        || normalized.includes('50 ve daha yukari')
+}
+
 function compactInternshipDurationTableCandidate(value: string, userMessage: string) {
     const normalizedUserMessage = normalizeSearch(userMessage)
     const normalizedValue = normalizeSearch(value)
@@ -994,6 +1068,11 @@ function repairPolicyDurationAnswer(input: {
 }) {
     const normalizedUserMessage = normalizeSearch(input.userMessage)
     if (!asksForPolicyDuration(normalizedUserMessage)) return null
+
+    const groupedPolicyDurationAnswer = extractGroupedPolicyDurationAnswer(input.chunks, input.userMessage)
+    if (groupedPolicyDurationAnswer && !responsePreservesGroupedDurationContext(input.response)) {
+        return groupedPolicyDurationAnswer
+    }
 
     const subjectTokens = durationSubjectTokens(normalizedUserMessage)
     const requiredSubjectTokens = durationRequiredSubjectTokens(subjectTokens)
@@ -1742,10 +1821,13 @@ function repairContactAnswer(input: {
     const normalizedResponse = normalizeSearch(input.response)
     const emailMissing = evidence.email ? !normalizedResponse.includes(normalizeSearch(evidence.email)) : false
     const phoneMissing = evidence.phone ? !normalizeSearch(input.response).includes(normalizeSearch(evidence.phone).replace(/\s+/g, ' ')) : false
+    const hasUnsupportedFocusedPhone = contactFocusTokens(input.userMessage).length > 0
+        && !evidence.phone
+        && findPhoneMatches(input.response).length > 0
     const deniesDirectContact = normalizedResponse.includes('dogrudan') && (normalizedResponse.includes('bulunmuyor') || normalizedResponse.includes('yok'))
     const subjectMismatch = hasGenericContactSubjectMismatch(input.response, evidence, input.userMessage)
 
-    if (!emailMissing && !phoneMissing && !deniesDirectContact && !subjectMismatch) return null
+    if (!emailMissing && !phoneMissing && !hasUnsupportedFocusedPhone && !deniesDirectContact && !subjectMismatch) return null
 
     const parts = [
         evidence.personName ? `Sorumlu: ${evidence.personName}` : null,

@@ -250,6 +250,7 @@ function stripGenericSourceLinkPrefaceTail(response: string) {
 
     const patterns = [
         /\s*(?:Başka bir (?:konuda|sorunuz(?: varsa| var mı)?|bilgi(?:ye)?)[\s\S]{0,160}?(?:yardımcı olabilir(?:im|iz| miyim)|ihtiyac(?:ın|ınız) var mı|ister misin(?:iz)?)\??[.!?]?|Başka bir sorunuz var mı\??[.!?]?)\s*$/iu,
+        /\s*(?:Daha fazla|Detaylı)\s+(?:bilgi|detay)(?: almak)?\s+ister misin(?:iz)?\??[.!?]?\s*$/iu,
         /\s*(?:Daha fazla|Detaylı)\s+(?:bilgi|detay)(?: almak)?\s+istersen(?:iz)?[\s,]*$/iu,
         /\s*(?:Daha fazla|Detaylı)\s+(?:detay|bilgi)(?: almak)?\s+istersen(?:iz)?,?\s*(?:belirli\s+bir\s+)?[\p{L}\p{N}\s]{0,80}?(?:dönem|konu|program|birim)[\s\S]{0,120}?hakkında\s+bilgi\s+verebilir(?:im|iz)[.!?]?\s*$/iu,
         /\s*(?:Daha fazla|Detaylı)\s+(?:detay|bilgi)(?: almak)?\s+istersen(?:iz)?,?\s*hangi\s+[\s\S]{0,160}?(?:bilgi almak istediğini(?:z)?|hakkında merak ettiğini(?:z)?|ilgili olduğunu)[\s\S]{0,100}?(?:söyleyebilir|belirtebilir|söyle|belirt)[\p{L}]*[.!?]?\s*$/iu,

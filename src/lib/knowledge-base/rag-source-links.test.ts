@@ -60,6 +60,17 @@ describe('appendCanonicalRagSourceLinks', () => {
         expect(formatted).toBe('TLT yaz stajı 20 iş günü sürmektedir.\nhttps://example.edu.tr/tlt.pdf')
     })
 
+    it('removes generic more-information engagement questions before appending the canonical source link', () => {
+        const formatted = appendCanonicalRagSourceLinks('Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer. Daha fazla bilgi almak ister misin?', [{
+            source_url: 'https://example.edu.tr/tip.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer.\nhttps://example.edu.tr/tip.pdf')
+    })
+
     it('removes unspecified-topic help closings before appending the canonical source link', () => {
         const formatted = appendCanonicalRagSourceLinks('"Tlt" kısaltması, "Tıbbi Laboratuvar Teknikleri" programını ifade edebilir. Daha fazla bilgiye ihtiyaç duyarsan, belirli bir konu hakkında yardımcı olabilirim!', [{
             source_url: 'https://example.edu.tr/tlt.pdf'
