@@ -298,30 +298,48 @@ function extractDemoAnchorTokens(value: string) {
         .filter((token) => !stopwords.has(token))))
 }
 
-function contextualChunksContainHistoryAnchor(
-    chunks: RagChunk[],
-    conversationHistory: KnowledgeSearchPlanningTurn[]
-) {
-    const anchors = conversationHistory
+function historyAnchorTokenGroups(conversationHistory: KnowledgeSearchPlanningTurn[]) {
+    const latestAnchorTokens = [...conversationHistory]
+        .reverse()
         .filter((turn) => turn.role === 'user')
         .map((turn) => normalizeDemoKnowledgeQuery(turn.content))
         .filter((content) => content && !shouldUseDemoConversationHistoryForRag(content))
         .map(extractDemoAnchorTokens)
-        .filter((tokens) => tokens.length >= MIN_CONTEXTUAL_ANCHOR_TOKEN_COVERAGE)
+        .find((tokens) => tokens.length >= MIN_CONTEXTUAL_ANCHOR_TOKEN_COVERAGE)
 
+    return latestAnchorTokens ? [latestAnchorTokens] : []
+}
+
+function contextualChunkMatchesHistoryAnchor(chunk: RagChunk, anchors: string[][]) {
+    const searchable = normalizeDemoAnchorText([
+        chunk.document_title ?? '',
+        chunk.source_url ?? '',
+        chunk.content ?? ''
+    ].join('\n'))
+
+    return anchors.some((tokens) => (
+        tokens.filter((token) => searchable.includes(token)).length >= MIN_CONTEXTUAL_ANCHOR_TOKEN_COVERAGE
+    ))
+}
+
+function filterChunksByHistoryAnchor(
+    chunks: RagChunk[],
+    conversationHistory: KnowledgeSearchPlanningTurn[]
+) {
+    const anchors = historyAnchorTokenGroups(conversationHistory)
+    if (anchors.length === 0) return chunks
+
+    return chunks.filter((chunk) => contextualChunkMatchesHistoryAnchor(chunk, anchors))
+}
+
+function contextualChunksContainHistoryAnchor(
+    chunks: RagChunk[],
+    conversationHistory: KnowledgeSearchPlanningTurn[]
+) {
+    const anchors = historyAnchorTokenGroups(conversationHistory)
     if (anchors.length === 0) return false
 
-    return chunks.some((chunk) => {
-        const searchable = normalizeDemoAnchorText([
-            chunk.document_title ?? '',
-            chunk.source_url ?? '',
-            chunk.content ?? ''
-        ].join('\n'))
-
-        return anchors.some((tokens) => (
-            tokens.filter((token) => searchable.includes(token)).length >= MIN_CONTEXTUAL_ANCHOR_TOKEN_COVERAGE
-        ))
-    })
+    return chunks.some((chunk) => contextualChunkMatchesHistoryAnchor(chunk, anchors))
 }
 
 function demoRagChunkKey(chunk: RagChunk) {
@@ -716,7 +734,12 @@ async function buildExtractiveDemoChatReply(input: {
     const buildReplyFromResults = async (kbResults: RagChunk[]): Promise<DemoChatExtractiveReply | null> => {
         if (!kbResults || kbResults.length === 0) return null
 
-        const { context, chunks } = buildRagContext(kbResults)
+        const anchoredResults = hasConversationHistory
+            ? filterChunksByHistoryAnchor(kbResults, conversationHistory)
+            : kbResults
+        if (hasConversationHistory && anchoredResults.length === 0) return null
+
+        const { context, chunks } = buildRagContext(anchoredResults)
         if (!context || chunks.length === 0) return null
 
         const responseLanguage = resolveMvpResponseLanguage(message)

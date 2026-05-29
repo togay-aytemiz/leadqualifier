@@ -635,7 +635,7 @@ describe('demo chat API route', () => {
         }))
     })
 
-    it('does not answer contextual follow-ups with deterministic repair when grounded generation cannot validate evidence', async () => {
+    it('does not answer contextual follow-ups from chunks that miss the prior explicit topic anchor', async () => {
         const erasmusChunk = {
             content: 'Erasmus staj hareketliliği 2 ile 12 ay arasında yapılabilir.',
             document_id: 'doc-erasmus',
@@ -643,19 +643,6 @@ describe('demo chat API route', () => {
             source_url: 'https://example.edu.tr/erasmus.pdf',
         }
         searchKnowledgeBaseMock.mockResolvedValueOnce([erasmusChunk])
-        buildRagContextMock.mockReturnValueOnce({
-            context: erasmusChunk.content,
-            chunks: [erasmusChunk],
-            tokenCount: 12,
-        })
-        generateGroundedRagAnswerMock.mockResolvedValueOnce({
-            answer: 'NO_ANSWER',
-            usedGeneration: false,
-            addedEngagement: false,
-            usage: null,
-            model: 'gpt-4o-mini',
-        })
-        repairLinkOnlyRagAnswerMock.mockReturnValueOnce('Erasmus staj hareketliliği 2 ile 12 ay arasında yapılabilir.')
 
         const createConversationChain = () => {
             const chain = {
@@ -746,6 +733,8 @@ describe('demo chat API route', () => {
 
         expect(res.status).toBe(202)
         await expect(res.json()).resolves.toEqual({ pending: true })
+        expect(buildRagContextMock).not.toHaveBeenCalled()
+        expect(generateGroundedRagAnswerMock).not.toHaveBeenCalled()
         expect(repairLinkOnlyRagAnswerMock).not.toHaveBeenCalled()
         expect(appendCanonicalRagSourceLinksMock).not.toHaveBeenCalled()
     })
@@ -770,7 +759,9 @@ describe('demo chat API route', () => {
             usage: null,
             model: 'gpt-4o-mini',
         })
-        repairLinkOnlyRagAnswerMock.mockReturnValueOnce(null)
+        repairLinkOnlyRagAnswerMock.mockReturnValueOnce(
+            'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.'
+        )
         appendCanonicalRagSourceLinksMock.mockReturnValueOnce(
             'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.\nhttps://example.edu.tr/tlt.pdf'
         )
@@ -885,6 +876,139 @@ describe('demo chat API route', () => {
             expect.any(Object)
         )
         expect(repairLinkOnlyRagAnswerMock).toHaveBeenCalled()
+    })
+
+    it('anchors contextual follow-ups to the latest explicit topic instead of older conversation topics', async () => {
+        const olderChunk = {
+            content: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir.',
+            document_id: 'doc-sbf',
+            document_title: 'Sağlık Bilimleri Fakültesi',
+            source_url: 'https://example.edu.tr/sbf.pdf',
+        }
+        const latestChunk = {
+            content: 'Tıbbi Laboratuvar Teknikleri programında zorunlu yaz stajı 20 iş günü olarak uygulanır.',
+            document_id: 'doc-tlt',
+            document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+            source_url: 'https://example.edu.tr/tlt.pdf',
+        }
+        searchKnowledgeBaseMock.mockResolvedValueOnce([olderChunk, latestChunk])
+        buildRagContextMock.mockReturnValueOnce({
+            context: latestChunk.content,
+            chunks: [latestChunk],
+            tokenCount: 12,
+        })
+        generateGroundedRagAnswerMock.mockResolvedValueOnce({
+            answer: 'NO_ANSWER',
+            usedGeneration: false,
+            addedEngagement: false,
+            usage: null,
+            model: 'gpt-4o-mini',
+        })
+        repairLinkOnlyRagAnswerMock.mockReturnValueOnce(
+            'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.'
+        )
+        appendCanonicalRagSourceLinksMock.mockReturnValueOnce(
+            'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.\nhttps://example.edu.tr/tlt.pdf'
+        )
+
+        const conversationChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: { id: 'conversation-1' },
+                error: null,
+            })),
+        }
+        conversationChain.eq.mockReturnValue(conversationChain)
+
+        const completedMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(async () => ({
+                data: [],
+                error: null,
+            })),
+        }
+        completedMessagesChain.eq.mockReturnValue(completedMessagesChain)
+
+        const inboundMessagesChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: {
+                    id: 'contact-message-1',
+                    content: 'Bu programda staj kaç iş günü?',
+                },
+                error: null,
+            })),
+        }
+        inboundMessagesChain.eq.mockReturnValue(inboundMessagesChain)
+
+        const historyMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(),
+            limit: vi.fn(async () => ({
+                data: [
+                    {
+                        content: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı?',
+                        sender_type: 'contact',
+                        metadata: { demo_chat_message_id: 'latest-topic' },
+                    },
+                    {
+                        content: 'Sağlık Bilimleri Fakültesi kampüsü nerede?',
+                        sender_type: 'contact',
+                        metadata: { demo_chat_message_id: 'older-topic' },
+                    },
+                ],
+                error: null,
+            })),
+        }
+        historyMessagesChain.eq.mockReturnValue(historyMessagesChain)
+        historyMessagesChain.order.mockReturnValue(historyMessagesChain)
+
+        const botInsertChain = {
+            insert: vi.fn(async () => ({ error: null })),
+        }
+        const duplicateReplyChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: null,
+                error: null,
+            })),
+        }
+        duplicateReplyChain.eq.mockReturnValue(duplicateReplyChain)
+        const conversationUpdateChain = {
+            update: vi.fn(() => conversationUpdateChain),
+            eq: vi.fn(async () => ({ error: null })),
+        }
+
+        const conversations = [conversationChain, conversationChain, conversationChain, conversationChain]
+        const messagesTable = {
+            select: vi.fn((columns: string) => {
+                if (columns === 'id, content') return inboundMessagesChain
+                if (columns === 'content, sender_type, metadata') return historyMessagesChain
+                if (columns.includes('content, metadata')) return completedMessagesChain
+                if (columns === 'id') return duplicateReplyChain
+                return completedMessagesChain
+            }),
+            insert: botInsertChain.insert,
+        }
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                const chain = conversations.shift()
+                if (!chain) return conversationUpdateChain
+                return { select: vi.fn(() => chain), update: conversationUpdateChain.update }
+            }
+            if (table === 'messages') return messagesTable
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+
+        const res = await GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+            message: 'Bu programda staj kaç iş günü?',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        expect(buildRagContextMock).toHaveBeenCalledWith([latestChunk])
     })
 
     it('falls back to broader knowledge search during polling before the shared pipeline', async () => {
