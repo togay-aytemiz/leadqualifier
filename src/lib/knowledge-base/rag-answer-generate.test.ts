@@ -193,6 +193,7 @@ describe('generateGroundedRagAnswer', () => {
             expect(systemPrompt).toContain('Evidence ID: ev_1')
             expect(systemPrompt).toContain('Use only the evidence ids listed below')
             expect(systemPrompt).toContain('used_evidence_ids')
+            expect(systemPrompt).toContain('engagement_evidence_id')
             expect(systemPrompt).toContain('Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.')
 
             return {
@@ -229,6 +230,7 @@ describe('generateGroundedRagAnswer', () => {
                     content: JSON.stringify({
                         answer: 'Yaz stajı 20 iş günüdür.',
                         used_evidence_ids: ['ev_404'],
+                        support_quotes: ['Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.'],
                         engagement_question: '',
                         engagement_evidence_id: ''
                     })
