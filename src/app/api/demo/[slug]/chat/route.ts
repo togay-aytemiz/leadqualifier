@@ -174,6 +174,47 @@ function normalizeDemoKnowledgeQuery(value: string) {
     return value.replace(/\s+/g, ' ').trim()
 }
 
+function normalizeDemoScopeHelpText(value: string) {
+    return value
+        .toLocaleLowerCase('tr-TR')
+        .normalize('NFKD')
+        .replace(/\p{Diacritic}/gu, '')
+        .replace(/[ıİğĞüÜşŞöÖçÇ]/g, (char) => ({
+            ı: 'i',
+            İ: 'i',
+            ğ: 'g',
+            Ğ: 'g',
+            ü: 'u',
+            Ü: 'u',
+            ş: 's',
+            Ş: 's',
+            ö: 'o',
+            Ö: 'o',
+            ç: 'c',
+            Ç: 'c',
+        }[char] ?? char))
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
+function isDemoScopeHelpQuestion(message: string) {
+    const normalized = normalizeDemoScopeHelpText(message)
+    if (!normalized) return false
+
+    return /\b(?:hangi|ne|neler|what|which)\b.*\b(?:konu|konular|konularda|soru|sorabilirim|sorabilirsin|ask|topics?)\b/u.test(normalized)
+        || /\b(?:sana|size|asistana|assistant)?\s*(?:ne|neler)\s+sorabilirim\b/u.test(normalized)
+        || /\bwhat\s+can\s+i\s+ask\b/u.test(normalized)
+}
+
+function buildDemoScopeHelpReply(message: string) {
+    if (!isDemoScopeHelpQuestion(message)) return null
+
+    return resolveMvpResponseLanguage(message) === 'tr'
+        ? 'Bu demo asistana aday öğrenci, mevcut öğrenci ve idari personel senaryolarıyla soru sorabilirsiniz. Örneğin başvuru ve kayıt, programlar, kampüs veya adres, akademik takvim, yönetmelikler, ders/staj süreçleri ve birim iletişimleri hakkında sorabilirsiniz. Qualy hakkında bilgi için www.askqualy.com adresini ziyaret edebilirsiniz.'
+        : 'You can ask this demo assistant about prospective student, current student, and administrative staff scenarios. Good examples are admissions and registration, programs, campus or address, academic calendar, regulations, course/internship processes, and unit contact details. For Qualy, visit www.askqualy.com.'
+}
+
 function demoKnowledgeQueryKey(value: string) {
     return normalizeDemoKnowledgeQuery(value).toLocaleLowerCase('tr-TR')
 }
@@ -1373,6 +1414,14 @@ export async function POST(req: NextRequest, context: RouteContext) {
     if (!isDemoChatRequestAuthorized(req, channel)) {
         return NextResponse.json({ error: 'Demo access denied' }, { status: 401 })
     }
+    const scopeHelpReply = buildDemoScopeHelpReply(message)
+    if (scopeHelpReply) {
+        return NextResponse.json({
+            pending: false,
+            response: scopeHelpReply,
+            skillImage: null
+        })
+    }
     if (isDemoChatRateLimited({ req, channel, sessionId })) {
         return NextResponse.json({ error: 'Demo rate limit exceeded' }, { status: 429 })
     }
@@ -1411,6 +1460,15 @@ export async function GET(req: NextRequest, context: RouteContext) {
         })
 
         if (!completedReply) {
+            const scopeHelpReply = buildDemoScopeHelpReply(message)
+            if (scopeHelpReply) {
+                return NextResponse.json({
+                    pending: false,
+                    response: scopeHelpReply,
+                    skillImage: null
+                })
+            }
+
             if (isDemoChatRateLimited({ req, channel, sessionId })) {
                 return NextResponse.json({ error: 'Demo rate limit exceeded' }, { status: 429 })
             }

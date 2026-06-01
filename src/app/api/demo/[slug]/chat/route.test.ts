@@ -242,6 +242,58 @@ describe('demo chat API route', () => {
         expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
     })
 
+    it('answers demo scope-help questions immediately instead of entering the pending recovery loop', async () => {
+        const res = await POST(createRequest({
+            sessionId: 'session-1',
+            message: 'sana başka hangi konularda soru sorabilirim',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: expect.stringContaining('aday öğrenci'),
+            skillImage: null,
+        })
+        expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalled()
+        expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+    })
+
+    it('recovers already-pending demo scope-help polls without running RAG or the shared pipeline', async () => {
+        const conversationChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: null,
+                error: null,
+            })),
+        }
+        conversationChain.eq.mockReturnValue(conversationChain)
+
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                return { select: vi.fn(() => conversationChain) }
+            }
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+
+        const res = await GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+            message: 'sana başka hangi konularda soru sorabilirim',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: expect.stringContaining('aday öğrenci'),
+            skillImage: null,
+        })
+        expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalled()
+        expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+    })
+
     it('returns a completed pending reply from persisted demo bot messages', async () => {
         const conversationChain = {
             eq: vi.fn(),
