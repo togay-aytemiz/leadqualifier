@@ -98,6 +98,7 @@ const DURATION_UNIT_PATTERN = String.raw`(?:gün(?:ü)?|hafta|ay|yıl|saat|dakik
 const TURKISH_NUMBER_WORD_PATTERN = TURKISH_NUMBER_WORDS.join('|')
 const TEXT_BOUNDARY_END = String.raw`(?![\p{L}\p{N}_])`
 const PLATFORM_PATTERN = String.raw`(?:MEDU|UZEM|ÖBS|OBS|LMS|Moodle|Teams|Zoom)`
+const DOCUMENT_CODE_PATTERN = String.raw`(?:[A-ZÇĞİÖŞÜ]{2,}[-_/]?\d{2,}(?:[-_/]?[A-ZÇĞİÖŞÜ0-9]+)*)`
 const NUMERIC_DURATION_REGEX = new RegExp(
     `${TEXT_BOUNDARY_START}\\d+\\s*(?:iş\\s*)?${DURATION_UNIT_PATTERN}${DURATION_VALUE_END}`,
     'giu'
@@ -116,6 +117,8 @@ const TURKISH_WORD_DURATION_TEST_REGEX = new RegExp(
 )
 const PLATFORM_REGEX = new RegExp(`${TEXT_BOUNDARY_START}${PLATFORM_PATTERN}${TEXT_BOUNDARY_END}`, 'giu')
 const PLATFORM_TEST_REGEX = new RegExp(`${TEXT_BOUNDARY_START}${PLATFORM_PATTERN}${TEXT_BOUNDARY_END}`, 'iu')
+const DOCUMENT_CODE_REGEX = new RegExp(`${TEXT_BOUNDARY_START}${DOCUMENT_CODE_PATTERN}${TEXT_BOUNDARY_END}`, 'gu')
+const DOCUMENT_CODE_TEST_REGEX = new RegExp(`${TEXT_BOUNDARY_START}${DOCUMENT_CODE_PATTERN}${TEXT_BOUNDARY_END}`, 'u')
 
 function sourceUrlFor(chunk: RagChunk) {
     return chunk.source_url ?? chunk.sourceUrl ?? null
@@ -174,7 +177,7 @@ function extractCriticalValues(quote: string) {
     values.push(...extractRegexValues(quote, TURKISH_WORD_DURATION_REGEX))
     values.push(...extractRegexValues(quote, /%\s?\d+(?:[.,]\d+)?|\b\d+(?:[.,]\d+)?\s?%/g))
     values.push(...extractRegexValues(quote, PLATFORM_REGEX))
-    values.push(...extractRegexValues(quote, /\b[A-ZÇĞİÖŞÜ]{2,}[-_/]?\d{2,}(?:[-_/]?[A-ZÇĞİÖŞÜ0-9]+)*\b/g))
+    values.push(...extractRegexValues(quote, DOCUMENT_CODE_REGEX))
 
     return uniqueValues(values)
 }
@@ -185,8 +188,8 @@ function detectKind(quote: string): RagEvidenceKind | null {
     if (/https?:\/\/[^\s<>"')]+/i.test(quote)) return 'link'
     if (NUMERIC_DURATION_TEST_REGEX.test(quote)) return 'duration'
     if (TURKISH_WORD_DURATION_TEST_REGEX.test(quote)) return 'duration'
+    if (DOCUMENT_CODE_TEST_REGEX.test(quote)) return 'document_code'
     if (PLATFORM_TEST_REGEX.test(quote)) return 'platform'
-    if (/\b[A-ZÇĞİÖŞÜ]{2,}[-_/]?\d{2,}(?:[-_/]?[A-ZÇĞİÖŞÜ0-9]+)*\b/.test(quote)) return 'document_code'
     if (/%\s?\d+(?:[.,]\d+)?|\b\d+(?:[.,]\d+)?\s?%/.test(quote)) return 'policy'
     if (/(?:adres|mahalle|cadde|sokak|bulvar|no:|kat:|ilçe|kampüs|yerleşke|address)\b/i.test(quote)) return 'address'
     if (/(?:zorunlu|gerekli|şart|koşul|politika|kural|yönetmelik|başvuru|teslim|policy|required|must)\b/i.test(quote)) return 'policy'
@@ -235,6 +238,26 @@ function dedupeKey(chunk: RagChunk, quote: string) {
     const source = normalizeText(sourceUrlFor(chunk) ?? '')
     const documentId = normalizeText(chunk.document_id ?? '')
     return `${source}|${documentId}|${normalizeText(quote)}`
+}
+
+function sourceChunkKey(chunk: RagChunk) {
+    if (chunk.chunk_id) return `chunk:${chunk.chunk_id}`
+
+    return [
+        'content',
+        normalizeText(sourceUrlFor(chunk) ?? ''),
+        normalizeText(chunk.document_id ?? ''),
+        normalizeText(chunk.content)
+    ].join('|')
+}
+
+function hasSameEvidenceSource(chunk: RagChunk, item: RagEvidenceItem) {
+    return normalizeText(sourceUrlFor(chunk) ?? '') === normalizeText(item.sourceUrl ?? '')
+        && normalizeText(chunk.document_id ?? '') === normalizeText(item.documentId ?? '')
+}
+
+function chunkContainsQuote(chunk: RagChunk, quote: string) {
+    return normalizeText(chunk.content).includes(normalizeText(quote))
 }
 
 export function buildRagEvidencePack<T extends RagChunk = RagChunk>({
@@ -286,7 +309,7 @@ export function buildRagEvidencePack<T extends RagChunk = RagChunk>({
     const selectedChunks: T[] = []
     const selectedChunkKeys = new Set<string>()
     const items = selectedCandidates.map((candidate, itemIndex) => {
-        const chunkKey = candidate.chunk.chunk_id ?? candidate.chunk.document_id ?? String(candidate.index)
+        const chunkKey = sourceChunkKey(candidate.chunk)
         if (!selectedChunkKeys.has(chunkKey)) {
             selectedChunkKeys.add(chunkKey)
             selectedChunks.push(candidate.chunk)
@@ -341,14 +364,22 @@ export function collectEvidenceSourceChunks<T extends RagChunk = RagChunk>(
     const chunks: T[] = []
     const seen = new Set<string>()
 
+    if (evidenceIds.length === 0) {
+        return pack.chunks.slice(0, fallbackLimit)
+    }
+
+    if (selectedItems.length === 0) {
+        return chunks
+    }
+
     for (const item of selectedItems) {
         const chunk = item.chunkId
             ? pack.chunks.find((candidate) => candidate.chunk_id === item.chunkId)
-            : pack.chunks.find((candidate) => candidate.document_id === item.documentId)
+            : pack.chunks.find((candidate) => hasSameEvidenceSource(candidate, item) && chunkContainsQuote(candidate, item.quote))
 
         if (!chunk) continue
 
-        const key = chunk.chunk_id ?? chunk.document_id ?? chunk.content
+        const key = sourceChunkKey(chunk)
         if (seen.has(key)) continue
         seen.add(key)
         chunks.push(chunk)
@@ -358,5 +389,5 @@ export function collectEvidenceSourceChunks<T extends RagChunk = RagChunk>(
         return chunks
     }
 
-    return pack.chunks.slice(0, fallbackLimit)
+    return chunks
 }

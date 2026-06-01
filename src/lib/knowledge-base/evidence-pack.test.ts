@@ -83,6 +83,23 @@ describe('buildRagEvidencePack', () => {
         expect(pack.items[0]?.criticalValues).toContain('ÖBS')
     })
 
+    it('extracts Turkish-initial document codes without dropping the first letter', () => {
+        const pack = buildRagEvidencePack({
+            userMessage: 'İSG ders kodu nedir?',
+            chunks: [{
+                chunk_id: 'chunk-isg-code',
+                document_id: 'doc-isg-code',
+                document_title: 'Ders Kodları',
+                source_url: 'https://example.edu.tr/codes.pdf',
+                content: 'Ders kodu İSG-101 olarak listelenir.'
+            }]
+        })
+
+        expect(pack.items[0]?.kind).toBe('document_code')
+        expect(pack.items[0]?.criticalValues).toContain('İSG-101')
+        expect(pack.items[0]?.criticalValues).not.toContain('SG-101')
+    })
+
     it('keeps all critical values found in the selected quote', () => {
         const pack = buildRagEvidencePack({
             userMessage: 'MEDU bağlantısı ve devam şartı nedir?',
@@ -194,5 +211,56 @@ describe('buildRagEvidencePack', () => {
 
         expect(chunks).toHaveLength(1)
         expect(chunks[0]?.chunk_id).toBe('chunk-tlt')
+    })
+
+    it('returns no chunks when requested evidence ids do not match', () => {
+        const pack = buildRagEvidencePack({
+            userMessage: 'TLT yaz stajı kaç gün?',
+            chunks: [
+                {
+                    chunk_id: 'chunk-tlt',
+                    document_id: 'doc-tlt',
+                    document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+                    source_url: sourceUrl,
+                    content: 'Yaz Stajı süresi 20 iş günüdür.'
+                },
+                {
+                    chunk_id: 'chunk-other',
+                    document_id: 'doc-other',
+                    document_title: 'Genel Akademik Bilgi',
+                    source_url: 'https://example.edu.tr/other.pdf',
+                    content: 'Başvurular ilgili takvimde açıklanır.'
+                }
+            ]
+        })
+
+        expect(collectEvidenceSourceChunks(pack, ['ev_missing'])).toHaveLength(0)
+    })
+
+    it('selects the matching chunk for same-document evidence without chunk ids', () => {
+        const pack = buildRagEvidencePack({
+            userMessage: 'Staj kaç gün?',
+            chunks: [
+                {
+                    document_id: 'doc-shared',
+                    document_title: 'Staj Rehberi',
+                    source_url: sourceUrl,
+                    content: 'Birinci staj süresi 10 iş günüdür.'
+                },
+                {
+                    document_id: 'doc-shared',
+                    document_title: 'Staj Rehberi',
+                    source_url: sourceUrl,
+                    content: 'İkinci staj süresi 20 iş günüdür.'
+                }
+            ]
+        })
+        const selected = pack.items.find((item) => item.quote.includes('İkinci staj'))
+        expect(selected).toBeTruthy()
+
+        const chunks = collectEvidenceSourceChunks(pack, selected ? [selected.id] : [])
+
+        expect(chunks).toHaveLength(1)
+        expect(chunks[0]?.content).toBe('İkinci staj süresi 20 iş günüdür.')
     })
 })
