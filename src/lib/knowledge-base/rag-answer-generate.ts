@@ -2,7 +2,13 @@ import { DEFAULT_FLEXIBLE_PROMPT, withBotNamePrompt } from '@/lib/ai/prompts'
 import { AiTimeoutError, resolveAiTimeoutMs } from '@/lib/ai/deadline'
 import type { MvpResponseLanguage } from '@/lib/ai/language'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
-import { buildRagContext, type RagChunk } from '@/lib/knowledge-base/rag'
+import type { RagChunk } from '@/lib/knowledge-base/rag'
+import {
+    buildEvidencePackContext,
+    buildRagEvidencePack,
+    collectEvidenceSourceChunks,
+    type RagEvidencePack
+} from '@/lib/knowledge-base/evidence-pack'
 
 type RagAnswerGenerateSettings = {
     prompt?: string | null
@@ -50,17 +56,22 @@ export type RagAnswerGenerateResult = {
     addedEngagement: boolean
     usage: RagAnswerGenerateUsage | null
     model: string
+    evidencePack?: RagEvidencePack
+    usedEvidenceIds?: string[]
+    sourceChunks?: RagChunk[]
 }
 
 type GeneratePayload = {
     answer: string
     supportQuotes: string[]
+    usedEvidenceIds: string[]
+    hasUsedEvidenceIds: boolean
     engagementQuestion: string
     engagementEvidence: string
+    engagementEvidenceId: string
 }
 
 const DEFAULT_RAG_GENERATE_MODEL = 'gpt-4o-mini'
-const RAG_GENERATE_MAX_CONTEXT_TOKENS = 1200
 const RAG_GENERATE_MAX_OUTPUT_TOKENS = 320
 
 const TURKISH_CHAR_MAP: Record<string, string> = {
@@ -181,8 +192,11 @@ function parseGeneratePayload(content: string): GeneratePayload | null {
         return {
             answer,
             supportQuotes: readStringArray(parsed.support_quotes),
+            usedEvidenceIds: readStringArray(parsed.used_evidence_ids),
+            hasUsedEvidenceIds: Object.prototype.hasOwnProperty.call(parsed, 'used_evidence_ids'),
             engagementQuestion: readString(parsed.engagement_question),
-            engagementEvidence: readString(parsed.engagement_evidence)
+            engagementEvidence: readString(parsed.engagement_evidence),
+            engagementEvidenceId: readString(parsed.engagement_evidence_id)
         }
     } catch {
         return null
@@ -283,6 +297,31 @@ function hasContextQuote(context: string, quote: string) {
 
 function hasAnySupportQuote(context: string, quotes: string[]) {
     return quotes.some((quote) => hasContextQuote(context, quote))
+}
+
+function evidenceItemMap(pack: RagEvidencePack) {
+    return new Map(pack.items.map((item) => [item.id, item]))
+}
+
+function hasValidEvidenceSelection(pack: RagEvidencePack, evidenceIds: string[]) {
+    if (evidenceIds.length === 0) return false
+
+    const itemsById = evidenceItemMap(pack)
+    return evidenceIds.every((id) => itemsById.has(id))
+}
+
+function selectedEvidenceText(pack: RagEvidencePack, evidenceIds: string[]) {
+    const itemsById = evidenceItemMap(pack)
+
+    return evidenceIds
+        .map((id) => itemsById.get(id))
+        .filter((item): item is NonNullable<typeof item> => Boolean(item))
+        .map((item) => [
+            item.fact,
+            item.quote,
+            ...item.criticalValues
+        ].filter(Boolean).join('\n'))
+        .join('\n\n')
 }
 
 function criticalFactsSupported(answer: string, context: string) {
@@ -395,6 +434,25 @@ function isEngagementSafe(input: {
     return hasEngagementEvidenceOverlap(`${input.userMessage} ${input.answer}`, evidence)
 }
 
+function isEngagementEvidenceIdSafe(input: {
+    pack: RagEvidencePack
+    answer: string
+    userMessage: string
+    engagementQuestion: string
+    engagementEvidenceId: string
+}) {
+    const item = evidenceItemMap(input.pack).get(input.engagementEvidenceId)
+    if (!item) return false
+
+    return isEngagementSafe({
+        answer: input.answer,
+        userMessage: input.userMessage,
+        engagementQuestion: input.engagementQuestion,
+        engagementEvidence: item.quote,
+        context: item.quote
+    })
+}
+
 function composeAnswer(answer: string, engagementQuestion: string, shouldAddEngagement: boolean) {
     const trimmedAnswer = answer.trim()
     const trimmedEngagement = engagementQuestion.trim()
@@ -427,6 +485,8 @@ If the context does not contain enough evidence to answer, return answer as "NO_
 Do not add facts, names, dates, numbers, contact details, rules, links, eligibility claims, or next steps that are not in the context.
 Do not include source URLs in the answer; source links are added by the application.
 Every factual answer must include at least one exact support quote copied from the context in support_quotes.
+Use only the evidence ids listed below. Prefer the evidence-id contract for new answers: include used_evidence_ids with one or more evidence IDs that support the answer.
+When adding an engagement question from evidence, include engagement_evidence_id instead of unsupported free text.
 For exact fields such as person names, fees, dates, document numbers, quotas, phone numbers, email addresses, addresses, durations, and percentages, copy values exactly.
 If sources conflict, answer only the part supported by the best matching quote and avoid unsupported certainty.
 Use recent conversation only to resolve references such as "this program", "there", or "it"; the factual answer must still be grounded in the context quotes.
@@ -438,8 +498,10 @@ Do not ask about the user's role, status, department, or identity. Do not add ge
 Return JSON only:
 {
   "answer": "grounded answer without source URLs",
+  "used_evidence_ids": ["one or more evidence IDs that support the answer"],
   "support_quotes": ["one or more exact quotes from the context supporting the answer"],
   "engagement_question": "optional short grounded follow-up question or offer",
+  "engagement_evidence_id": "optional evidence ID supporting the engagement",
   "engagement_evidence": "exact quote from the context supporting the engagement"
 }
 
@@ -482,6 +544,7 @@ export async function generateGroundedRagAnswer(input: {
     chunks: RagChunk[]
     settings?: RagAnswerGenerateSettings
     conversationHistory?: RagConversationTurn[]
+    evidencePack?: RagEvidencePack
     model?: string
     timeoutMs?: number
     createCompletion?: CreateCompletion
@@ -489,7 +552,11 @@ export async function generateGroundedRagAnswer(input: {
     const model = resolveRagGenerateModel(input.model)
     if (!input.userMessage.trim() || input.chunks.length === 0) return fallbackResult(model)
 
-    const { context } = buildRagContext(input.chunks, { maxTokens: RAG_GENERATE_MAX_CONTEXT_TOKENS })
+    const evidencePack = input.evidencePack ?? buildRagEvidencePack({
+        userMessage: input.userMessage,
+        chunks: input.chunks
+    })
+    const context = buildEvidencePackContext(evidencePack)
     if (!context.trim()) return fallbackResult(model)
 
     const systemPrompt = buildSystemPrompt({
@@ -525,27 +592,47 @@ export async function generateGroundedRagAnswer(input: {
     })
     if (!payload) return fallbackResult(model, usage)
 
-    if (!hasAnySupportQuote(context, payload.supportQuotes)) {
+    const usesEvidenceIds = payload.hasUsedEvidenceIds
+    if (usesEvidenceIds && !hasValidEvidenceSelection(evidencePack, payload.usedEvidenceIds)) {
         return fallbackResult(model, usage)
     }
 
-    if (!criticalFactsSupported(payload.answer, context)) {
+    if (!usesEvidenceIds && !hasAnySupportQuote(context, payload.supportQuotes)) {
         return fallbackResult(model, usage)
     }
 
-    const shouldAddEngagement = isEngagementSafe({
-        answer: payload.answer,
-        userMessage: input.userMessage,
-        engagementQuestion: payload.engagementQuestion,
-        engagementEvidence: payload.engagementEvidence,
-        context
-    })
+    const supportContext = usesEvidenceIds
+        ? selectedEvidenceText(evidencePack, payload.usedEvidenceIds)
+        : context
+
+    if (!criticalFactsSupported(payload.answer, supportContext)) {
+        return fallbackResult(model, usage)
+    }
+
+    const shouldAddEngagement = payload.engagementEvidenceId
+        ? isEngagementEvidenceIdSafe({
+            pack: evidencePack,
+            answer: payload.answer,
+            userMessage: input.userMessage,
+            engagementQuestion: payload.engagementQuestion,
+            engagementEvidenceId: payload.engagementEvidenceId
+        })
+        : isEngagementSafe({
+            answer: payload.answer,
+            userMessage: input.userMessage,
+            engagementQuestion: payload.engagementQuestion,
+            engagementEvidence: payload.engagementEvidence,
+            context
+        })
 
     return {
         answer: composeAnswer(payload.answer, payload.engagementQuestion, shouldAddEngagement),
         usedGeneration: true,
         addedEngagement: shouldAddEngagement,
         usage,
-        model
+        model,
+        evidencePack,
+        usedEvidenceIds: usesEvidenceIds ? payload.usedEvidenceIds : undefined,
+        sourceChunks: usesEvidenceIds ? collectEvidenceSourceChunks(evidencePack, payload.usedEvidenceIds) : undefined
     }
 }
