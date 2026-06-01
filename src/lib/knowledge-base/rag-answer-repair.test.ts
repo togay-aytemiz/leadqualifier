@@ -1605,6 +1605,32 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).not.toContain('kutuphane@yuksekihtisas.edu.tr')
     })
 
+    it('does not slide from the requested program contact to the next adjacent program email', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Tıbbi Laboratuvar Teknikleri Programı iletişim bilgisi: E-posta: tst@yiu.edu.tr.',
+            userMessage: 'TLT program sorumlusunun iletişim bilgisi nedir?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'İletişim',
+                    content: [
+                        'Tıbbi Laboratuvar Teknikleri Program Başkanı',
+                        '(+90 312 329 1010)',
+                        '331',
+                        'tlt@yiu.edu.tr',
+                        'Tele-Sağlık Teknikerliği',
+                        '(+90 312 329 1010)',
+                        '334',
+                        'tst@yiu.edu.tr'
+                    ].join('\n')
+                }
+            ]
+        })
+
+        expect(repaired).toContain('E-posta: tlt@yiu.edu.tr')
+        expect(repaired).not.toContain('tst@yiu.edu.tr')
+    })
+
     it('skips unrelated contact rows before using the retrieved subject-matched program contact chunk', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Kurum iletişim bilgisi: Telefon: +90 312 329 10 10 - E-posta: kutuphane@yuksekihtisas.edu.tr.',

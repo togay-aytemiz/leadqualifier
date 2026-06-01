@@ -1550,6 +1550,16 @@ const CONTACT_FOCUS_STOPWORDS = new Set([
     'ihtisas'
 ].map(normalizeSearch))
 
+const CONTACT_FOCUS_STOPWORD_PREFIXES = [
+    'baskan',
+    'bilgi',
+    'iletisim',
+    'numara',
+    'program',
+    'sorumlu',
+    'telefon'
+]
+
 type ContactEvidence = {
     email: string | null
     phone: string | null
@@ -1585,7 +1595,11 @@ function contactFocusTokens(userMessage: string) {
 
     return Array.from(new Set(rawTokens
         .map((token) => token.replace(/[^\p{L}\p{N}]+/gu, ''))
-        .filter((token) => token.length >= 3 && !CONTACT_FOCUS_STOPWORDS.has(token))))
+        .filter((token) => (
+            token.length >= 3
+            && !CONTACT_FOCUS_STOPWORDS.has(token)
+            && !CONTACT_FOCUS_STOPWORD_PREFIXES.some((prefix) => token.startsWith(prefix))
+        ))))
 }
 
 function contactFocusAcronyms(tokens: string[]) {
