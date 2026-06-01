@@ -230,6 +230,25 @@ describe('appendCanonicalRagSourceLinks', () => {
         )
     })
 
+    it('does not append extra learning-material sources that omit the named platform', () => {
+        const formatted = appendCanonicalRagSourceLinks('Ders içeriği ve materyalleri ÖBS üzerinden öğrencilerle paylaşılır.', [
+            {
+                source_url: 'https://example.edu.tr/shmyo-obs.pdf',
+                content: 'Ders içeriği ve ders materyalleri ÖBS üzerinden öğrencilerle paylaşılır.'
+            },
+            {
+                source_url: 'https://example.edu.tr/engelli-danismanlari.pdf',
+                content: 'Öğrencilerin ders uyarlama ve sınav düzenlemeleri için öğretim elemanlarıyla iletişim kurulur.'
+            }
+        ], {
+            force: true,
+            limit: 2
+        })
+
+        expect(formatted).toBe('Ders içeriği ve materyalleri ÖBS üzerinden öğrencilerle paylaşılır.\nhttps://example.edu.tr/shmyo-obs.pdf')
+        expect(formatted).not.toContain('engelli-danismanlari')
+    })
+
     it('removes dangling more-info prefaces before source links', () => {
         const formatted = appendCanonicalRagSourceLinks('Evet, TLT programında yaz stajı vardır ve 20 iş günüdür. Daha fazla bilgi istersen,', [{
             source_url: 'https://example.edu.tr/tlt.pdf'

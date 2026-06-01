@@ -4,6 +4,8 @@ function readTrimmedString(value: unknown): string | null {
     return trimmed.length > 0 ? trimmed : null
 }
 
+const PLATFORM_SOURCE_EVIDENCE = ['uzem', 'medu', 'obs'] as const
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -71,6 +73,12 @@ function normalizeConcreteEvidenceValue(value: string) {
         .trim()
 }
 
+function extractPlatformEvidence(value: string) {
+    const normalized = normalizeEvidenceText(value)
+
+    return PLATFORM_SOURCE_EVIDENCE.filter((platform) => normalized.includes(platform))
+}
+
 function extractConcreteValueEvidence(value: string) {
     const normalized = normalizeEvidenceText(value)
     const turkishNumberWordDurations = normalized.match(
@@ -80,7 +88,8 @@ function extractConcreteValueEvidence(value: string) {
     return Array.from(new Set([
         ...(value.match(/\d+(?:[.,]\d+)?\s*(?:iş\s*günü|is\s*gunu|gün|gun|ay|yıl|yil|saat|dakika|akts|kredi|puan)/giu) ?? []),
         ...(value.match(/%\s*\d+(?:[.,]\d+)?|\b\d+(?:[.,]\d+)?\s*%/gu) ?? []),
-        ...turkishNumberWordDurations
+        ...turkishNumberWordDurations,
+        ...extractPlatformEvidence(value)
     ].map(normalizeConcreteEvidenceValue).filter(Boolean)))
 }
 
@@ -181,7 +190,7 @@ function sourceEvidenceScore(response: string, chunk: unknown) {
     for (const concreteValue of extractConcreteValueEvidence(response)) {
         if (searchable.includes(concreteValue)) score += 4
     }
-    for (const platform of ['uzem', 'medu', 'obs']) {
+    for (const platform of PLATFORM_SOURCE_EVIDENCE) {
         if (normalizedResponse.includes(platform) && searchable.includes(platform)) score += 2.2
     }
 
