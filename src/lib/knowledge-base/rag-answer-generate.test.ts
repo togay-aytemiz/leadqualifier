@@ -257,6 +257,7 @@ describe('generateGroundedRagAnswer', () => {
                     content: JSON.stringify({
                         answer: 'Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.',
                         used_evidence_ids: ['ev_1'],
+                        support_quotes: ['Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.'],
                         engagement_question: 'İstersen sınav takvimini de gösterebilirim.',
                         engagement_evidence_id: 'ev_99'
                     })
