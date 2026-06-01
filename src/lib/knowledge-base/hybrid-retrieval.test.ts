@@ -102,4 +102,40 @@ describe('mergeHybridRagResults', () => {
             }
         })
     })
+
+    it('keeps first-seen order stable when fused scores tie', () => {
+        const firstSeenLowerSimilarity: TestChunk = {
+            chunk_id: 'chunk-first',
+            document_id: 'doc-first',
+            document_title: 'İlk Sonuç',
+            document_type: 'article',
+            content: 'İlk sonuç.',
+            similarity: 0.2
+        }
+        const secondSeenHigherSimilarity: TestChunk = {
+            chunk_id: 'chunk-second',
+            document_id: 'doc-second',
+            document_title: 'İkinci Sonuç',
+            document_type: 'article',
+            content: 'İkinci sonuç.',
+            similarity: 0.99
+        }
+
+        const results = mergeHybridRagResults({
+            query: 'eşit skor',
+            limit: 2,
+            channels: [
+                {
+                    name: 'vector',
+                    results: [firstSeenLowerSimilarity]
+                },
+                {
+                    name: 'keyword',
+                    results: [secondSeenHigherSimilarity]
+                }
+            ]
+        })
+
+        expect(results.map((result) => result.chunk_id)).toEqual(['chunk-first', 'chunk-second'])
+    })
 })

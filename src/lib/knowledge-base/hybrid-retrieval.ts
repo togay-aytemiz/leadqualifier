@@ -104,9 +104,6 @@ export function mergeHybridRagResults<T extends RagChunk>({
             const scoreDelta = right.score - left.score
             if (scoreDelta !== 0) return scoreDelta
 
-            const similarityDelta = right.bestSimilarity - left.bestSimilarity
-            if (similarityDelta !== 0) return similarityDelta
-
             return left.firstSeenIndex - right.firstSeenIndex
         })
         .slice(0, limit)
