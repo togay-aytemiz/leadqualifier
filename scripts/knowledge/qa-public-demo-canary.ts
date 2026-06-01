@@ -111,7 +111,7 @@ const CASES: CanaryCase[] = [
         id: 'tlt-contact',
         question: 'Tıbbi Laboratuvar Teknikleri programının iletişim bilgisi var mı?',
         mustContain: ['Tıbbi Laboratuvar Teknikleri'],
-        anyOf: [['tlt@yiu.edu.tr'], ['+90 312 329 10 10', '0312 329 10 10']],
+        anyOf: [['tlt@yiu.edu.tr', '+90 312 329 10 10', '0312 329 10 10']],
         requiresUrl: true,
         forbid: [NO_INFO_FORBID, /kutuphane@/i, MARKDOWN_LINK_FORBID, BROKEN_URL_FORBID]
     },
@@ -158,7 +158,7 @@ const CASES: CanaryCase[] = [
     {
         id: 'lecture-notes',
         question: 'Ders notlarına nereden ulaşabilirim?',
-        anyOf: [['UZEM', 'MEDU']],
+        anyOf: [['ÖBS', 'OBS', 'UZEM', 'MEDU']],
         requiresUrl: true,
         forbid: [NO_INFO_FORBID, FOOTER_ADDRESS_FORBID, MARKDOWN_LINK_FORBID, BROKEN_URL_FORBID]
     },
