@@ -17,6 +17,7 @@ const {
     openAiCreateMock,
     polishGroundedRagAnswerMock,
     recordAiUsageMock,
+    appendCanonicalRagSourceLinksMock,
     resolveOrganizationUsageEntitlementMock,
     resolveBotModeActionMock,
     resolveLeadExtractionAllowanceMock,
@@ -41,6 +42,7 @@ const {
     openAiCreateMock: vi.fn(),
     polishGroundedRagAnswerMock: vi.fn(),
     recordAiUsageMock: vi.fn(),
+    appendCanonicalRagSourceLinksMock: vi.fn(),
     resolveOrganizationUsageEntitlementMock: vi.fn(),
     resolveBotModeActionMock: vi.fn(),
     resolveLeadExtractionAllowanceMock: vi.fn(),
@@ -87,6 +89,16 @@ vi.mock('@/lib/knowledge-base/rag-answer-polish', () => ({
 vi.mock('@/lib/knowledge-base/rag-answer-generate', () => ({
     generateGroundedRagAnswer: generateGroundedRagAnswerMock
 }))
+
+vi.mock('@/lib/knowledge-base/rag-source-links', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@/lib/knowledge-base/rag-source-links')>()
+    appendCanonicalRagSourceLinksMock.mockImplementation(actual.appendCanonicalRagSourceLinks)
+
+    return {
+        ...actual,
+        appendCanonicalRagSourceLinks: appendCanonicalRagSourceLinksMock
+    }
+})
 
 vi.mock('@/lib/knowledge-base/actions', () => ({
     searchKnowledgeBase: searchKnowledgeBaseMock
@@ -2146,7 +2158,7 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })
 
-    it('uses grounded RAG generation before free-form RAG completion when support evidence is valid', async () => {
+    it('uses selected grounded generation sources for inbound polish and source links', async () => {
         process.env.OPENAI_API_KEY = 'test-openai-key'
 
         const sendOutbound = vi.fn(async () => undefined)
@@ -2169,13 +2181,30 @@ describe('processInboundAiPipeline guardrails', () => {
             extracted_fields: {}
         })
         const chunk = {
-            document_id: 'doc-1',
-            content: 'Güzellik merkezimizde cilt bakımı ve lazer epilasyon hizmetleri sunuyoruz.'
+            content: 'Yaz Stajı süresi 20 iş günüdür.',
+            document_id: 'doc-tlt',
+            document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+            chunk_id: 'chunk-tlt',
+            source_url: 'https://example.edu.tr/tlt.pdf'
         }
+        const broadChunk = {
+            content: 'Hemşirelik programında farklı klinik uygulama süreleri bulunur.',
+            document_id: 'doc-noise',
+            document_title: 'Hemşirelik Programı',
+            chunk_id: 'chunk-noise',
+            source_url: 'https://example.edu.tr/noise.pdf'
+        }
+        const selectedSourceChunks = [{
+            content: 'Yaz Stajı süresi 20 iş günüdür.',
+            document_id: 'doc-tlt',
+            document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+            chunk_id: 'chunk-tlt',
+            source_url: 'https://example.edu.tr/tlt.pdf'
+        }]
 
         decideKnowledgeBaseRouteMock.mockResolvedValue({
             route_to_kb: true,
-            rewritten_query: 'hizmet bilgisi',
+            rewritten_query: 'TLT yaz stajı süresi',
             reason: 'knowledge_question',
             usage: {
                 inputTokens: 10,
@@ -2183,24 +2212,26 @@ describe('processInboundAiPipeline guardrails', () => {
                 totalTokens: 14
             }
         })
-        searchKnowledgeBaseMock.mockResolvedValue([chunk])
+        searchKnowledgeBaseMock.mockResolvedValue([chunk, broadChunk])
         buildRagContextMock.mockReturnValue({
             context: chunk.content,
-            chunks: [chunk],
+            chunks: [chunk, broadChunk],
             tokenCount: 10
         })
         generateGroundedRagAnswerMock.mockResolvedValueOnce({
-            answer: 'Tabii, cilt bakımı ve lazer epilasyon hizmetleri mevcut.',
+            answer: 'TLT yaz stajı 20 iş günüdür.',
             usedGeneration: true,
             addedEngagement: false,
-            usage: { inputTokens: 90, outputTokens: 18, totalTokens: 108 },
-            model: 'gpt-4o-mini'
+            usage: null,
+            model: 'gpt-4o-mini',
+            usedEvidenceIds: ['ev_1'],
+            sourceChunks: selectedSourceChunks
         })
         polishGroundedRagAnswerMock.mockResolvedValueOnce({
-            answer: 'Elbette, cilt bakımı ve lazer epilasyon hizmetleri mevcut.\n\nİstersen bu hizmetlerin kapsamını da kısaca anlatabilirim.',
+            answer: 'TLT yaz stajı 20 iş günüdür.',
             usedPolish: true,
-            addedEngagement: true,
-            usage: { inputTokens: 80, outputTokens: 24, totalTokens: 104 },
+            addedEngagement: false,
+            usage: null,
             model: 'gpt-4o-mini'
         })
 
@@ -2214,52 +2245,33 @@ describe('processInboundAiPipeline guardrails', () => {
         matchSkillsSafelyMock.mockResolvedValueOnce([])
 
         await processInboundAiPipeline(
-            buildInput(supabase, sendOutbound, { text: 'hizmetleriniz hakkında bilgi almak istiyorum' })
+            buildInput(supabase, sendOutbound, { text: 'TLT yaz stajı kaç gün?' })
         )
 
         expect(generateGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
-            userMessage: 'hizmetleriniz hakkında bilgi almak istiyorum',
+            userMessage: 'TLT yaz stajı kaç gün?',
             responseLanguage: 'tr',
-            chunks: [chunk],
+            chunks: [chunk, broadChunk],
             conversationHistory: expect.any(Array)
         }))
         expect(openAiCreateMock).not.toHaveBeenCalledWith(expect.objectContaining({
             messages: expect.arrayContaining([
                 expect.objectContaining({ role: 'system' }),
-                expect.objectContaining({ role: 'user', content: 'hizmetleriniz hakkında bilgi almak istiyorum' })
+                expect.objectContaining({ role: 'user', content: 'TLT yaz stajı kaç gün?' })
             ])
         }))
         expect(polishGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
-            answer: 'Tabii, cilt bakımı ve lazer epilasyon hizmetleri mevcut.',
-            userMessage: 'hizmetleriniz hakkında bilgi almak istiyorum',
+            answer: 'TLT yaz stajı 20 iş günüdür.',
+            userMessage: 'TLT yaz stajı kaç gün?',
             responseLanguage: 'tr',
-            chunks: [chunk]
+            chunks: [expect.objectContaining({ document_id: 'doc-tlt' })]
         }))
-        expect(sendOutbound).toHaveBeenCalledWith('Elbette, cilt bakımı ve lazer epilasyon hizmetleri mevcut.\n\nİstersen bu hizmetlerin kapsamını da kısaca anlatabilirim.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
-        expect(recordAiUsageMock).toHaveBeenCalledWith(expect.objectContaining({
-            organizationId: 'org-1',
-            category: 'rag',
-            model: 'gpt-4o-mini',
-            inputTokens: 90,
-            outputTokens: 18,
-            totalTokens: 108,
-            metadata: expect.objectContaining({
-                source: 'rag_grounded_generate',
-                response_kind: 'rag_grounded_generate'
-            })
-        }))
-        expect(recordAiUsageMock).toHaveBeenCalledWith(expect.objectContaining({
-            organizationId: 'org-1',
-            category: 'rag',
-            model: 'gpt-4o-mini',
-            inputTokens: 80,
-            outputTokens: 24,
-            totalTokens: 104,
-            metadata: expect.objectContaining({
-                source: 'rag_grounded_generate_polish',
-                response_kind: 'rag_grounded_generate_polish'
-            })
-        }))
+        expect(appendCanonicalRagSourceLinksMock).toHaveBeenCalledWith(
+            expect.stringContaining('20 iş günüdür'),
+            [expect.objectContaining({ document_id: 'doc-tlt' })],
+            expect.objectContaining({ force: true })
+        )
+        expect(sendOutbound).toHaveBeenCalledWith('TLT yaz stajı 20 iş günüdür.\nhttps://example.edu.tr/tlt.pdf\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
         expect(botInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({
             metadata: expect.objectContaining({
                 rag_generate: {
@@ -2269,7 +2281,7 @@ describe('processInboundAiPipeline guardrails', () => {
                 },
                 rag_polish: {
                     usedPolish: true,
-                    addedEngagement: true,
+                    addedEngagement: false,
                     model: 'gpt-4o-mini'
                 }
             })

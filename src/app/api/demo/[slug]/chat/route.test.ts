@@ -1704,44 +1704,55 @@ describe('demo chat API route', () => {
         }))
     })
 
-    it('repairs grounded generated demo answers before appending source links', async () => {
+    it('uses selected grounded generation sources for demo repair, polish, and source links', async () => {
         const chunk = {
-            content: [
-                'Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer.',
-                'Bütünleme sınavından alınan not final notu yerine geçer.',
-                'Dönem içi kurul notu 80 ve üzerinde olan öğrenciler final sınavına girmeksizin dönemi başarıyla tamamlamış kabul edilir.'
-            ].join('\n'),
-            document_id: 'doc-tip',
-            document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
-            source_url: 'https://example.edu.tr/tip.pdf',
+            content: 'Yaz Stajı süresi 20 iş günüdür.',
+            document_id: 'doc-tlt',
+            document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+            chunk_id: 'chunk-tlt',
+            source_url: 'https://example.edu.tr/tlt.pdf',
         }
-        searchKnowledgeBaseFocusedEvidenceMock.mockResolvedValueOnce([chunk])
+        const broadChunk = {
+            content: 'Hemşirelik programında farklı klinik uygulama süreleri bulunur.',
+            document_id: 'doc-noise',
+            document_title: 'Hemşirelik Programı',
+            chunk_id: 'chunk-noise',
+            source_url: 'https://example.edu.tr/noise.pdf',
+        }
+        const selectedSourceChunks = [{
+            content: 'Yaz Stajı süresi 20 iş günüdür.',
+            document_id: 'doc-tlt',
+            document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+            chunk_id: 'chunk-tlt',
+            source_url: 'https://example.edu.tr/tlt.pdf',
+        }]
+        searchKnowledgeBaseFocusedEvidenceMock.mockResolvedValueOnce([chunk, broadChunk])
         buildRagContextMock.mockReturnValueOnce({
             context: chunk.content,
-            chunks: [chunk],
+            chunks: [chunk, broadChunk],
             tokenCount: 40,
         })
         generateGroundedRagAnswerMock.mockResolvedValueOnce({
-            answer: 'Evet, final sınavına girmeden bütünlemeye girebilirsiniz. Eğer dönem içi kurul notunuz 80 ve üzerinde ise final sınavına girmeksizin dönemi başarıyla tamamlarsınız.',
+            answer: 'TLT yaz stajı 20 iş günüdür.',
             usedGeneration: true,
             addedEngagement: false,
             usage: null,
             model: 'gpt-4o-mini',
+            usedEvidenceIds: ['ev_1'],
+            sourceChunks: selectedSourceChunks,
         })
         repairLinkOnlyRagAnswerMock
             .mockReturnValueOnce(null)
-            .mockReturnValueOnce(
-                'Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.'
-            )
+            .mockReturnValueOnce('TLT yaz stajı 20 iş günüdür.')
         polishGroundedRagAnswerMock.mockResolvedValueOnce({
-            answer: 'Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.',
-            usedPolish: false,
+            answer: 'TLT yaz stajı 20 iş günüdür.',
+            usedPolish: true,
             addedEngagement: false,
             usage: null,
             model: 'gpt-4o-mini',
         })
         appendCanonicalRagSourceLinksMock.mockReturnValueOnce(
-            'Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.\nhttps://example.edu.tr/tip.pdf'
+            'TLT yaz stajı 20 iş günüdür.\nhttps://example.edu.tr/tlt.pdf'
         )
 
         const conversationChain = {
@@ -1767,7 +1778,7 @@ describe('demo chat API route', () => {
             maybeSingle: vi.fn(async () => ({
                 data: {
                     id: 'contact-message-1',
-                    content: 'Tıp fakültesinde finale girmeden bütünlemeye girebilir miyim?',
+                    content: 'TLT yaz stajı kaç gün?',
                 },
                 error: null,
             })),
@@ -1815,18 +1826,40 @@ describe('demo chat API route', () => {
         const res = await GET(createGetRequest({
             sessionId: 'session-1',
             messageId: 'message-1',
-            message: 'Tıp fakültesinde finale girmeden bütünlemeye girebilir miyim?',
+            message: 'TLT yaz stajı kaç gün?',
         }), createContext())
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({
             pending: false,
-            response: 'Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.\nhttps://example.edu.tr/tip.pdf',
+            response: 'TLT yaz stajı 20 iş günüdür.\nhttps://example.edu.tr/tlt.pdf',
             skillImage: null,
         })
+        const generatedRepairCalls = repairLinkOnlyRagAnswerMock.mock.calls
+            .map(([call]) => call)
+            .filter((call) => call.response === 'TLT yaz stajı 20 iş günüdür.')
+        expect(generatedRepairCalls).toHaveLength(2)
+        expect(generatedRepairCalls).toEqual([
+            expect.objectContaining({
+                userMessage: 'TLT yaz stajı kaç gün?',
+                responseLanguage: 'tr',
+                chunks: [expect.objectContaining({ document_id: 'doc-tlt' })],
+            }),
+            expect.objectContaining({
+                userMessage: 'TLT yaz stajı kaç gün?',
+                responseLanguage: 'tr',
+                chunks: [expect.objectContaining({ document_id: 'doc-tlt' })],
+            }),
+        ])
+        expect(polishGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
+            answer: 'TLT yaz stajı 20 iş günüdür.',
+            userMessage: 'TLT yaz stajı kaç gün?',
+            responseLanguage: 'tr',
+            chunks: [expect.objectContaining({ document_id: 'doc-tlt' })],
+        }))
         expect(appendCanonicalRagSourceLinksMock).toHaveBeenCalledWith(
-            'Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.',
-            [chunk],
+            expect.stringContaining('20 iş günüdür'),
+            [expect.objectContaining({ document_id: 'doc-tlt' })],
             expect.objectContaining({ force: true, limit: 2 })
         )
     })

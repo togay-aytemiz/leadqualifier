@@ -939,6 +939,9 @@ async function buildExtractiveDemoChatReply(input: {
                 : readFastRagGenerateTimeoutMs()
         })
         const generationMs = elapsedMs(generationStartedAt)
+        const generatedSourceChunks = generatedAnswer.sourceChunks && generatedAnswer.sourceChunks.length > 0
+            ? generatedAnswer.sourceChunks
+            : chunks
 
         if (generatedAnswer.usage) {
             try {
@@ -953,7 +956,7 @@ async function buildExtractiveDemoChatReply(input: {
                         source: 'demo_chat_rag_generate',
                         response_kind: 'rag_grounded_generate',
                         demo_chat_channel_id: input.channel.id,
-                        document_count: chunks.length
+                        document_count: generatedSourceChunks.length
                     },
                     supabase: input.supabase
                 })
@@ -967,7 +970,7 @@ async function buildExtractiveDemoChatReply(input: {
                 response: generatedAnswer.answer,
                 userMessage: evidenceQuestion,
                 responseLanguage,
-                chunks,
+                chunks: generatedSourceChunks,
                 allowCompoundRepair
             })
             const generatedAnswerWasRepaired = Boolean(
@@ -989,7 +992,7 @@ async function buildExtractiveDemoChatReply(input: {
                     answer: generatedAnswerForReply,
                     userMessage: message,
                     responseLanguage,
-                    chunks,
+                    chunks: generatedSourceChunks,
                     settings: aiSettings,
                     timeoutMs: readFastRagPolishTimeoutMs()
                 })
@@ -1007,7 +1010,7 @@ async function buildExtractiveDemoChatReply(input: {
                                 source: 'demo_chat_rag_generate_polish',
                                 response_kind: 'rag_grounded_generate_polish',
                                 demo_chat_channel_id: input.channel.id,
-                                document_count: chunks.length
+                                document_count: generatedSourceChunks.length
                             },
                             supabase: input.supabase
                         })
@@ -1031,7 +1034,7 @@ async function buildExtractiveDemoChatReply(input: {
                         response: polishedGeneratedAnswer.answer,
                         userMessage: evidenceQuestion,
                         responseLanguage,
-                        chunks,
+                        chunks: generatedSourceChunks,
                         allowCompoundRepair
                     })
                     generatedAnswerForReply = repairedPolishedGeneratedAnswer && !isNoAnswerReply(repairedPolishedGeneratedAnswer)
@@ -1041,12 +1044,12 @@ async function buildExtractiveDemoChatReply(input: {
             }
 
             return {
-                replyText: appendCanonicalRagSourceLinks(generatedAnswerForReply, chunks, {
+                replyText: appendCanonicalRagSourceLinks(generatedAnswerForReply, generatedSourceChunks, {
                     force: true,
                     limit: 2
                 }),
                 skillImage: null,
-                chunks,
+                chunks: generatedSourceChunks,
                 generation: {
                     usedGeneration: generatedAnswer.usedGeneration,
                     addedEngagement: generatedAnswer.addedEngagement,

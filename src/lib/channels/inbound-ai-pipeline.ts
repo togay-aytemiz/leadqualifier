@@ -1578,6 +1578,9 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                     settings: aiSettings,
                     conversationHistory: history
                 })
+                const generatedSourceChunks = groundedGeneratedRagResponse.sourceChunks && groundedGeneratedRagResponse.sourceChunks.length > 0
+                    ? groundedGeneratedRagResponse.sourceChunks
+                    : repairChunks
                 if (groundedGeneratedRagResponse.usage) {
                     await recordInboundAiUsage({
                         organizationId: orgId,
@@ -1591,7 +1594,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                             source: 'rag_grounded_generate',
                             response_kind: 'rag_grounded_generate',
                             platform: options.platform,
-                            document_count: repairChunks.length
+                            document_count: generatedSourceChunks.length
                         },
                         supabase: options.supabase
                     }, options.logPrefix)
@@ -1605,7 +1608,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                         response: groundedGeneratedRagResponse.answer,
                         userMessage: options.text,
                         responseLanguage,
-                        chunks: repairChunks
+                        chunks: generatedSourceChunks
                     })
                     const generatedAnswerWasRepaired = Boolean(
                         repairedGeneratedRagAnswer
@@ -1626,7 +1629,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                             answer: generatedAnswerForReply,
                             userMessage: options.text,
                             responseLanguage,
-                            chunks: repairChunks,
+                            chunks: generatedSourceChunks,
                             settings: aiSettings
                         })
                         if (polishedGeneratedRagResponse.usage) {
@@ -1642,7 +1645,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                                     source: 'rag_grounded_generate_polish',
                                     response_kind: 'rag_grounded_generate_polish',
                                     platform: options.platform,
-                                    document_count: repairChunks.length
+                                    document_count: generatedSourceChunks.length
                                 },
                                 supabase: options.supabase
                             }, options.logPrefix)
@@ -1661,7 +1664,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                                 response: polishedGeneratedRagResponse.answer,
                                 userMessage: options.text,
                                 responseLanguage,
-                                chunks: repairChunks
+                                chunks: generatedSourceChunks
                             })
                             generatedAnswerForReply = repairedPolishedGeneratedRagAnswer && !isRagNoAnswerResponse(repairedPolishedGeneratedRagAnswer)
                                 ? repairedPolishedGeneratedRagAnswer
@@ -1669,7 +1672,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                         }
                     }
 
-                    const generatedRagWithSources = appendCanonicalRagSourceLinks(generatedAnswerForReply, repairChunks, {
+                    const generatedRagWithSources = appendCanonicalRagSourceLinks(generatedAnswerForReply, generatedSourceChunks, {
                         force: true,
                         limit: resolveRagSourceLinkLimit(options.platform)
                     })
@@ -1684,7 +1687,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                             model: groundedGeneratedRagResponse.model
                         },
                         rag_polish: generatedRagPolishMetadata,
-                        sources: repairChunks.map((chunk) => chunk.document_id).filter(Boolean)
+                        sources: generatedSourceChunks.map((chunk) => chunk.document_id).filter(Boolean)
                     })
                     await recordAiLatencyEvent({
                         organizationId: orgId,
