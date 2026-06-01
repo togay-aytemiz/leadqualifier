@@ -88,6 +88,22 @@ describe('buildRagEvidencePack', () => {
         ]))
     })
 
+    it('extracts Turkish word-number durations with unicode boundaries', () => {
+        const pack = buildRagEvidencePack({
+            userMessage: 'Uygulama kaç hafta sürer?',
+            chunks: [{
+                chunk_id: 'chunk-turkish-duration',
+                document_id: 'doc-turkish-duration',
+                document_title: 'Uygulama Takvimi',
+                source_url: sourceUrl,
+                content: 'Mesleki uygulama üç hafta boyunca devam eder.'
+            }]
+        })
+
+        expect(pack.items[0]?.kind).toBe('duration')
+        expect(pack.items[0]?.criticalValues).toContain('üç hafta')
+    })
+
     it('deduplicates evidence with normalized source and document identity', () => {
         const pack = buildRagEvidencePack({
             userMessage: 'MEDU nereden kullanılır?',
