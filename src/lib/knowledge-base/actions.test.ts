@@ -2973,7 +2973,7 @@ describe('searchKnowledgeBase', () => {
         })
     })
 
-    it('skips broad vector search when quick lexical evidence is already strong enough', async () => {
+    it('runs vector search even when quick lexical evidence is strong enough', async () => {
         const { supabase, rpcMock } = createHybridSearchSupabase({
             rpcRows: [{
                 chunk_id: 'irrelevant-vector-1',
@@ -3004,14 +3004,14 @@ describe('searchKnowledgeBase', () => {
             { supabase }
         )
 
-        expect(rpcMock).not.toHaveBeenCalledWith('match_knowledge_chunks', expect.anything())
+        expect(rpcMock).toHaveBeenCalledWith('match_knowledge_chunks', expect.anything())
         expect(results[0]).toMatchObject({
             chunk_id: 'tlt-staj-lexical-1',
             document_id: 'doc-tlt-staj-1'
         })
     })
 
-    it('uses focused internship evidence before broad vector search', async () => {
+    it('keeps focused internship evidence ahead of broad vector matches after vector search runs', async () => {
         const { supabase, rpcMock } = createHybridSearchSupabase({
             rpcRows: [{
                 chunk_id: 'irrelevant-vector-1',
@@ -3046,7 +3046,7 @@ describe('searchKnowledgeBase', () => {
             { supabase }
         )
 
-        expect(rpcMock).not.toHaveBeenCalledWith('match_knowledge_chunks', expect.anything())
+        expect(rpcMock).toHaveBeenCalledWith('match_knowledge_chunks', expect.anything())
         expect(results[0]).toMatchObject({
             chunk_id: 'tlt-staj-focused-1',
             document_id: 'doc-tlt-staj-focused-1'
@@ -3086,8 +3086,8 @@ describe('searchKnowledgeBase', () => {
         })
     })
 
-    it('does not run broad lexical fallbacks when policy-duration evidence already fills the result set', async () => {
-        const { supabase, limitMock } = createHybridSearchSupabase({
+    it('keeps policy-duration evidence after vector and lexical channels also run', async () => {
+        const { supabase, limitMock, rpcMock } = createHybridSearchSupabase({
             rpcRows: [],
             fallbackRows: [
                 {
@@ -3134,7 +3134,8 @@ describe('searchKnowledgeBase', () => {
 
         expect(results).toHaveLength(3)
         expect(results.map((result) => result.chunk_id)).toContain('unpaid-leave-duration-1')
-        expect(limitMock).toHaveBeenCalledTimes(1)
+        expect(rpcMock).toHaveBeenCalledWith('match_knowledge_chunks', expect.anything())
+        expect(limitMock.mock.calls.length).toBeGreaterThan(1)
     })
 
     it('keeps exact policy duration evidence for non-leave duration questions', async () => {
@@ -3374,7 +3375,7 @@ describe('searchKnowledgeBase', () => {
         expect(context).not.toContain('Tıbbi Dokümantasyon')
     })
 
-    it('treats ÇAP as a double-major intent before broad vector search', async () => {
+    it('keeps ÇAP double-major evidence ahead of broad vector matches after vector search runs', async () => {
         const { supabase, rpcMock } = createHybridSearchSupabase({
             rpcRows: [{
                 chunk_id: 'generic-cap-1',
@@ -3409,7 +3410,7 @@ describe('searchKnowledgeBase', () => {
             { supabase }
         )
 
-        expect(rpcMock).not.toHaveBeenCalledWith('match_knowledge_chunks', expect.anything())
+        expect(rpcMock).toHaveBeenCalledWith('match_knowledge_chunks', expect.anything())
         expect(results[0]).toMatchObject({
             chunk_id: 'tlt-cap-focused-1',
             document_id: 'doc-tlt-cap-1'

@@ -71,7 +71,6 @@ const MAX_PROFILE_CONTEXT_CHARS = 6000
 const COUNT_SCAN_PAGE_SIZE = 1000
 const VECTOR_SEARCH_TIMEOUT_MS = 2500
 const EVIDENCE_SEARCH_TIMEOUT_MS = 4500
-const LEXICAL_EVIDENCE_FIRST_TIMEOUT_MS = 750
 const PLANNED_QUERY_SHORT_CIRCUIT_MIN_RESULTS = 3
 const PLANNED_QUERY_SHORT_CIRCUIT_MIN_SCORE = 1.2
 
@@ -294,21 +293,6 @@ function logKnowledgeVectorSearchIssue(error: unknown) {
     }
 
     console.error('RAG Search failed:', error)
-}
-
-async function readBeforeDeadline<T>(promise: Promise<T>, timeoutMs: number) {
-    let timeout: ReturnType<typeof setTimeout> | null = null
-
-    const timeoutPromise = new Promise<{ status: 'timeout' }>((resolve) => {
-        timeout = setTimeout(() => resolve({ status: 'timeout' }), timeoutMs)
-    })
-
-    return Promise.race([
-        promise.then((value) => ({ status: 'fulfilled' as const, value })),
-        timeoutPromise
-    ]).finally(() => {
-        if (timeout) clearTimeout(timeout)
-    })
 }
 
 /**
@@ -716,18 +700,12 @@ async function searchKnowledgeBaseSingleQuery(
     const policyDurationResults = isPolicyDurationQuery(query)
         ? await searchKnowledgeBaseByPolicyDurationEvidence(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
         : []
-    if (shouldReturnPolicyDurationResultsEarly(query, policyDurationResults)) {
-        return mergeSearchResults(query, [], policyDurationResults, limit)
-    }
     const focusedEvidenceLimit = Math.max(limit * 4, 16)
     const focusedPolicyEvidenceResultsPromise = Promise.all(
         buildFocusedEvidenceSearches(query, organizationId, focusedEvidenceLimit, fallbackOptions)
     ).then((results) => results.flat())
 
     const focusedPolicyEvidenceResults = await focusedPolicyEvidenceResultsPromise
-    if (shouldReturnFocusedEvidenceResultsEarly(query, focusedPolicyEvidenceResults)) {
-        return mergeSearchResults(query, [], focusedPolicyEvidenceResults, limit)
-    }
 
     const fallbackSearchLimit = Math.max(limit * 4, 16)
     const lexicalFallbackResultsPromise = Promise.all([
@@ -747,11 +725,6 @@ async function searchKnowledgeBaseSingleQuery(
         if (abbreviationLexicalResults.length > 0) {
             return mergeSearchResults(query, [], abbreviationLexicalResults, limit)
         }
-    }
-
-    const lexicalEvidenceBeforeVector = await getQuickLexicalEvidenceBeforeVector(query, lexicalFallbackResultsPromise)
-    if (lexicalEvidenceBeforeVector && shouldReturnLexicalEvidenceResultsEarly(query, lexicalEvidenceBeforeVector)) {
-        return mergeSearchResults(query, [], lexicalEvidenceBeforeVector, limit)
     }
 
     let embedding: number[] | null = null
@@ -4744,15 +4717,6 @@ function policyDurationSubjectTextSearchExpression(subjectGroups: string[][]) {
         .join(' & ')
 }
 
-function shouldReturnPolicyDurationResultsEarly(query: string, results: KnowledgeSearchResult[]) {
-    if (results.length === 0) return false
-    if (isMedicineMaxDurationQuery(query)) return false
-
-    const requiredTokens = policyDurationRequiredSubjectTokens(policyDurationSubjectTokens(query))
-
-    return requiredTokens.some((token) => !POLICY_DURATION_GENERIC_SUBJECT_TOKENS.has(token))
-}
-
 async function searchKnowledgeBaseByPolicyDurationEvidence(
     query: string,
     organizationId: string,
@@ -5161,62 +5125,6 @@ function shouldReturnFocusedEvidenceResultsEarly(query: string, results: Knowled
         || isElectiveCourseRequirementQuery(query)
         || isInternshipEvidenceQuery(query)
     ) && topScore >= 1.05
-}
-
-function shouldProbeLexicalEvidenceBeforeVector(query: string) {
-    return isPolicyRuleQuery(query)
-        || isContactInfoQuery(query)
-        || isErasmusEligibilityQuery(query)
-        || isLibraryContactQuery(query)
-        || isAddressLookupQuery(query)
-        || isLectureNotesAccessQuery(query)
-        || isInternshipEvidenceQuery(query)
-        || isPolicyDurationQuery(query)
-        || isProgramContactResponsibilityQuery(query)
-        || isTltDoubleMajorQuery(query)
-        || isAnnualPaidLeaveQuery(query)
-        || extractAbbreviationCandidates(query).length > 0
-}
-
-async function getQuickLexicalEvidenceBeforeVector(
-    query: string,
-    fallbackResultsPromise: Promise<KnowledgeSearchResult[][]>
-) {
-    if (!shouldProbeLexicalEvidenceBeforeVector(query)) return null
-
-    const result = await readBeforeDeadline(fallbackResultsPromise, LEXICAL_EVIDENCE_FIRST_TIMEOUT_MS)
-    if (result.status !== 'fulfilled') return null
-
-    return result.value.flat()
-}
-
-function shouldReturnLexicalEvidenceResultsEarly(query: string, results: KnowledgeSearchResult[]) {
-    if (results.length === 0) return false
-
-    const ranked = mergeSearchResults(query, [], results, Math.min(6, Math.max(3, results.length)))
-    const top = ranked[0]
-    if (!top) return false
-
-    const searchable = `${top.document_title}\n${top.content}\n${sourceUrlFromResult(top) ?? ''}`
-    const lexicalCoverage = lexicalMatchScore(query, searchable)
-    const subjectCoverage = evidenceSubjectCoverageScore(query, searchable)
-    const topScore = scoreKnowledgeResult(query, enrichKnowledgeSearchResult(top))
-    const hasAbbreviationCandidate = extractAbbreviationCandidates(query).length > 0
-
-    if (hasAbbreviationCandidate && abbreviationLookupScore(query, top) >= 0.25) return true
-
-    if (topScore >= 1.35 && lexicalCoverage >= 0.45) return true
-
-    return lexicalCoverage >= 0.7
-        && subjectCoverage >= 0.45
-        && (
-            isPolicyRuleQuery(query)
-            || isContactInfoQuery(query)
-            || isAddressLookupQuery(query)
-            || isLectureNotesAccessQuery(query)
-            || isAnnualPaidLeaveQuery(query)
-            || hasAbbreviationCandidate
-        )
 }
 
 async function searchKnowledgeBaseByKeyword(
