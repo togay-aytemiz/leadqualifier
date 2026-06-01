@@ -3826,6 +3826,76 @@ describe('searchKnowledgeBase', () => {
         expect(context).toContain('ders notlarının paylaşımı')
     })
 
+    it('uses selective required evidence before broad lecture-note OR search', async () => {
+        const { supabase, ilikeMock, limitMock, orMock } = createHybridSearchSupabase({
+            rpcRows: [],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'ÖBS',
+                rows: [{
+                    id: 'lecture-notes-required-1',
+                    document_id: 'doc-course-materials-1',
+                    content: 'Page Title: SHMYO Ders Bilgi Paketi\nSource URL: https://example.edu.tr/shmyo-ders-bilgi-paketi.pdf\n\nDers içeriği ve ders materyalleri ÖBS’ye yüklenerek öğrencilerin erişimine açılır.',
+                    knowledge_documents: {
+                        title: 'SHMYO Ders Bilgi Paketi',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBaseFocusedEvidence(
+            'SHMYO ders içeriklerine nereden ulaşabilirim?',
+            'org-1',
+            6,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'lecture-notes-required-1',
+            document_id: 'doc-course-materials-1'
+        })
+        expect(ilikeMock).toHaveBeenCalledWith('content', expect.stringContaining('Ders içeriği'))
+        expect(ilikeMock).toHaveBeenCalledWith('content', expect.stringContaining('ÖBS'))
+        expect(limitMock).toHaveBeenCalledTimes(1)
+        expect(orMock).not.toHaveBeenCalled()
+    })
+
+    it('skips broad health-report OR search when required remedy evidence is enough', async () => {
+        const { supabase, orMock } = createHybridSearchSupabase({
+            rpcRows: [],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'sağlık raporu',
+                rows: [{
+                    id: 'health-remedy-required-1',
+                    document_id: 'doc-undergrad-exam-1',
+                    content: 'Page Title: Ön Lisans ve Lisans Eğitim-Öğretim ve Sınav Yönetmeliği\nSource URL: https://example.edu.tr/yonetmelik.pdf\n\nSağlık raporu ile belgelendirilen mazeretlerde ilgili Yönetim Kurulu kararıyla mazeret sınavı yapılır.',
+                    knowledge_documents: {
+                        title: 'Ön Lisans ve Lisans Eğitim-Öğretim ve Sınav Yönetmeliği',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }]
+        })
+
+        const results = await searchKnowledgeBaseFocusedEvidence(
+            'Sağlık raporu vermeden mazeret sınavına giremez miyim?',
+            'org-1',
+            6,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'health-remedy-required-1',
+            document_id: 'doc-undergrad-exam-1'
+        })
+        expect(orMock).not.toHaveBeenCalled()
+    })
+
     it('runs a focused elective policy search when the user asks how many electives are required', async () => {
         const { supabase } = createHybridSearchSupabase({
             rpcRows: [

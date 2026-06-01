@@ -635,6 +635,7 @@ describe('demo chat API route', () => {
             expect.objectContaining({
                 supabase: expect.any(Object),
                 plannerHistory: expectedHistory,
+                skipQueryPlanner: true,
             })
         )
         expect(generateGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
@@ -767,6 +768,7 @@ describe('demo chat API route', () => {
             expect.objectContaining({
                 supabase: expect.any(Object),
                 plannerHistory: expect.any(Array),
+                skipQueryPlanner: true,
             })
         )
         expect(searchKnowledgeBaseFocusedEvidenceMock).toHaveBeenCalledTimes(1)

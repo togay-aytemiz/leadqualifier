@@ -3976,17 +3976,7 @@ async function searchKnowledgeBaseByLectureNotesEvidence(
 ) {
     if (!isLectureNotesAccessQuery(query)) return []
 
-    const rows = await searchKnowledgeBaseByEvidenceFilters('Lecture-notes access', [
-        'ders notlarının paylaşımı',
-        'UZEM/MEDU sistemleri',
-        'Ders içeriği',
-        'Ders Materyali',
-        'ders materyalleri',
-        'ÖBS’ye yüklenir ve öğrencilerle',
-        'ÖBS’ye yüklenerek öğrencilerin erişimine açılır'
-    ], organizationId, limit, options)
-
-    return rows
+    const buildLectureNotesResults = (rows: KeywordSearchRow[]) => rows
         .map((row) => buildKeywordResultFromRow(row, 0.8))
         .filter((result) => {
             const searchable = normalizeSearchText(`${result.document_title}\n${result.content}`)
@@ -4014,6 +4004,38 @@ async function searchKnowledgeBaseByLectureNotesEvidence(
                 )
             }
         })
+
+    const requiredFilterGroups = [
+        ['Ders içeriği', 'ÖBS'],
+        ['Ders Materyali', 'ÖBS'],
+        ['ders materyalleri', 'ÖBS'],
+        ['ÖBS’ye yüklenerek', 'erişimine açılır'],
+        ['UZEM/MEDU sistemleri', 'ders notlarının paylaşımı'],
+        ['ders notlarının paylaşımı']
+    ]
+    for (const requiredFilters of requiredFilterGroups) {
+        const requiredRows = await searchKnowledgeBaseByRequiredEvidenceFilters(
+            'Lecture-notes access',
+            requiredFilters,
+            organizationId,
+            limit,
+            options
+        )
+        const requiredResults = buildLectureNotesResults(requiredRows)
+        if (requiredResults.length > 0) return requiredResults
+    }
+
+    const rows = await searchKnowledgeBaseByEvidenceFilters('Lecture-notes access', [
+        'ders notlarının paylaşımı',
+        'UZEM/MEDU sistemleri',
+        'Ders içeriği',
+        'Ders Materyali',
+        'ders materyalleri',
+        'ÖBS’ye yüklenir ve öğrencilerle',
+        'ÖBS’ye yüklenerek öğrencilerin erişimine açılır'
+    ], organizationId, limit, options)
+
+    return buildLectureNotesResults(rows)
 }
 
 function isFinalExemptionPolicyQuery(query: string) {
@@ -4224,29 +4246,7 @@ async function searchKnowledgeBaseByHealthReportExamPolicyEvidence(
 ) {
     if (!isHealthReportExcuseExamQuery(query)) return []
 
-    const remedyRows = asksForMissedExamRemedy(query)
-        ? (await Promise.all([
-            searchKnowledgeBaseByRequiredEvidenceFilters('Health-report exam remedy', ['mazeret sınavı', 'sağlık raporu'], organizationId, limit, options),
-            searchKnowledgeBaseByRequiredEvidenceFilters('Health-report exam remedy', ['mazeret sınavı', 'hastalık'], organizationId, limit, options),
-            searchKnowledgeBaseByRequiredEvidenceFilters('Health-report exam remedy', ['mazeret sınavı', 'sağlık mazereti'], organizationId, limit, options),
-            searchKnowledgeBaseByRequiredEvidenceFilters('Health-report exam remedy', ['telafi sınavı', 'sağlık raporu'], organizationId, limit, options)
-        ])).flat()
-        : []
-    const broadRows = await searchKnowledgeBaseByEvidenceFilters('Health-report exam policy', [
-        'sağlık raporu ile belgelendirmesi',
-        'Sağlık raporu olduğu halde',
-        'sınavı geçersiz sayılır',
-        'sınava girmesini engelleyen hastalık',
-        'mazeret sınavı yapılır',
-        'Yönetim Kurulu tarafından kabul edilen mazeretler'
-    ], organizationId, limit, options)
-    const rowsById = new Map<string, KeywordSearchRow>()
-
-    for (const row of [...remedyRows, ...broadRows]) {
-        rowsById.set(row.id, row)
-    }
-
-    return [...rowsById.values()]
+    const buildHealthReportExamResults = (rows: KeywordSearchRow[]) => rows
         .map((row) => buildKeywordResultFromRow(row, 0.8))
         .filter((result) => {
             const searchable = normalizeSearchText(`${result.document_title}\n${result.content}`)
@@ -4265,6 +4265,33 @@ async function searchKnowledgeBaseByHealthReportExamPolicyEvidence(
                     + lexicalMatchScore(query, `${result.document_title}\n${result.content}`) * 0.08
             )
         }))
+
+    const remedyRows = asksForMissedExamRemedy(query)
+        ? (await Promise.all([
+            searchKnowledgeBaseByRequiredEvidenceFilters('Health-report exam remedy', ['mazeret sınavı', 'sağlık raporu'], organizationId, limit, options),
+            searchKnowledgeBaseByRequiredEvidenceFilters('Health-report exam remedy', ['mazeret sınavı', 'hastalık'], organizationId, limit, options),
+            searchKnowledgeBaseByRequiredEvidenceFilters('Health-report exam remedy', ['mazeret sınavı', 'sağlık mazereti'], organizationId, limit, options),
+            searchKnowledgeBaseByRequiredEvidenceFilters('Health-report exam remedy', ['telafi sınavı', 'sağlık raporu'], organizationId, limit, options)
+        ])).flat()
+        : []
+    const remedyResults = buildHealthReportExamResults(remedyRows)
+    if (remedyResults.length > 0) return remedyResults
+
+    const broadRows = await searchKnowledgeBaseByEvidenceFilters('Health-report exam policy', [
+        'sağlık raporu ile belgelendirmesi',
+        'Sağlık raporu olduğu halde',
+        'sınavı geçersiz sayılır',
+        'sınava girmesini engelleyen hastalık',
+        'mazeret sınavı yapılır',
+        'Yönetim Kurulu tarafından kabul edilen mazeretler'
+    ], organizationId, limit, options)
+    const rowsById = new Map<string, KeywordSearchRow>()
+
+    for (const row of broadRows) {
+        rowsById.set(row.id, row)
+    }
+
+    return buildHealthReportExamResults([...rowsById.values()])
 }
 
 function isElectiveCourseRequirementQuery(query: string) {

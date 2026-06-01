@@ -1098,7 +1098,7 @@ async function buildExtractiveDemoChatReply(input: {
                 query,
                 input.channel.organizationId,
                 FAST_RAG_RESULT_LIMIT,
-                { supabase: input.supabase, plannerHistory: conversationHistory }
+                { supabase: input.supabase, plannerHistory: conversationHistory, skipQueryPlanner: true }
             ))),
             FAST_RAG_RESULT_LIMIT
         )
