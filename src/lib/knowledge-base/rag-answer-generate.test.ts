@@ -259,6 +259,7 @@ describe('generateGroundedRagAnswer', () => {
                         used_evidence_ids: ['ev_1'],
                         support_quotes: ['Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.'],
                         engagement_question: 'İstersen sınav takvimini de gösterebilirim.',
+                        engagement_evidence: 'Sınav takvimi akademik takvim sayfasında ilan edilir.',
                         engagement_evidence_id: 'ev_99'
                     })
                 }
@@ -270,7 +271,10 @@ describe('generateGroundedRagAnswer', () => {
             userMessage: 'Ders içerikleri nereden paylaşılır?',
             responseLanguage: 'tr',
             chunks: [{
-                content: 'Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.',
+                content: [
+                    'Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.',
+                    'Sınav takvimi akademik takvim sayfasında ilan edilir.'
+                ].join('\n'),
                 document_id: 'doc-medu',
                 document_title: 'Ders İçerikleri',
                 source_url: 'https://example.edu.tr/medu.pdf'
@@ -279,6 +283,10 @@ describe('generateGroundedRagAnswer', () => {
         })
 
         expect(result.answer).toBe('Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.')
+        expect(result.answer).not.toContain('İstersen sınav takvimini de gösterebilirim.')
+        expect(result.usedGeneration).toBe(true)
+        expect(result.usedEvidenceIds).toEqual(['ev_1'])
+        expect(result.sourceChunks?.map((chunk) => chunk.document_id)).toEqual(['doc-medu'])
         expect(result.addedEngagement).toBe(false)
     })
 })
