@@ -223,12 +223,12 @@ describe('generateGroundedRagAnswer', () => {
         expect(result.sourceChunks?.map((chunk) => chunk.document_id)).toEqual(['doc-tlt'])
     })
 
-    it('rejects evidence-id answers that do not overlap selected evidence semantically', async () => {
+    it('rejects evidence-id answers that add unsupported claims despite partial evidence overlap', async () => {
         const createCompletion = vi.fn(async () => ({
             choices: [{
                 message: {
                     content: JSON.stringify({
-                        answer: 'Bu programda başvuru ücreti alınmaz.',
+                        answer: 'Bu programda staj ücreti alınmaz.',
                         used_evidence_ids: ['ev_1'],
                         engagement_question: '',
                         engagement_evidence_id: ''

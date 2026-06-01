@@ -152,7 +152,6 @@ const ANSWER_EVIDENCE_STOPWORDS = new Set([
     'için',
     'is',
     'ise',
-    'no',
     'program',
     'programda',
     'programinda',
@@ -162,7 +161,36 @@ const ANSWER_EVIDENCE_STOPWORDS = new Set([
     'var',
     've',
     'veya',
-    'yes',
+    'yes'
+])
+
+const ANSWER_EVIDENCE_COVERAGE_THRESHOLD = 0.6
+
+const CLAIM_RISK_TERMS = new Set([
+    'alinmaz',
+    'alınmaz',
+    'bedel',
+    'bedeli',
+    'cost',
+    'degil',
+    'değil',
+    'fee',
+    'fiyat',
+    'fiyati',
+    'fiyatı',
+    'free',
+    'not',
+    'no',
+    'odenmez',
+    'ödenmez',
+    'paid',
+    'price',
+    'ucret',
+    'ucreti',
+    'ücret',
+    'ücreti',
+    'ucretsiz',
+    'ücretsiz',
     'yok'
 ])
 
@@ -351,24 +379,28 @@ function selectedEvidenceText(pack: RagEvidencePack, evidenceIds: string[]) {
 }
 
 function tokenizeAnswerEvidenceSignalTerms(value: string) {
-    return new Set(normalizeForMatch(value)
+    return normalizeForMatch(value)
         .split(/[^a-z0-9]+/i)
         .map((token) => token.trim())
         .map(stemEngagementToken)
         .filter((token) => token.length >= 4)
-        .filter((token) => !ANSWER_EVIDENCE_STOPWORDS.has(token)))
+        .filter((token) => !ANSWER_EVIDENCE_STOPWORDS.has(token))
 }
 
 function hasSelectedEvidenceSemanticOverlap(answer: string, selectedEvidence: string) {
-    const answerTerms = tokenizeAnswerEvidenceSignalTerms(answer)
-    if (answerTerms.size === 0) return false
+    const answerTerms = Array.from(new Set(tokenizeAnswerEvidenceSignalTerms(answer)))
+    if (answerTerms.length === 0) return false
 
-    const evidenceTerms = tokenizeAnswerEvidenceSignalTerms(selectedEvidence)
-    for (const term of answerTerms) {
-        if (evidenceTerms.has(term)) return true
+    const evidenceTerms = new Set(tokenizeAnswerEvidenceSignalTerms(selectedEvidence))
+    const unsupportedRiskTerms = answerTerms
+        .filter((term) => CLAIM_RISK_TERMS.has(term))
+        .filter((term) => !evidenceTerms.has(term))
+    if (unsupportedRiskTerms.length > 0) {
+        return false
     }
 
-    return false
+    const supportedTerms = answerTerms.filter((term) => evidenceTerms.has(term))
+    return supportedTerms.length / answerTerms.length >= ANSWER_EVIDENCE_COVERAGE_THRESHOLD
 }
 
 function criticalFactsSupported(answer: string, context: string) {
