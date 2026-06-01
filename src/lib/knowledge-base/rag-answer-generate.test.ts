@@ -258,8 +258,8 @@ describe('generateGroundedRagAnswer', () => {
                         answer: 'Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.',
                         used_evidence_ids: ['ev_1'],
                         support_quotes: ['Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.'],
-                        engagement_question: 'İstersen sınav takvimini de gösterebilirim.',
-                        engagement_evidence: 'Sınav takvimi akademik takvim sayfasında ilan edilir.',
+                        engagement_question: 'İstersen MEDU üzerinden ödev teslimlerinin nasıl takip edildiğini de kısaca anlatabilirim.',
+                        engagement_evidence: 'MEDU sisteminde ödev teslimleri de takip edilir.',
                         engagement_evidence_id: 'ev_99'
                     })
                 }
@@ -273,7 +273,7 @@ describe('generateGroundedRagAnswer', () => {
             chunks: [{
                 content: [
                     'Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.',
-                    'Sınav takvimi akademik takvim sayfasında ilan edilir.'
+                    'MEDU sisteminde ödev teslimleri de takip edilir.'
                 ].join('\n'),
                 document_id: 'doc-medu',
                 document_title: 'Ders İçerikleri',
@@ -283,7 +283,7 @@ describe('generateGroundedRagAnswer', () => {
         })
 
         expect(result.answer).toBe('Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.')
-        expect(result.answer).not.toContain('İstersen sınav takvimini de gösterebilirim.')
+        expect(result.answer).not.toContain('İstersen MEDU üzerinden ödev teslimlerinin nasıl takip edildiğini de kısaca anlatabilirim.')
         expect(result.usedGeneration).toBe(true)
         expect(result.usedEvidenceIds).toEqual(['ev_1'])
         expect(result.sourceChunks?.map((chunk) => chunk.document_id)).toEqual(['doc-medu'])
