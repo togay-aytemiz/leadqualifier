@@ -3831,7 +3831,7 @@ describe('searchKnowledgeBase', () => {
             rpcRows: [],
             fallbackRows: [],
             fallbackRowsByFilter: [{
-                includes: 'ÖBS',
+                includes: 'SHMYO',
                 rows: [{
                     id: 'lecture-notes-required-1',
                     document_id: 'doc-course-materials-1',
@@ -3857,7 +3857,7 @@ describe('searchKnowledgeBase', () => {
             chunk_id: 'lecture-notes-required-1',
             document_id: 'doc-course-materials-1'
         })
-        expect(ilikeMock).toHaveBeenCalledWith('content', expect.stringContaining('Ders içeriği'))
+        expect(ilikeMock).toHaveBeenCalledWith('content', expect.stringContaining('SHMYO'))
         expect(ilikeMock).toHaveBeenCalledWith('content', expect.stringContaining('ÖBS'))
         expect(limitMock).toHaveBeenCalledTimes(1)
         expect(orMock).not.toHaveBeenCalled()

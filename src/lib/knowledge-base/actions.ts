@@ -3963,6 +3963,31 @@ function isLectureNotesAccessQuery(query: string) {
     return asksLearningAsset && asksAccess
 }
 
+function lectureNotesSubjectFilterSets(query: string) {
+    const normalized = normalizeSearchText(query)
+    const filterSets: string[][] = []
+
+    if (normalized.includes('shmyo')
+        || (normalized.includes('saglik') && normalized.includes('hizmet') && normalized.includes('meslek'))) {
+        filterSets.push(['SHMYO'])
+        filterSets.push(['Sağlık Hizmetleri Meslek Yüksekokulu'])
+    }
+    if (normalized.includes('sbf')
+        || (normalized.includes('saglik') && normalized.includes('bilim') && normalized.includes('fakulte'))) {
+        filterSets.push(['SBF'])
+        filterSets.push(['Sağlık Bilimleri Fakültesi'])
+    }
+    if (isTltProgramQuery(query)) {
+        filterSets.push(['TLT'])
+        filterSets.push(['Tıbbi Laboratuvar Teknikleri'])
+    }
+    if (normalized.includes('tip fakultesi') || normalized.includes('tıp fakültesi')) {
+        filterSets.push(['Tıp Fakültesi'])
+    }
+
+    return filterSets
+}
+
 async function searchKnowledgeBaseByLectureNotesEvidence(
     query: string,
     organizationId: string,
@@ -3984,7 +4009,9 @@ async function searchKnowledgeBaseByLectureNotesEvidence(
             return (searchable.includes('ders not')
                     || searchable.includes('ders materyal')
                     || searchable.includes('ders icerigi')
-                    || searchable.includes('ders bilgi paketi'))
+                    || searchable.includes('ders bilgi paketi')
+                    || searchable.includes('ders program')
+                    || searchable.includes('ders listesi'))
                 && (searchable.includes('uzem') || searchable.includes('medu') || searchable.includes('obs') || searchable.includes('obs') || searchable.includes('erisime acilir'))
         })
         .map((result) => {
@@ -4005,7 +4032,10 @@ async function searchKnowledgeBaseByLectureNotesEvidence(
             }
         })
 
-    const requiredFilterGroups = [
+    const subjectFilterSets = lectureNotesSubjectFilterSets(query)
+    const requiredFilterGroups = subjectFilterSets.length > 0
+        ? subjectFilterSets.map((subjectFilters) => [...subjectFilters, 'ÖBS'])
+        : [
         ['Ders içeriği', 'ÖBS'],
         ['Ders Materyali', 'ÖBS'],
         ['ders materyalleri', 'ÖBS'],
@@ -4013,6 +4043,7 @@ async function searchKnowledgeBaseByLectureNotesEvidence(
         ['UZEM/MEDU sistemleri', 'ders notlarının paylaşımı'],
         ['ders notlarının paylaşımı']
     ]
+
     for (const requiredFilters of requiredFilterGroups) {
         const requiredRows = await searchKnowledgeBaseByRequiredEvidenceFilters(
             'Lecture-notes access',
