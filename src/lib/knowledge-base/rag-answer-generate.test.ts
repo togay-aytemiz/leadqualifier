@@ -249,6 +249,58 @@ describe('generateGroundedRagAnswer', () => {
         expect(result.answer).toBe('')
     })
 
+    it('rejects evidence-id answers that add unsupported factual modifiers', async () => {
+        const createCompletion = vi.fn(async () => ({
+            choices: [{
+                message: {
+                    content: JSON.stringify({
+                        answer: 'Yaz stajı hastanede 20 iş günüdür.',
+                        used_evidence_ids: ['ev_1'],
+                        engagement_question: '',
+                        engagement_evidence_id: ''
+                    })
+                }
+            }],
+            usage: { prompt_tokens: 90, completion_tokens: 20, total_tokens: 110 }
+        }))
+
+        const result = await generateGroundedRagAnswer({
+            userMessage: 'TLT yaz stajı kaç gün?',
+            responseLanguage: 'tr',
+            chunks,
+            createCompletion
+        })
+
+        expect(result.usedGeneration).toBe(false)
+        expect(result.answer).toBe('')
+    })
+
+    it('rejects legacy support quote answers that add unsupported semantic claims', async () => {
+        const createCompletion = vi.fn(async () => ({
+            choices: [{
+                message: {
+                    content: JSON.stringify({
+                        answer: 'Bu programda staj ücreti alınmaz.',
+                        support_quotes: ['Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.'],
+                        engagement_question: '',
+                        engagement_evidence: ''
+                    })
+                }
+            }],
+            usage: { prompt_tokens: 90, completion_tokens: 20, total_tokens: 110 }
+        }))
+
+        const result = await generateGroundedRagAnswer({
+            userMessage: 'TLT yaz stajı kaç gün?',
+            responseLanguage: 'tr',
+            chunks,
+            createCompletion
+        })
+
+        expect(result.usedGeneration).toBe(false)
+        expect(result.answer).toBe('')
+    })
+
     it('rejects answers whose selected evidence ids do not exist', async () => {
         const createCompletion = vi.fn(async () => ({
             choices: [{

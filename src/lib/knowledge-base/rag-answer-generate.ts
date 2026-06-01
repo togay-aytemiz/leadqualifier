@@ -146,6 +146,9 @@ const ANSWER_EVIDENCE_STOPWORDS = new Set([
     'bir',
     'bu',
     'evet',
+    'gun',
+    'gunu',
+    'günü',
     'hayir',
     'hayır',
     'icin',
@@ -156,42 +159,16 @@ const ANSWER_EVIDENCE_STOPWORDS = new Set([
     'programda',
     'programinda',
     'programında',
+    'sure',
+    'suresi',
+    'süre',
+    'süresi',
     'the',
     'this',
     'var',
     've',
     'veya',
     'yes'
-])
-
-const ANSWER_EVIDENCE_COVERAGE_THRESHOLD = 0.6
-
-const CLAIM_RISK_TERMS = new Set([
-    'alinmaz',
-    'alınmaz',
-    'bedel',
-    'bedeli',
-    'cost',
-    'degil',
-    'değil',
-    'fee',
-    'fiyat',
-    'fiyati',
-    'fiyatı',
-    'free',
-    'not',
-    'no',
-    'odenmez',
-    'ödenmez',
-    'paid',
-    'price',
-    'ucret',
-    'ucreti',
-    'ücret',
-    'ücreti',
-    'ucretsiz',
-    'ücretsiz',
-    'yok'
 ])
 
 function resolveRagGenerateModel(model?: string) {
@@ -383,24 +360,42 @@ function tokenizeAnswerEvidenceSignalTerms(value: string) {
         .split(/[^a-z0-9]+/i)
         .map((token) => token.trim())
         .map(stemEngagementToken)
+        .map(stemAnswerEvidenceToken)
         .filter((token) => token.length >= 4)
         .filter((token) => !ANSWER_EVIDENCE_STOPWORDS.has(token))
 }
 
-function hasSelectedEvidenceSemanticOverlap(answer: string, selectedEvidence: string) {
+function stemAnswerEvidenceToken(token: string) {
+    const suffixes = [
+        'dedir',
+        'dadir',
+        'tedir',
+        'tadir',
+        'dur',
+        'dür',
+        'dir',
+        'dır',
+        'de',
+        'da',
+        'te',
+        'ta'
+    ]
+
+    for (const suffix of suffixes) {
+        if (token.endsWith(suffix) && token.length - suffix.length >= 4) {
+            return token.slice(0, -suffix.length)
+        }
+    }
+
+    return token
+}
+
+function hasCompleteFactualSupport(answer: string, supportText: string) {
     const answerTerms = Array.from(new Set(tokenizeAnswerEvidenceSignalTerms(answer)))
     if (answerTerms.length === 0) return false
 
-    const evidenceTerms = new Set(tokenizeAnswerEvidenceSignalTerms(selectedEvidence))
-    const unsupportedRiskTerms = answerTerms
-        .filter((term) => CLAIM_RISK_TERMS.has(term))
-        .filter((term) => !evidenceTerms.has(term))
-    if (unsupportedRiskTerms.length > 0) {
-        return false
-    }
-
-    const supportedTerms = answerTerms.filter((term) => evidenceTerms.has(term))
-    return supportedTerms.length / answerTerms.length >= ANSWER_EVIDENCE_COVERAGE_THRESHOLD
+    const supportTerms = new Set(tokenizeAnswerEvidenceSignalTerms(supportText))
+    return answerTerms.every((term) => supportTerms.has(term))
 }
 
 function criticalFactsSupported(answer: string, context: string) {
@@ -684,7 +679,7 @@ export async function generateGroundedRagAnswer(input: {
         ? selectedEvidenceText(evidencePack, payload.usedEvidenceIds)
         : context
 
-    if (usesEvidenceIds && !hasSelectedEvidenceSemanticOverlap(payload.answer, supportContext)) {
+    if (!hasCompleteFactualSupport(payload.answer, supportContext)) {
         return fallbackResult(model, usage)
     }
 
