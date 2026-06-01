@@ -140,38 +140,21 @@ function extractRegexValues(quote: string, regex: RegExp) {
     return Array.from(quote.matchAll(regex), (match) => match[0].trim())
 }
 
-function extractCriticalValues(quote: string, kind: RagEvidenceKind) {
+function extractCriticalValues(quote: string) {
     const values: string[] = []
     const escapedWords = TURKISH_NUMBER_WORDS.join('|')
 
-    if (kind === 'contact') {
-        values.push(...extractRegexValues(quote, /[\w.!#$%&'*+/=?^`{|}~-]+@[\w-]+(?:\.[\w-]+)+/gi))
-        values.push(...extractRegexValues(quote, /(?:\+?\d[\d\s().-]{7,}\d)/g))
-    }
-
-    if (kind === 'link') {
-        values.push(...extractRegexValues(quote, /https?:\/\/[^\s<>"')]+/gi))
-    }
-
-    if (kind === 'duration') {
-        values.push(...extractRegexValues(quote, /\b\d+\s*(?:iş\s*)?(?:gün(?:ü|dür|dur)?|hafta|ay|yıl|saat|dakika)\b/gi))
-        values.push(...extractRegexValues(
-            quote,
-            new RegExp(`\\b(?:${escapedWords})(?:\\s+(?:${escapedWords}))*\\s*(?:iş\\s*)?(?:gün(?:ü|dür|dur)?|hafta|ay|yıl|saat|dakika)\\b`, 'gi')
-        ))
-    }
-
-    if (kind === 'policy') {
-        values.push(...extractRegexValues(quote, /%\s?\d+(?:[.,]\d+)?|\b\d+(?:[.,]\d+)?\s?%/g))
-    }
-
-    if (kind === 'platform') {
-        values.push(...extractRegexValues(quote, /\b(?:MEDU|UZEM|ÖBS|OBS|LMS|Moodle|Teams|Zoom)\b/giu))
-    }
-
-    if (kind === 'document_code') {
-        values.push(...extractRegexValues(quote, /\b[A-ZÇĞİÖŞÜ]{2,}[-_/]?\d{2,}(?:[-_/]?[A-ZÇĞİÖŞÜ0-9]+)*\b/g))
-    }
+    values.push(...extractRegexValues(quote, /[\w.!#$%&'*+/=?^`{|}~-]+@[\w-]+(?:\.[\w-]+)+/gi))
+    values.push(...extractRegexValues(quote, /(?:\+?\d[\d\s().-]{7,}\d)/g))
+    values.push(...extractRegexValues(quote, /https?:\/\/[^\s<>"')]+/gi))
+    values.push(...extractRegexValues(quote, /\b\d+\s*(?:iş\s*)?(?:gün(?:ü|dür|dur)?|hafta|ay|yıl|saat|dakika)\b/gi))
+    values.push(...extractRegexValues(
+        quote,
+        new RegExp(`\\b(?:${escapedWords})(?:\\s+(?:${escapedWords}))*\\s*(?:iş\\s*)?(?:gün(?:ü|dür|dur)?|hafta|ay|yıl|saat|dakika)\\b`, 'gi')
+    ))
+    values.push(...extractRegexValues(quote, /%\s?\d+(?:[.,]\d+)?|\b\d+(?:[.,]\d+)?\s?%/g))
+    values.push(...extractRegexValues(quote, /\b(?:MEDU|UZEM|ÖBS|OBS|LMS|Moodle|Teams|Zoom)\b/giu))
+    values.push(...extractRegexValues(quote, /\b[A-ZÇĞİÖŞÜ]{2,}[-_/]?\d{2,}(?:[-_/]?[A-ZÇĞİÖŞÜ0-9]+)*\b/g))
 
     return uniqueValues(values)
 }
@@ -231,8 +214,8 @@ function scoreCandidate(userMessage: string, chunk: RagChunk, kind: RagEvidenceK
 }
 
 function dedupeKey(chunk: RagChunk, quote: string) {
-    const source = sourceUrlFor(chunk) ?? ''
-    const documentId = chunk.document_id ?? ''
+    const source = normalizeText(sourceUrlFor(chunk) ?? '')
+    const documentId = normalizeText(chunk.document_id ?? '')
     return `${source}|${documentId}|${normalizeText(quote)}`
 }
 
@@ -264,7 +247,7 @@ export function buildRagEvidencePack<T extends RagChunk = RagChunk>({
             }
             seen.add(key)
 
-            const criticalValues = extractCriticalValues(quote, kind)
+            const criticalValues = extractCriticalValues(quote)
             candidates.push({
                 chunk,
                 kind,

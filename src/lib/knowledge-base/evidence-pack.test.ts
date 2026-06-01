@@ -67,6 +67,54 @@ describe('buildRagEvidencePack', () => {
         expect(pack.diagnostics.droppedDuplicateCount).toBe(1)
     })
 
+    it('keeps all critical values found in the selected quote', () => {
+        const pack = buildRagEvidencePack({
+            userMessage: 'MEDU bağlantısı ve devam şartı nedir?',
+            chunks: [{
+                chunk_id: 'chunk-medu-link',
+                document_id: 'doc-medu-link',
+                document_title: 'MEDU Kullanım Kılavuzu',
+                source_url: 'https://example.edu.tr/medu-guide.pdf',
+                content: 'MEDU erişimi https://medu.example.edu.tr adresinden yapılır ve devam şartı %70 olarak uygulanır.'
+            }]
+        })
+
+        const item = pack.items[0]
+
+        expect(item?.criticalValues).toEqual(expect.arrayContaining([
+            'https://medu.example.edu.tr',
+            'MEDU',
+            '%70'
+        ]))
+    })
+
+    it('deduplicates evidence with normalized source and document identity', () => {
+        const pack = buildRagEvidencePack({
+            userMessage: 'MEDU nereden kullanılır?',
+            chunks: [
+                {
+                    chunk_id: 'chunk-medu-uppercase-source',
+                    document_id: ' DOC-MEDU ',
+                    document_title: 'Ders İçerikleri',
+                    source_url: ' HTTPS://EXAMPLE.EDU.TR/MEDU.PDF ',
+                    similarity: 0.8,
+                    content: 'Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.'
+                },
+                {
+                    chunk_id: 'chunk-medu-normalized-source',
+                    document_id: 'doc-medu',
+                    document_title: 'Ders İçerikleri',
+                    source_url: 'https://example.edu.tr/medu.pdf',
+                    similarity: 0.7,
+                    content: 'Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.'
+                }
+            ]
+        })
+
+        expect(pack.items.filter((item) => item.quote.includes('MEDU'))).toHaveLength(1)
+        expect(pack.diagnostics.droppedDuplicateCount).toBe(1)
+    })
+
     it('builds a source-labeled evidence context for the answerer', () => {
         const pack = buildRagEvidencePack({
             userMessage: 'TLT yaz stajı kaç gün?',
