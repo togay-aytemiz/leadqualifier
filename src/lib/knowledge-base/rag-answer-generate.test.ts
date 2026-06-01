@@ -223,6 +223,32 @@ describe('generateGroundedRagAnswer', () => {
         expect(result.sourceChunks?.map((chunk) => chunk.document_id)).toEqual(['doc-tlt'])
     })
 
+    it('rejects evidence-id answers that do not overlap selected evidence semantically', async () => {
+        const createCompletion = vi.fn(async () => ({
+            choices: [{
+                message: {
+                    content: JSON.stringify({
+                        answer: 'Bu programda başvuru ücreti alınmaz.',
+                        used_evidence_ids: ['ev_1'],
+                        engagement_question: '',
+                        engagement_evidence_id: ''
+                    })
+                }
+            }],
+            usage: { prompt_tokens: 90, completion_tokens: 20, total_tokens: 110 }
+        }))
+
+        const result = await generateGroundedRagAnswer({
+            userMessage: 'TLT yaz stajı kaç gün?',
+            responseLanguage: 'tr',
+            chunks,
+            createCompletion
+        })
+
+        expect(result.usedGeneration).toBe(false)
+        expect(result.answer).toBe('')
+    })
+
     it('rejects answers whose selected evidence ids do not exist', async () => {
         const createCompletion = vi.fn(async () => ({
             choices: [{

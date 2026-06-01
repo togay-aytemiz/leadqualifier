@@ -140,6 +140,32 @@ const ENGAGEMENT_STOPWORDS = new Set([
     'would'
 ])
 
+const ANSWER_EVIDENCE_STOPWORDS = new Set([
+    ...ENGAGEMENT_STOPWORDS,
+    'answer',
+    'bir',
+    'bu',
+    'evet',
+    'hayir',
+    'hayır',
+    'icin',
+    'için',
+    'is',
+    'ise',
+    'no',
+    'program',
+    'programda',
+    'programinda',
+    'programında',
+    'the',
+    'this',
+    'var',
+    've',
+    'veya',
+    'yes',
+    'yok'
+])
+
 function resolveRagGenerateModel(model?: string) {
     return model?.trim()
         || process.env.OPENAI_RAG_GENERATE_MODEL?.trim()
@@ -322,6 +348,27 @@ function selectedEvidenceText(pack: RagEvidencePack, evidenceIds: string[]) {
             ...item.criticalValues
         ].filter(Boolean).join('\n'))
         .join('\n\n')
+}
+
+function tokenizeAnswerEvidenceSignalTerms(value: string) {
+    return new Set(normalizeForMatch(value)
+        .split(/[^a-z0-9]+/i)
+        .map((token) => token.trim())
+        .map(stemEngagementToken)
+        .filter((token) => token.length >= 4)
+        .filter((token) => !ANSWER_EVIDENCE_STOPWORDS.has(token)))
+}
+
+function hasSelectedEvidenceSemanticOverlap(answer: string, selectedEvidence: string) {
+    const answerTerms = tokenizeAnswerEvidenceSignalTerms(answer)
+    if (answerTerms.size === 0) return false
+
+    const evidenceTerms = tokenizeAnswerEvidenceSignalTerms(selectedEvidence)
+    for (const term of answerTerms) {
+        if (evidenceTerms.has(term)) return true
+    }
+
+    return false
 }
 
 function criticalFactsSupported(answer: string, context: string) {
@@ -604,6 +651,10 @@ export async function generateGroundedRagAnswer(input: {
     const supportContext = usesEvidenceIds
         ? selectedEvidenceText(evidencePack, payload.usedEvidenceIds)
         : context
+
+    if (usesEvidenceIds && !hasSelectedEvidenceSemanticOverlap(payload.answer, supportContext)) {
+        return fallbackResult(model, usage)
+    }
 
     if (!criticalFactsSupported(payload.answer, supportContext)) {
         return fallbackResult(model, usage)
