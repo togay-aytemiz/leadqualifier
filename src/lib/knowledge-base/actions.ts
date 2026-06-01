@@ -4009,9 +4009,7 @@ async function searchKnowledgeBaseByLectureNotesEvidence(
             return (searchable.includes('ders not')
                     || searchable.includes('ders materyal')
                     || searchable.includes('ders icerigi')
-                    || searchable.includes('ders bilgi paketi')
-                    || searchable.includes('ders program')
-                    || searchable.includes('ders listesi'))
+                    || searchable.includes('ders bilgi paketi'))
                 && (searchable.includes('uzem') || searchable.includes('medu') || searchable.includes('obs') || searchable.includes('obs') || searchable.includes('erisime acilir'))
         })
         .map((result) => {
