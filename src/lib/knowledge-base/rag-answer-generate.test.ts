@@ -184,4 +184,98 @@ describe('generateGroundedRagAnswer', () => {
         expect(result.usedGeneration).toBe(true)
         expect(result.addedEngagement).toBe(false)
     })
+
+    it('asks the model to answer from evidence ids and returns selected source chunks', async () => {
+        const createCompletion = vi.fn(async (args: Record<string, unknown>) => {
+            const messages = args.messages as Array<{ role: string; content: string }>
+            const systemPrompt = messages.find((message) => message.role === 'system')?.content ?? ''
+
+            expect(systemPrompt).toContain('Evidence ID: ev_1')
+            expect(systemPrompt).toContain('Use only the evidence ids listed below')
+            expect(systemPrompt).toContain('used_evidence_ids')
+            expect(systemPrompt).toContain('Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.')
+
+            return {
+                choices: [{
+                    message: {
+                        content: JSON.stringify({
+                            answer: 'Evet, Tıbbi Laboratuvar Teknikleri programında yaz stajı var; süresi 20 iş günü.',
+                            used_evidence_ids: ['ev_1'],
+                            engagement_question: '',
+                            engagement_evidence_id: ''
+                        })
+                    }
+                }],
+                usage: { prompt_tokens: 130, completion_tokens: 35, total_tokens: 165 }
+            }
+        })
+
+        const result = await generateGroundedRagAnswer({
+            userMessage: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı?',
+            responseLanguage: 'tr',
+            chunks,
+            createCompletion
+        })
+
+        expect(result.usedGeneration).toBe(true)
+        expect(result.usedEvidenceIds).toEqual(['ev_1'])
+        expect(result.sourceChunks?.map((chunk) => chunk.document_id)).toEqual(['doc-tlt'])
+    })
+
+    it('rejects answers whose selected evidence ids do not exist', async () => {
+        const createCompletion = vi.fn(async () => ({
+            choices: [{
+                message: {
+                    content: JSON.stringify({
+                        answer: 'Yaz stajı 20 iş günüdür.',
+                        used_evidence_ids: ['ev_404'],
+                        engagement_question: '',
+                        engagement_evidence_id: ''
+                    })
+                }
+            }],
+            usage: { prompt_tokens: 90, completion_tokens: 20, total_tokens: 110 }
+        }))
+
+        const result = await generateGroundedRagAnswer({
+            userMessage: 'TLT yaz stajı kaç gün?',
+            responseLanguage: 'tr',
+            chunks,
+            createCompletion
+        })
+
+        expect(result.usedGeneration).toBe(false)
+        expect(result.answer).toBe('')
+    })
+
+    it('drops engagement when the engagement evidence id is missing from the pack', async () => {
+        const createCompletion = vi.fn(async () => ({
+            choices: [{
+                message: {
+                    content: JSON.stringify({
+                        answer: 'Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.',
+                        used_evidence_ids: ['ev_1'],
+                        engagement_question: 'İstersen sınav takvimini de gösterebilirim.',
+                        engagement_evidence_id: 'ev_99'
+                    })
+                }
+            }],
+            usage: { prompt_tokens: 100, completion_tokens: 40, total_tokens: 140 }
+        }))
+
+        const result = await generateGroundedRagAnswer({
+            userMessage: 'Ders içerikleri nereden paylaşılır?',
+            responseLanguage: 'tr',
+            chunks: [{
+                content: 'Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.',
+                document_id: 'doc-medu',
+                document_title: 'Ders İçerikleri',
+                source_url: 'https://example.edu.tr/medu.pdf'
+            }],
+            createCompletion
+        })
+
+        expect(result.answer).toBe('Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.')
+        expect(result.addedEngagement).toBe(false)
+    })
 })
