@@ -2922,6 +2922,57 @@ describe('searchKnowledgeBase', () => {
         }
     })
 
+    it('fuses vector and keyword channels so repeated evidence beats a single broad vector match', async () => {
+        const { supabase, rpcMock } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'chunk-broad',
+                    document_id: 'doc-broad',
+                    document_title: 'Akademik Duyurular',
+                    document_type: 'article',
+                    content: 'Akademik bilgi paylaşımı genel duyurular ve süreçler kapsamında yapılır.',
+                    similarity: 0.99
+                },
+                {
+                    chunk_id: 'chunk-obs',
+                    document_id: 'doc-obs',
+                    document_title: 'Akademik Bilgi Paylaşımı',
+                    document_type: 'pdf',
+                    content: 'Akademik bilgi paylaşımı ÖBS üzerinden yapılır.',
+                    similarity: 0.2
+                }
+            ],
+            fallbackRows: [{
+                id: 'chunk-obs',
+                document_id: 'doc-obs',
+                content: 'Page Title: Akademik Bilgi Paylaşımı\nSource URL: https://example.edu.tr/obs.pdf\n\nAkademik bilgi paylaşımı ÖBS üzerinden yapılır.',
+                knowledge_documents: {
+                    title: 'Akademik Bilgi Paylaşımı',
+                    type: 'pdf',
+                    status: 'ready'
+                }
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'akademik bilgi paylaşımı',
+            'org-1',
+            0.6,
+            2,
+            { supabase, skipQueryPlanner: true }
+        )
+
+        expect(rpcMock).toHaveBeenCalledWith('match_knowledge_chunks', expect.anything())
+        expect(results[0]).toMatchObject({
+            chunk_id: 'chunk-obs',
+            document_id: 'doc-obs',
+            rrf: {
+                channels: expect.arrayContaining(['vector', 'keyword'])
+            }
+        })
+    })
+
     it('skips broad vector search when quick lexical evidence is already strong enough', async () => {
         const { supabase, rpcMock } = createHybridSearchSupabase({
             rpcRows: [{

@@ -24,6 +24,11 @@ import {
     type KnowledgeSearchPlanningTurn,
     type KnowledgeSearchQueryPlan
 } from '@/lib/knowledge-base/query-planner'
+import {
+    mergeHybridRagResults,
+    type HybridSearchChannel,
+    type HybridSearchChannelName
+} from '@/lib/knowledge-base/hybrid-retrieval'
 import { assertTenantWriteAllowed, resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { revalidatePath } from 'next/cache'
 
@@ -819,12 +824,34 @@ async function searchKnowledgeBaseSingleQuery(
     ]
 
     if ((!data || data.length === 0) && lexicalResults.length > 0) {
-        return mergeSearchResults(query, [], lexicalResults, limit)
+        return mergeHybridSearchChannels(query, buildHybridKnowledgeSearchChannels({
+            vectorResults: [],
+            policyDurationResults,
+            focusedEvidenceResults: focusedPolicyEvidenceResults,
+            keywordResults: fallbackResults,
+            documentCodeResults,
+            abbreviationResults,
+            focusedKeywordResults,
+            exactTitlePhraseResults,
+            titleResults,
+            sourceResults
+        }), limit)
     }
 
     if (!data) return []
 
-    return mergeSearchResults(query, data, lexicalResults, limit)
+    return mergeHybridSearchChannels(query, buildHybridKnowledgeSearchChannels({
+        vectorResults: data,
+        policyDurationResults,
+        focusedEvidenceResults: focusedPolicyEvidenceResults,
+        keywordResults: fallbackResults,
+        documentCodeResults,
+        abbreviationResults,
+        focusedKeywordResults,
+        exactTitlePhraseResults,
+        titleResults,
+        sourceResults
+    }), limit)
 }
 
 function dedupePlannedSearchQueries(originalQuery: string, plannedQueries: string[]) {
@@ -5015,9 +5042,19 @@ function mergeSearchResults(
     keywordResults: KnowledgeSearchResult[],
     limit: number
 ) {
+    return mergeHybridSearchChannels(query, [
+        { name: 'vector', results: vectorResults },
+        { name: 'keyword', results: keywordResults, weight: 1.2 }
+    ], limit)
+}
+
+function prepareHybridSearchChannel(
+    query: string,
+    channel: HybridSearchChannel<KnowledgeSearchResult>
+): HybridSearchChannel<KnowledgeSearchResult> {
     const byChunk = new Map<string, KnowledgeSearchResult>()
 
-    for (const rawResult of [...vectorResults, ...keywordResults]) {
+    for (const rawResult of channel.results) {
         const result = enrichKnowledgeSearchResult(rawResult)
         if (shouldSuppressAcademicSubjectMismatch(query, result)) continue
 
@@ -5027,7 +5064,35 @@ function mergeSearchResults(
         }
     }
 
-    return [...byChunk.values()]
+    return {
+        ...channel,
+        results: [...byChunk.values()]
+            .sort((left, right) => {
+                const leftAddressPriority = namedUnitAddressPriority(query, left)
+                const rightAddressPriority = namedUnitAddressPriority(query, right)
+                if (leftAddressPriority !== rightAddressPriority) {
+                    return rightAddressPriority - leftAddressPriority
+                }
+
+                return scoreKnowledgeResult(query, right) - scoreKnowledgeResult(query, left)
+            })
+    }
+}
+
+function mergeHybridSearchChannels(
+    query: string,
+    channels: Array<HybridSearchChannel<KnowledgeSearchResult>>,
+    limit: number
+) {
+    const preparedChannels = channels
+        .map((channel) => prepareHybridSearchChannel(query, channel))
+        .filter((channel) => channel.results.length > 0)
+
+    return mergeHybridRagResults({
+        query,
+        channels: preparedChannels,
+        limit: Math.max(limit * 3, limit + 4)
+    })
         .sort((left, right) => {
             const leftAddressPriority = namedUnitAddressPriority(query, left)
             const rightAddressPriority = namedUnitAddressPriority(query, right)
@@ -5035,9 +5100,47 @@ function mergeSearchResults(
                 return rightAddressPriority - leftAddressPriority
             }
 
-            return scoreKnowledgeResult(query, right) - scoreKnowledgeResult(query, left)
+            return (right.rrf?.score ?? 0) - (left.rrf?.score ?? 0)
         })
         .slice(0, limit)
+}
+
+function buildHybridKnowledgeSearchChannels(input: {
+    vectorResults: KnowledgeSearchResult[]
+    policyDurationResults: KnowledgeSearchResult[]
+    focusedEvidenceResults: KnowledgeSearchResult[]
+    keywordResults: KnowledgeSearchResult[]
+    documentCodeResults: KnowledgeSearchResult[]
+    abbreviationResults: KnowledgeSearchResult[]
+    focusedKeywordResults: KnowledgeSearchResult[]
+    exactTitlePhraseResults: KnowledgeSearchResult[]
+    titleResults: KnowledgeSearchResult[]
+    sourceResults: KnowledgeSearchResult[]
+}) {
+    const channel = (
+        name: HybridSearchChannelName,
+        results: KnowledgeSearchResult[],
+        weight?: number
+    ): HybridSearchChannel<KnowledgeSearchResult> => ({ name, results, weight })
+
+    return [
+        channel('vector', input.vectorResults),
+        channel('focused_evidence', [
+            ...input.policyDurationResults,
+            ...input.focusedEvidenceResults
+        ], 2),
+        channel('keyword', [
+            ...input.keywordResults,
+            ...input.documentCodeResults,
+            ...input.abbreviationResults,
+            ...input.focusedKeywordResults
+        ], 1.2),
+        channel('title_source', [
+            ...input.exactTitlePhraseResults,
+            ...input.titleResults,
+            ...input.sourceResults
+        ], 1.25)
+    ]
 }
 
 function shouldReturnFocusedEvidenceResultsEarly(query: string, results: KnowledgeSearchResult[]) {
