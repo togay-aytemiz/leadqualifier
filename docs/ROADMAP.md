@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-06-01):** The next RAG P1 is split into two guarded steps: first a typed Evidence Pack layer that separates source-backed evidence selection from LLM answer writing, then a real hybrid RRF retrieval merge across vector, lexical, title/source, and focused-evidence channels. Production deploys for this work require automated regression coverage plus local/test UI smoke before any live rollout.
+
 > **Update Note (2026-06-01):** Public Demo Chat source-link filtering now treats short learning-platform names such as UZEM/MEDU/ÖBS as required concrete evidence, not only ranking hints. If an answer says a material is available through a named platform, appended source URLs must come from chunks that actually contain that platform evidence, preventing broad learning-material PDFs from appearing as extra sources. Persisted RAG metadata now records only document ids whose source URLs are displayed in the final reply when the reply contains source links, keeping diagnostics aligned with customer-visible citations.
 
 > **Update Note (2026-06-01):** Focused contact repair now strips inflected generic role words such as `sorumlusunun` before acronym scoring, so a real subject acronym like `TLT` does not combine with role wording into a bogus acronym that can select the next adjacent program e-mail in a contact table. This keeps contact selection tied to the requested unit/program rather than neighboring rows.
