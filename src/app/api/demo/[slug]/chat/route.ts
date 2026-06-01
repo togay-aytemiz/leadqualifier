@@ -406,6 +406,54 @@ function demoRagChunkKey(chunk: RagChunk) {
         ?? `${chunk.document_id ?? 'unknown'}:${chunk.content.replace(/\s+/g, ' ').trim().slice(0, 180)}`
 }
 
+function normalizeDemoSourceUrl(value: string | null | undefined) {
+    const raw = value?.trim()
+    if (!raw) return null
+
+    const compacted = raw.replace(/\s+/g, '').replace(/[)\].,;:!?]+$/g, '')
+    try {
+        const parsed = new URL(compacted)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
+        return parsed.toString()
+    } catch {
+        return null
+    }
+}
+
+function collectDisplayedDemoSourceUrls(replyText: string) {
+    const urls = new Set<string>()
+    const matches = replyText.match(/https?:\/\/\S+/gi) ?? []
+
+    for (const match of matches) {
+        const normalized = normalizeDemoSourceUrl(match)
+        if (normalized) urls.add(normalized)
+    }
+
+    return urls
+}
+
+function collectDemoReplySourceIds(reply: Pick<DemoChatExtractiveReply, 'replyText' | 'chunks'>) {
+    const displayedUrls = collectDisplayedDemoSourceUrls(reply.replyText)
+    const shouldFilterByDisplayedUrl = displayedUrls.size > 0
+    const sourceIds: string[] = []
+    const seen = new Set<string>()
+
+    for (const chunk of reply.chunks) {
+        const documentId = chunk.document_id?.trim()
+        if (!documentId || seen.has(documentId)) continue
+
+        if (shouldFilterByDisplayedUrl) {
+            const sourceUrl = normalizeDemoSourceUrl(chunk.source_url)
+            if (!sourceUrl || !displayedUrls.has(sourceUrl)) continue
+        }
+
+        seen.add(documentId)
+        sourceIds.push(documentId)
+    }
+
+    return sourceIds
+}
+
 function mergeDemoRagResultGroups(groups: RagChunk[][], limit: number) {
     const seen = new Set<string>()
     const merged: RagChunk[] = []
@@ -1197,7 +1245,7 @@ async function persistDemoChatExtractiveReply(input: {
                 rag_generate: input.reply.generation,
                 rag_polish: input.reply.polish,
                 rag_diagnostics: input.reply.diagnostics,
-                sources: input.reply.chunks.map((chunk) => chunk.document_id).filter(Boolean)
+                sources: collectDemoReplySourceIds(input.reply)
             }
         })
 

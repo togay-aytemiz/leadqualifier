@@ -1157,16 +1157,24 @@ describe('demo chat API route', () => {
     })
 
     it('falls back to broader knowledge search during polling before the shared pipeline', async () => {
-        const chunk = {
-            content: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir.',
-            document_id: 'doc-1',
-            document_title: 'Sağlık Bilimleri Fakültesi',
-            source_url: 'https://example.edu.tr/sbf.pdf',
-        }
-        searchKnowledgeBaseMock.mockResolvedValueOnce([chunk])
+        const chunks = [
+            {
+                content: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir.',
+                document_id: 'doc-1',
+                document_title: 'Sağlık Bilimleri Fakültesi',
+                source_url: 'https://example.edu.tr/sbf.pdf',
+            },
+            {
+                content: 'Genel ders materyali duyuruları ve erişilebilirlik düzenlemeleri.',
+                document_id: 'doc-2',
+                document_title: 'Genel Bilgilendirme',
+                source_url: 'https://example.edu.tr/generic.pdf',
+            }
+        ]
+        searchKnowledgeBaseMock.mockResolvedValueOnce(chunks)
         buildRagContextMock.mockReturnValueOnce({
-            context: chunk.content,
-            chunks: [chunk],
+            context: chunks.map((chunk) => chunk.content).join('\n---\n'),
+            chunks,
             tokenCount: 12,
         })
         repairLinkOnlyRagAnswerMock.mockReturnValueOnce('Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir.')
