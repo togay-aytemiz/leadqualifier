@@ -8,6 +8,7 @@
 
 ### Added
 
+- Added the task-by-task implementation plan for the P1 RAG Evidence Pack, evidence-id answerer contract, selected-source integration, hybrid RRF retrieval merge, automated regressions, and mandatory local/test UI smoke gate before production deployment (`docs/superpowers/plans/2026-06-01-rag-evidence-pack-rrf-implementation-plan.md`).
 - Added the approved P1 RAG design for a typed Evidence Pack layer, separated LLM answerer contract, evidence-selected source links, and a follow-up hybrid RRF retrieval merge, including the requirement to pass automated tests plus local/test UI smoke before any production deploy (`docs/superpowers/specs/2026-06-01-rag-evidence-pack-rrf-design.md`, `docs/PRD.md`, `docs/ROADMAP.md`).
 - Added Public Demo Chat RAG diagnostics and deterministic micro-polish: direct RAG bot replies now persist `rag_diagnostics` with search strategy, query count, retrieved chunk count, fast-path/micro-polish flags, and timing buckets; terse course-code answers may be warmed and expanded only when retrieved document titles support the acronym (`src/app/api/demo/[slug]/chat/route.ts`, `src/app/api/demo/[slug]/chat/route.test.ts`, `src/lib/knowledge-base/rag-answer-micro-polish.ts`, `src/lib/knowledge-base/rag-answer-micro-polish.test.ts`).
 - Added regression coverage for compound RAG source-link completeness when separate answer facts are supported by distinct documents, including Turkish word-number durations such as `altı yıldır` (`src/lib/knowledge-base/rag-source-links.ts`, `src/lib/knowledge-base/rag-source-links.test.ts`).
