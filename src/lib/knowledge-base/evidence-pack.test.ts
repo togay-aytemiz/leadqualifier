@@ -67,6 +67,22 @@ describe('buildRagEvidencePack', () => {
         expect(pack.diagnostics.droppedDuplicateCount).toBe(1)
     })
 
+    it('extracts ÖBS as platform evidence with unicode boundaries', () => {
+        const pack = buildRagEvidencePack({
+            userMessage: 'Ders içerikleri nereden paylaşılır?',
+            chunks: [{
+                chunk_id: 'chunk-obs-platform',
+                document_id: 'doc-obs-platform',
+                document_title: 'Öğrenci Bilgi Sistemi',
+                source_url: 'https://example.edu.tr/obs.pdf',
+                content: 'Ders içerikleri ÖBS üzerinden öğrencilerle paylaşılır.'
+            }]
+        })
+
+        expect(pack.items[0]?.kind).toBe('platform')
+        expect(pack.items[0]?.criticalValues).toContain('ÖBS')
+    })
+
     it('keeps all critical values found in the selected quote', () => {
         const pack = buildRagEvidencePack({
             userMessage: 'MEDU bağlantısı ve devam şartı nedir?',

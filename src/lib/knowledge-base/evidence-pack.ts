@@ -96,6 +96,8 @@ const TEXT_BOUNDARY_START = String.raw`(?<![\p{L}\p{N}_])`
 const DURATION_VALUE_END = String.raw`(?=(?:dür|dur)?(?![\p{L}\p{N}_]))`
 const DURATION_UNIT_PATTERN = String.raw`(?:gün(?:ü)?|hafta|ay|yıl|saat|dakika)`
 const TURKISH_NUMBER_WORD_PATTERN = TURKISH_NUMBER_WORDS.join('|')
+const TEXT_BOUNDARY_END = String.raw`(?![\p{L}\p{N}_])`
+const PLATFORM_PATTERN = String.raw`(?:MEDU|UZEM|ÖBS|OBS|LMS|Moodle|Teams|Zoom)`
 const NUMERIC_DURATION_REGEX = new RegExp(
     `${TEXT_BOUNDARY_START}\\d+\\s*(?:iş\\s*)?${DURATION_UNIT_PATTERN}${DURATION_VALUE_END}`,
     'giu'
@@ -112,6 +114,8 @@ const TURKISH_WORD_DURATION_TEST_REGEX = new RegExp(
     `${TEXT_BOUNDARY_START}(?:${TURKISH_NUMBER_WORD_PATTERN})(?:\\s+(?:${TURKISH_NUMBER_WORD_PATTERN}))*\\s*(?:iş\\s*)?${DURATION_UNIT_PATTERN}${DURATION_VALUE_END}`,
     'iu'
 )
+const PLATFORM_REGEX = new RegExp(`${TEXT_BOUNDARY_START}${PLATFORM_PATTERN}${TEXT_BOUNDARY_END}`, 'giu')
+const PLATFORM_TEST_REGEX = new RegExp(`${TEXT_BOUNDARY_START}${PLATFORM_PATTERN}${TEXT_BOUNDARY_END}`, 'iu')
 
 function sourceUrlFor(chunk: RagChunk) {
     return chunk.source_url ?? chunk.sourceUrl ?? null
@@ -169,7 +173,7 @@ function extractCriticalValues(quote: string) {
     values.push(...extractRegexValues(quote, NUMERIC_DURATION_REGEX))
     values.push(...extractRegexValues(quote, TURKISH_WORD_DURATION_REGEX))
     values.push(...extractRegexValues(quote, /%\s?\d+(?:[.,]\d+)?|\b\d+(?:[.,]\d+)?\s?%/g))
-    values.push(...extractRegexValues(quote, /\b(?:MEDU|UZEM|ÖBS|OBS|LMS|Moodle|Teams|Zoom)\b/giu))
+    values.push(...extractRegexValues(quote, PLATFORM_REGEX))
     values.push(...extractRegexValues(quote, /\b[A-ZÇĞİÖŞÜ]{2,}[-_/]?\d{2,}(?:[-_/]?[A-ZÇĞİÖŞÜ0-9]+)*\b/g))
 
     return uniqueValues(values)
@@ -181,7 +185,7 @@ function detectKind(quote: string): RagEvidenceKind | null {
     if (/https?:\/\/[^\s<>"')]+/i.test(quote)) return 'link'
     if (NUMERIC_DURATION_TEST_REGEX.test(quote)) return 'duration'
     if (TURKISH_WORD_DURATION_TEST_REGEX.test(quote)) return 'duration'
-    if (/\b(?:MEDU|UZEM|ÖBS|OBS|LMS|Moodle|Teams|Zoom)\b/iu.test(quote)) return 'platform'
+    if (PLATFORM_TEST_REGEX.test(quote)) return 'platform'
     if (/\b[A-ZÇĞİÖŞÜ]{2,}[-_/]?\d{2,}(?:[-_/]?[A-ZÇĞİÖŞÜ0-9]+)*\b/.test(quote)) return 'document_code'
     if (/%\s?\d+(?:[.,]\d+)?|\b\d+(?:[.,]\d+)?\s?%/.test(quote)) return 'policy'
     if (/(?:adres|mahalle|cadde|sokak|bulvar|no:|kat:|ilçe|kampüs|yerleşke|address)\b/i.test(quote)) return 'address'
