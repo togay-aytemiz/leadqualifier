@@ -40,7 +40,7 @@ function buildCleanDemoRedirectUrl(req: NextRequest) {
         redirectUrl.pathname = canonicalPath
     }
 
-    redirectUrl.searchParams.delete(DEMO_MAINTENANCE_BYPASS_PARAM)
+    redirectUrl.search = ''
     return redirectUrl
 }
 
@@ -48,10 +48,20 @@ function isSecureRequest(req: NextRequest) {
     return req.nextUrl.protocol === 'https:'
 }
 
+function createCleanRedirectResponse(redirectUrl: URL) {
+    return new NextResponse(null, {
+        status: 307,
+        headers: {
+            'Cache-Control': 'no-store',
+            Location: redirectUrl.toString(),
+        },
+    })
+}
+
 export async function GET(req: NextRequest) {
     const bypassValue = req.nextUrl.searchParams.get(DEMO_MAINTENANCE_BYPASS_PARAM)
     const redirectUrl = buildCleanDemoRedirectUrl(req)
-    const response = NextResponse.redirect(redirectUrl)
+    const response = createCleanRedirectResponse(redirectUrl)
 
     if (bypassValue === DEMO_MAINTENANCE_BYPASS_CLEAR_VALUE) {
         response.cookies.set({

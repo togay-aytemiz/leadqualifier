@@ -49,6 +49,19 @@ describe('demo maintenance bypass route', () => {
         expect(res.headers.get('location')).toBe('https://app.askqualy.com/en/demo/yiu-qualy-ai-demo')
     })
 
+    it('drops all query parameters from the clean redirect target', async () => {
+        vi.stubEnv('DEMO_MAINTENANCE_BYPASS_TOKEN', 'qualy-admin-maintenance-bypass-token-123')
+
+        const res = await GET(createBypassRequest({
+            [DEMO_MAINTENANCE_BYPASS_PARAM]: 'qualy-admin-maintenance-bypass-token-123',
+            next: '/demo/yiu-qualy-ai-demo?maintenance_bypass=qualy-admin-maintenance-bypass-token-123&next=%2Fdemo%2Fyiu-qualy-ai-demo&utm_source=qa',
+        }))
+
+        expect(res.status).toBe(307)
+        expect(res.headers.get('location')).toBe('https://app.askqualy.com/demo/yiu-qualy-ai-demo')
+        expect(res.headers.get('cache-control')).toBe('no-store')
+    })
+
     it('does not set a bypass cookie when the token is wrong', async () => {
         vi.stubEnv('DEMO_MAINTENANCE_BYPASS_TOKEN', 'qualy-admin-maintenance-bypass-token-123')
 
