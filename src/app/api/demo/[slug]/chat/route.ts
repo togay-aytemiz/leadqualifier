@@ -879,6 +879,7 @@ async function buildExtractiveDemoChatReply(input: {
     supabase: DemoChatServiceClient
     channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
     message: string
+    conversationId?: string | null
     conversationHistory?: KnowledgeSearchPlanningTurn[]
 }): Promise<DemoChatExtractiveReply | null> {
     const message = readMessageText(input.message)
@@ -999,6 +1000,7 @@ async function buildExtractiveDemoChatReply(input: {
                         source: 'demo_chat_rag_generate',
                         response_kind: 'rag_grounded_generate',
                         demo_chat_channel_id: input.channel.id,
+                        ...(input.conversationId ? { conversation_id: input.conversationId } : {}),
                         document_count: generatedSourceChunks.length
                     },
                     supabase: input.supabase
@@ -1053,6 +1055,7 @@ async function buildExtractiveDemoChatReply(input: {
                                 source: 'demo_chat_rag_generate_polish',
                                 response_kind: 'rag_grounded_generate_polish',
                                 demo_chat_channel_id: input.channel.id,
+                                ...(input.conversationId ? { conversation_id: input.conversationId } : {}),
                                 document_count: generatedSourceChunks.length
                             },
                             supabase: input.supabase
@@ -1133,6 +1136,7 @@ async function buildExtractiveDemoChatReply(input: {
                     metadata: {
                         source: 'demo_chat_rag_polish',
                         demo_chat_channel_id: input.channel.id,
+                        ...(input.conversationId ? { conversation_id: input.conversationId } : {}),
                         document_count: chunks.length
                     },
                     supabase: input.supabase
@@ -1317,13 +1321,29 @@ async function recoverPendingDemoChatReplyExtractively(input: {
     fallbackMessage: string
 }): Promise<DemoChatPipelineResult | null> {
     const pendingInbound = await findPendingDemoChatInboundMessage(input)
-    const inboundMessage = pendingInbound.message
+    let inboundMessage = pendingInbound.message
+    let conversationId = pendingInbound.conversationId
     const message = (readMessageText(inboundMessage?.content) || input.fallbackMessage).slice(0, MAX_MESSAGE_CHARS)
     if (!message) return null
+
+    if (!inboundMessage?.id || !conversationId) {
+        await ingestDemoChatInboundOnly({
+            supabase: input.supabase,
+            channel: input.channel,
+            sessionId: input.sessionId,
+            message,
+            inboundMessageId: input.messageId
+        })
+
+        const refreshedPendingInbound = await findPendingDemoChatInboundMessage(input)
+        inboundMessage = refreshedPendingInbound.message ?? inboundMessage
+        conversationId = refreshedPendingInbound.conversationId ?? conversationId
+    }
+
     const conversationHistory = shouldUseDemoConversationHistoryForRag(message)
         ? await readRecentDemoChatHistory({
             supabase: input.supabase,
-            conversationId: pendingInbound.conversationId,
+            conversationId,
             messageId: input.messageId
         })
         : []
@@ -1332,19 +1352,10 @@ async function recoverPendingDemoChatReplyExtractively(input: {
         supabase: input.supabase,
         channel: input.channel,
         message,
+        conversationId,
         conversationHistory
     })
     if (!reply) return null
-
-    if (!inboundMessage?.id) {
-        await ingestDemoChatInboundOnly({
-            supabase: input.supabase,
-            channel: input.channel,
-            sessionId: input.sessionId,
-            message,
-            inboundMessageId: input.messageId
-        })
-    }
 
     await persistDemoChatExtractiveReply({
         supabase: input.supabase,

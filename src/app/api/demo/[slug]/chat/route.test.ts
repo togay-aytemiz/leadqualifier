@@ -1684,6 +1684,7 @@ describe('demo chat API route', () => {
             metadata: expect.objectContaining({
                 source: 'demo_chat_rag_generate',
                 response_kind: 'rag_grounded_generate',
+                conversation_id: 'conversation-1',
             })
         }))
         expect(botInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
@@ -1695,6 +1696,123 @@ describe('demo chat API route', () => {
                 }
             })
         }))
+    })
+
+    it('creates the demo conversation before recording generated RAG usage', async () => {
+        const chunk = {
+            content: 'Üniversitede personelin yıllık izin süreleri hizmet süresine göre değişir.',
+            document_id: 'doc-leave',
+            document_title: 'Personel İzinleri',
+            source_url: 'https://example.edu.tr/izin.pdf',
+        }
+        searchKnowledgeBaseFocusedEvidenceMock.mockResolvedValueOnce([chunk])
+        buildRagContextMock.mockReturnValueOnce({
+            context: chunk.content,
+            chunks: [chunk],
+            tokenCount: 18,
+        })
+        generateGroundedRagAnswerMock.mockResolvedValueOnce({
+            answer: 'Personelin yıllık izin süresi hizmet süresine göre 14, 20 veya 26 iş günüdür.',
+            usedGeneration: true,
+            addedEngagement: true,
+            usage: { inputTokens: 90, outputTokens: 35, totalTokens: 125 },
+            model: 'gpt-4o-mini',
+        })
+        repairLinkOnlyRagAnswerMock.mockReturnValueOnce(null)
+        appendCanonicalRagSourceLinksMock.mockReturnValueOnce(
+            'Personelin yıllık izin süresi hizmet süresine göre 14, 20 veya 26 iş günüdür.\nhttps://example.edu.tr/izin.pdf'
+        )
+
+        const createConversationChain = (id: string | null) => {
+            const chain = {
+                eq: vi.fn(),
+                maybeSingle: vi.fn(async () => ({
+                    data: id ? { id } : null,
+                    error: null,
+                })),
+            }
+            chain.eq.mockReturnValue(chain)
+            return chain
+        }
+        const inboundMessagesChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: {
+                    id: 'contact-message-1',
+                    content: 'personelin yıllık izni ne kadar?',
+                },
+                error: null,
+            })),
+        }
+        inboundMessagesChain.eq.mockReturnValue(inboundMessagesChain)
+
+        const duplicateReplyChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: null,
+                error: null,
+            })),
+        }
+        duplicateReplyChain.eq.mockReturnValue(duplicateReplyChain)
+
+        const botInsertChain = {
+            insert: vi.fn(async () => ({ error: null })),
+        }
+        const conversationUpdateChain = {
+            update: vi.fn(() => conversationUpdateChain),
+            eq: vi.fn(async () => ({ error: null })),
+        }
+        const conversations = [
+            createConversationChain(null),
+            createConversationChain(null),
+            createConversationChain('conversation-1'),
+            createConversationChain('conversation-1'),
+        ]
+        const messagesTable = {
+            select: vi.fn((columns: string) => {
+                if (columns.includes('id, content')) return inboundMessagesChain
+                if (columns === 'id') return duplicateReplyChain
+                throw new Error(`Unexpected messages select ${columns}`)
+            }),
+            insert: botInsertChain.insert,
+        }
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                const chain = conversations.shift()
+                if (!chain) return conversationUpdateChain
+                return { select: vi.fn(() => chain), update: conversationUpdateChain.update }
+            }
+            if (table === 'messages') return messagesTable
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+        processInboundAiPipelineMock.mockImplementationOnce(async () => undefined)
+
+        const res = await GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+            message: 'personelin yıllık izni ne kadar?',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: 'Personelin yıllık izin süresi hizmet süresine göre 14, 20 veya 26 iş günüdür.\nhttps://example.edu.tr/izin.pdf',
+            skillImage: null,
+        })
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            inboundMessageId: 'message-1',
+            skipAutomation: true,
+        }))
+        expect(recordAiUsageMock).toHaveBeenCalledWith(expect.objectContaining({
+            metadata: expect.objectContaining({
+                source: 'demo_chat_rag_generate',
+                conversation_id: 'conversation-1',
+            })
+        }))
+        expect(processInboundAiPipelineMock.mock.invocationCallOrder[0]).toBeLessThan(
+            recordAiUsageMock.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+        )
     })
 
     it('returns deterministic repaired demo RAG replies without waiting for generation or polish', async () => {
