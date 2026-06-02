@@ -28,6 +28,30 @@ This is a **WhatsApp AI Qualy** SaaS for Turkish SMBs. The system:
 
 ## ⚠️ Critical Workflow Rules
 
+### Public Demo Maintenance Operations
+
+When the user asks to turn Public Demo Chat maintenance **on**, send or apply only the relevant Supabase SQL:
+
+```sql
+update public.demo_chat_channels
+set maintenance_enabled = true
+where slug = '<demo-slug>';
+```
+
+When the user asks to turn Public Demo Chat maintenance **off**, send or apply only the relevant Supabase SQL:
+
+```sql
+update public.demo_chat_channels
+set maintenance_enabled = false
+where slug = '<demo-slug>';
+```
+
+- Do **not** enable or disable maintenance unless the user explicitly asks for that action.
+- If the slug is not specified, use `yiu-qualy-ai-demo` for the current public demo unless the conversation clearly names another demo slug.
+- Before reporting success after applying SQL, verify the target row's `maintenance_enabled` value.
+- `DEMO_MAINTENANCE_MODE=1` is an emergency global override. If it is set, database `maintenance_enabled = false` will not reopen the demo until the env override is removed or set away from `1`.
+- Admin bypass stays token/cookie based: `?maintenance_bypass=<token>` enables private testing in that browser, and `?maintenance_bypass=off` clears it.
+
 ### After Completing Tasks
 
 **You MUST update these documents after completing work:**
