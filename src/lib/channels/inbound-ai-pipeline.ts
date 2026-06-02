@@ -788,10 +788,18 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     }
     const matchThreshold = aiSettings.match_threshold
     const kbThreshold = matchThreshold
-    const requiredIntakeFields = await getRequiredIntakeFields({
-        organizationId: orgId,
-        supabase: options.supabase
-    })
+    let requiredIntakeFields: Awaited<ReturnType<typeof getRequiredIntakeFields>> = []
+    let requiredIntakeFieldsLoaded = false
+    const ensureRequiredIntakeFields = async () => {
+        if (requiredIntakeFieldsLoaded) return requiredIntakeFields
+
+        requiredIntakeFields = await getRequiredIntakeFields({
+            organizationId: orgId,
+            supabase: options.supabase
+        })
+        requiredIntakeFieldsLoaded = true
+        return requiredIntakeFields
+    }
 
     const operatorActive = isOperatorActive(conversation)
     const botMode = aiSettings.bot_mode ?? 'active'
@@ -1270,6 +1278,74 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         }
     }
 
+    const skillMatchResult = await matchSkillsWithStatus({
+        matcher: () => matchSkills(options.text, orgId, matchThreshold, 5, options.supabase),
+        context: {
+            organization_id: orgId,
+            conversation_id: conversation.id,
+            source: options.source
+        },
+        intentGate: {
+            message: options.text,
+            threshold: matchThreshold
+        }
+    })
+    if (skillMatchResult.status === 'error') {
+        console.warn(`${options.logPrefix}: Skill matching failed; routing to human attention without fallback`, {
+            organization_id: orgId,
+            conversation_id: conversation.id,
+            error: skillMatchResult.error
+        })
+
+        await options.supabase
+            .from('conversations')
+            .update({
+                human_attention_required: true,
+                human_attention_reason: 'skill_match_error',
+                human_attention_resolved_at: null,
+                human_attention_requested_at: conversation.human_attention_requested_at ?? new Date().toISOString()
+            })
+            .eq('id', conversation.id)
+        return
+    }
+    const skillCandidates = skillMatchResult.matches ?? []
+    for (const candidateMatch of skillCandidates) {
+        const { data: matchedSkillDetails, error: matchedSkillError } = await options.supabase
+            .from('skills')
+            .select('requires_human_handover, title, skill_actions, image_public_url, image_mime_type, image_original_filename')
+            .eq('id', candidateMatch.skill_id)
+            .maybeSingle()
+
+        if (matchedSkillError) {
+            console.warn(`${options.logPrefix}: Failed to load matched skill handover flag`, {
+                skill_id: candidateMatch.skill_id,
+                error: matchedSkillError
+            })
+            continue
+        }
+
+        const skillRequiresHumanHandover = Boolean(matchedSkillDetails?.requires_human_handover)
+        const matchedSkillTitle = (candidateMatch.title ?? '').toString().trim()
+            || (matchedSkillDetails?.title ?? '').toString().trim()
+            || null
+
+        await sendSkillReply({
+            skillId: candidateMatch.skill_id,
+            skillTitle: matchedSkillTitle,
+            responseText: candidateMatch.response_text,
+            skillRequiresHumanHandover,
+            rawSkillActions: matchedSkillDetails?.skill_actions,
+            imagePublicUrl: matchedSkillDetails?.image_public_url,
+            imageMimeType: matchedSkillDetails?.image_mime_type,
+            imageOriginalFilename: matchedSkillDetails?.image_original_filename,
+            metadata: {
+                skill_match_source: 'semantic_top_match'
+            }
+        })
+
+        return
+    }
+
     const llmResponseStartedAt = Date.now()
 
     if (options.platform !== 'demo_chat') {
@@ -1348,74 +1424,6 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         }
     }
 
-    const skillMatchResult = await matchSkillsWithStatus({
-        matcher: () => matchSkills(options.text, orgId, matchThreshold, 5, options.supabase),
-        context: {
-            organization_id: orgId,
-            conversation_id: conversation.id,
-            source: options.source
-        },
-        intentGate: {
-            message: options.text,
-            threshold: matchThreshold
-        }
-    })
-    if (skillMatchResult.status === 'error') {
-        console.warn(`${options.logPrefix}: Skill matching failed; routing to human attention without fallback`, {
-            organization_id: orgId,
-            conversation_id: conversation.id,
-            error: skillMatchResult.error
-        })
-
-        await options.supabase
-            .from('conversations')
-            .update({
-                human_attention_required: true,
-                human_attention_reason: 'skill_match_error',
-                human_attention_resolved_at: null,
-                human_attention_requested_at: conversation.human_attention_requested_at ?? new Date().toISOString()
-            })
-            .eq('id', conversation.id)
-        return
-    }
-    const skillCandidates = skillMatchResult.matches ?? []
-    for (const candidateMatch of skillCandidates) {
-        const { data: matchedSkillDetails, error: matchedSkillError } = await options.supabase
-            .from('skills')
-            .select('requires_human_handover, title, skill_actions, image_public_url, image_mime_type, image_original_filename')
-            .eq('id', candidateMatch.skill_id)
-            .maybeSingle()
-
-        if (matchedSkillError) {
-            console.warn(`${options.logPrefix}: Failed to load matched skill handover flag`, {
-                skill_id: candidateMatch.skill_id,
-                error: matchedSkillError
-            })
-            continue
-        }
-
-        const skillRequiresHumanHandover = Boolean(matchedSkillDetails?.requires_human_handover)
-        const matchedSkillTitle = (candidateMatch.title ?? '').toString().trim()
-            || (matchedSkillDetails?.title ?? '').toString().trim()
-            || null
-
-        await sendSkillReply({
-            skillId: candidateMatch.skill_id,
-            skillTitle: matchedSkillTitle,
-            responseText: candidateMatch.response_text,
-            skillRequiresHumanHandover,
-            rawSkillActions: matchedSkillDetails?.skill_actions,
-            imagePublicUrl: matchedSkillDetails?.image_public_url,
-            imageMimeType: matchedSkillDetails?.image_mime_type,
-            imageOriginalFilename: matchedSkillDetails?.image_original_filename,
-            metadata: {
-                skill_match_source: 'semantic_top_match'
-            }
-        })
-
-        return
-    }
-
     try {
         const { searchKnowledgeBase } = await import('@/lib/knowledge-base/actions')
         const [{ data: recentMessages, error: historyError }, { data: leadSnapshot, error: leadError }] = await Promise.all([
@@ -1470,14 +1478,15 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         if (latestMessage && !customerHistoryForFollowup.some((value) => value === latestMessage)) {
             customerHistoryForFollowup.push(latestMessage)
         }
+        const loadedRequiredIntakeFields = await ensureRequiredIntakeFields()
         requiredIntakeAnalysis = analyzeRequiredIntakeState({
-            requiredFields: requiredIntakeFields,
+            requiredFields: loadedRequiredIntakeFields,
             recentCustomerMessages: customerHistoryForFollowup,
             recentAssistantMessages: assistantHistoryForFollowup,
             leadSnapshot: leadSnapshotForReply
         })
         const requiredIntakeGuidance = buildRequiredIntakeFollowupGuidance(
-            requiredIntakeFields,
+            loadedRequiredIntakeFields,
             customerHistoryForFollowup,
             assistantHistoryForFollowup,
             {
@@ -1960,11 +1969,18 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
     }
 
     if (!await ensureUsageAllowed('before_fallback')) return
+    const fallbackRequiredIntakeFields = await ensureRequiredIntakeFields()
+    requiredIntakeAnalysis = analyzeRequiredIntakeState({
+        requiredFields: fallbackRequiredIntakeFields,
+        recentCustomerMessages: customerHistoryForFollowup,
+        recentAssistantMessages: assistantHistoryForFollowup,
+        leadSnapshot: leadSnapshotForReply
+    })
     const fallbackText = await buildFallbackResponse({
         organizationId: orgId,
         message: options.text,
         preferredLanguage: responseLanguage,
-        requiredIntakeFields,
+        requiredIntakeFields: fallbackRequiredIntakeFields,
         recentCustomerMessages: customerHistoryForFollowup,
         recentAssistantMessages: assistantHistoryForFollowup,
         conversationHistory: conversationHistoryForReply,

@@ -44,6 +44,12 @@ describe('ai language helpers', () => {
         expect(resolveMvpResponseLanguage('Yuksek Ihtisas Universitesi genel telefon numarasi nedir?')).toBe('tr')
     })
 
+    it('treats ascii Turkish assistant-scope questions as Turkish', () => {
+        expect(resolveMvpResponseLanguage('sana hangi konuda soru sorabilirim')).toBe('tr')
+        expect(resolveMvpResponseLanguage('hangi konularda yardimci olabilirsin')).toBe('tr')
+        expect(resolveMvpResponseLanguageName('ne sorabilirim')).toBe('Turkish')
+    })
+
     it('uses history when current message language is ambiguous', () => {
         expect(isMvpResponseLanguageAmbiguous('ok')).toBe(true)
         expect(resolveMvpResponseLanguage('ok', {

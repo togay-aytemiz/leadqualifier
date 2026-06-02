@@ -1321,6 +1321,43 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })
 
+    it('answers matched skills before scheduling, intake, or RAG work starts', async () => {
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: false })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            skills: [skillDetails.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-greeting',
+                title: 'Karşılama ve İlk Mesaj',
+                response_text: 'Merhaba, size nasıl yardımcı olabilirim?',
+                trigger_text: 'Merhaba',
+                similarity: 1
+            }
+        ])
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound, { text: 'merhaba' }))
+
+        expect(sendOutbound).toHaveBeenCalledWith('Merhaba, size nasıl yardımcı olabilirim?\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(matchSkillsSafelyMock).toHaveBeenCalled()
+        expect(maybeHandleSchedulingRequestMock).not.toHaveBeenCalled()
+        expect(getRequiredIntakeFieldsMock).not.toHaveBeenCalled()
+        expect(decideKnowledgeBaseRouteMock).not.toHaveBeenCalled()
+        expect(openAiCreateMock).not.toHaveBeenCalled()
+        expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
     it('sends matched skill text first and image second when the skill has an image', async () => {
         const sendOutbound = vi.fn(async () => undefined)
         const dedupe = createDedupeBuilder(null)
@@ -3958,7 +3995,7 @@ describe('processInboundAiPipeline guardrails', () => {
                 is_booking_response: true
             })
         }))
-        expect(matchSkillsSafelyMock).not.toHaveBeenCalled()
+        expect(matchSkillsSafelyMock).toHaveBeenCalledTimes(1)
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
         expect(escalationConversationUpdate.updateMock).toHaveBeenCalledWith(expect.objectContaining({
             active_agent: 'operator',

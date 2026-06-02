@@ -259,6 +259,21 @@ describe('demo chat API route', () => {
         expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
     })
 
+    it('keeps Turkish scope-help replies Turkish even when the message has no Turkish-specific letters', async () => {
+        const res = await POST(createRequest({
+            sessionId: 'session-1',
+            message: 'sana hangi konuda soru sorabilirim',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: expect.stringContaining('Bu demo asistana'),
+            skillImage: null,
+        })
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+    })
+
     it('recovers already-pending demo scope-help polls without running RAG or the shared pipeline', async () => {
         const conversationChain = {
             eq: vi.fn(),
