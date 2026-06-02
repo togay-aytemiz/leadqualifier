@@ -48,12 +48,22 @@ function isSecureRequest(req: NextRequest) {
     return req.nextUrl.protocol === 'https:'
 }
 
+function escapeHtmlAttribute(value: string) {
+    return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('"', '&quot;')
+        .replaceAll('<', '&lt;')
+}
+
 function createCleanRedirectResponse(redirectUrl: URL) {
-    return new NextResponse(null, {
-        status: 307,
+    const redirectTarget = redirectUrl.toString()
+    const body = `<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex"><meta http-equiv="refresh" content="0;url=${escapeHtmlAttribute(redirectTarget)}"></head><body><script>window.location.replace(${JSON.stringify(redirectTarget)})</script></body></html>`
+
+    return new NextResponse(body, {
+        status: 200,
         headers: {
             'Cache-Control': 'no-store',
-            Location: redirectUrl.toString(),
+            'Content-Type': 'text/html; charset=utf-8',
         },
     })
 }

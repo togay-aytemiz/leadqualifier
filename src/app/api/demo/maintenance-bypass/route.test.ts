@@ -15,6 +15,17 @@ function createBypassRequest(searchParams: Record<string, string>) {
     return new NextRequest(url)
 }
 
+async function expectClientRedirect(res: Response, expectedUrl: string) {
+    expect(res.status).toBe(200)
+    expect(res.headers.get('location')).toBeNull()
+    expect(res.headers.get('cache-control')).toBe('no-store')
+    expect(res.headers.get('content-type')).toContain('text/html')
+
+    const body = await res.text()
+    expect(body).toContain(`window.location.replace(${JSON.stringify(expectedUrl)})`)
+    expect(body).not.toContain('maintenance_bypass=')
+}
+
 describe('demo maintenance bypass route', () => {
     afterEach(() => {
         vi.unstubAllEnvs()
@@ -28,8 +39,7 @@ describe('demo maintenance bypass route', () => {
             next: '/tr/demo/yiu-qualy-ai-demo?maintenance_bypass=qualy-admin-maintenance-bypass-token-123',
         }))
 
-        expect(res.status).toBe(307)
-        expect(res.headers.get('location')).toBe('https://app.askqualy.com/demo/yiu-qualy-ai-demo')
+        await expectClientRedirect(res, 'https://app.askqualy.com/demo/yiu-qualy-ai-demo')
         const setCookie = res.headers.get('set-cookie') ?? ''
         expect(setCookie).toContain(`${DEMO_MAINTENANCE_BYPASS_COOKIE}=`)
         expect(setCookie).toContain('HttpOnly')
@@ -45,8 +55,7 @@ describe('demo maintenance bypass route', () => {
             next: '/en/demo/yiu-qualy-ai-demo?maintenance_bypass=qualy-admin-maintenance-bypass-token-123',
         }))
 
-        expect(res.status).toBe(307)
-        expect(res.headers.get('location')).toBe('https://app.askqualy.com/en/demo/yiu-qualy-ai-demo')
+        await expectClientRedirect(res, 'https://app.askqualy.com/en/demo/yiu-qualy-ai-demo')
     })
 
     it('drops all query parameters from the clean redirect target', async () => {
@@ -57,9 +66,7 @@ describe('demo maintenance bypass route', () => {
             next: '/demo/yiu-qualy-ai-demo?maintenance_bypass=qualy-admin-maintenance-bypass-token-123&next=%2Fdemo%2Fyiu-qualy-ai-demo&utm_source=qa',
         }))
 
-        expect(res.status).toBe(307)
-        expect(res.headers.get('location')).toBe('https://app.askqualy.com/demo/yiu-qualy-ai-demo')
-        expect(res.headers.get('cache-control')).toBe('no-store')
+        await expectClientRedirect(res, 'https://app.askqualy.com/demo/yiu-qualy-ai-demo')
     })
 
     it('does not set a bypass cookie when the token is wrong', async () => {
@@ -70,8 +77,7 @@ describe('demo maintenance bypass route', () => {
             next: '/tr/demo/yiu-qualy-ai-demo',
         }))
 
-        expect(res.status).toBe(307)
-        expect(res.headers.get('location')).toBe('https://app.askqualy.com/demo/yiu-qualy-ai-demo')
+        await expectClientRedirect(res, 'https://app.askqualy.com/demo/yiu-qualy-ai-demo')
         expect(res.headers.get('set-cookie')).toBeNull()
     })
 
@@ -83,8 +89,7 @@ describe('demo maintenance bypass route', () => {
             next: '/tr/demo/yiu-qualy-ai-demo?maintenance_bypass=off',
         }))
 
-        expect(res.status).toBe(307)
-        expect(res.headers.get('location')).toBe('https://app.askqualy.com/demo/yiu-qualy-ai-demo')
+        await expectClientRedirect(res, 'https://app.askqualy.com/demo/yiu-qualy-ai-demo')
         const setCookie = res.headers.get('set-cookie') ?? ''
         expect(setCookie).toContain(`${DEMO_MAINTENANCE_BYPASS_COOKIE}=`)
         expect(setCookie).toContain('Max-Age=0')
