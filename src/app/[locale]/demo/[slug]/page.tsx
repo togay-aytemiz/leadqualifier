@@ -12,6 +12,7 @@ import {
     DEMO_MAINTENANCE_BYPASS_PARAM,
     shouldServeDemoMaintenance,
 } from '@/lib/demo-chat/maintenance'
+import { buildLocalizedPath } from '@/lib/i18n/locale-path'
 import { getScopedMessages } from '@/i18n/messages'
 
 export const dynamic = 'force-dynamic'
@@ -63,7 +64,7 @@ function readSearchParamValue(
 function buildMaintenanceBypassRedirect(locale: string, slug: string, bypassValue: string) {
     const params = new URLSearchParams()
     params.set(DEMO_MAINTENANCE_BYPASS_PARAM, bypassValue)
-    params.set('next', `/${locale}/demo/${slug}`)
+    params.set('next', buildLocalizedPath(`/demo/${slug}`, locale))
     return `/api/demo/maintenance-bypass?${params.toString()}`
 }
 

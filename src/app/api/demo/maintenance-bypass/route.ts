@@ -7,11 +7,21 @@ import {
     createDemoMaintenanceBypassCookieValue,
     isDemoMaintenanceBypassTokenValid,
 } from '@/lib/demo-chat/maintenance'
+import { buildLocalizedPath, normalizeAppLocale } from '@/lib/i18n/locale-path'
 
 export const runtime = 'nodejs'
 
-const DEFAULT_DEMO_REDIRECT_PATH = '/tr/demo/yiu-qualy-ai-demo'
-const DEMO_REDIRECT_PATH_PATTERN = /^\/(tr|en)\/demo\/[^/?#]+$/
+const DEFAULT_DEMO_REDIRECT_PATH = '/demo/yiu-qualy-ai-demo'
+const DEMO_REDIRECT_PATH_PATTERN = /^\/(?:(en|tr)\/)?demo\/([^/?#]+)$/
+
+function normalizeDemoRedirectPath(pathname: string) {
+    const match = pathname.match(DEMO_REDIRECT_PATH_PATTERN)
+    if (!match) return null
+
+    const locale = normalizeAppLocale(match[1])
+    const slug = match[2]
+    return buildLocalizedPath(`/demo/${slug}`, locale)
+}
 
 function buildCleanDemoRedirectUrl(req: NextRequest) {
     const rawNextPath = req.nextUrl.searchParams.get('next')?.trim() || DEFAULT_DEMO_REDIRECT_PATH
@@ -23,8 +33,11 @@ function buildCleanDemoRedirectUrl(req: NextRequest) {
         redirectUrl = new URL(DEFAULT_DEMO_REDIRECT_PATH, req.nextUrl.origin)
     }
 
-    if (redirectUrl.origin !== req.nextUrl.origin || !DEMO_REDIRECT_PATH_PATTERN.test(redirectUrl.pathname)) {
+    const canonicalPath = normalizeDemoRedirectPath(redirectUrl.pathname)
+    if (redirectUrl.origin !== req.nextUrl.origin || !canonicalPath) {
         redirectUrl = new URL(DEFAULT_DEMO_REDIRECT_PATH, req.nextUrl.origin)
+    } else {
+        redirectUrl.pathname = canonicalPath
     }
 
     redirectUrl.searchParams.delete(DEMO_MAINTENANCE_BYPASS_PARAM)

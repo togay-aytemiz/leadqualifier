@@ -20,7 +20,7 @@ describe('demo maintenance bypass route', () => {
         vi.unstubAllEnvs()
     })
 
-    it('sets a hashed bypass cookie and redirects to the clean demo URL when the token matches', async () => {
+    it('sets a hashed bypass cookie and redirects to the canonical default-locale demo URL when the token matches', async () => {
         vi.stubEnv('DEMO_MAINTENANCE_BYPASS_TOKEN', 'qualy-admin-maintenance-bypass-token-123')
 
         const res = await GET(createBypassRequest({
@@ -29,12 +29,24 @@ describe('demo maintenance bypass route', () => {
         }))
 
         expect(res.status).toBe(307)
-        expect(res.headers.get('location')).toBe('https://app.askqualy.com/tr/demo/yiu-qualy-ai-demo')
+        expect(res.headers.get('location')).toBe('https://app.askqualy.com/demo/yiu-qualy-ai-demo')
         const setCookie = res.headers.get('set-cookie') ?? ''
         expect(setCookie).toContain(`${DEMO_MAINTENANCE_BYPASS_COOKIE}=`)
         expect(setCookie).toContain('HttpOnly')
         expect(setCookie.toLowerCase()).toContain('samesite=lax')
         expect(setCookie).not.toContain('qualy-admin-maintenance-bypass-token-123')
+    })
+
+    it('keeps the non-default locale prefix when cleaning bypass redirects', async () => {
+        vi.stubEnv('DEMO_MAINTENANCE_BYPASS_TOKEN', 'qualy-admin-maintenance-bypass-token-123')
+
+        const res = await GET(createBypassRequest({
+            [DEMO_MAINTENANCE_BYPASS_PARAM]: 'qualy-admin-maintenance-bypass-token-123',
+            next: '/en/demo/yiu-qualy-ai-demo?maintenance_bypass=qualy-admin-maintenance-bypass-token-123',
+        }))
+
+        expect(res.status).toBe(307)
+        expect(res.headers.get('location')).toBe('https://app.askqualy.com/en/demo/yiu-qualy-ai-demo')
     })
 
     it('does not set a bypass cookie when the token is wrong', async () => {
@@ -46,7 +58,7 @@ describe('demo maintenance bypass route', () => {
         }))
 
         expect(res.status).toBe(307)
-        expect(res.headers.get('location')).toBe('https://app.askqualy.com/tr/demo/yiu-qualy-ai-demo')
+        expect(res.headers.get('location')).toBe('https://app.askqualy.com/demo/yiu-qualy-ai-demo')
         expect(res.headers.get('set-cookie')).toBeNull()
     })
 
@@ -59,7 +71,7 @@ describe('demo maintenance bypass route', () => {
         }))
 
         expect(res.status).toBe(307)
-        expect(res.headers.get('location')).toBe('https://app.askqualy.com/tr/demo/yiu-qualy-ai-demo')
+        expect(res.headers.get('location')).toBe('https://app.askqualy.com/demo/yiu-qualy-ai-demo')
         const setCookie = res.headers.get('set-cookie') ?? ''
         expect(setCookie).toContain(`${DEMO_MAINTENANCE_BYPASS_COOKIE}=`)
         expect(setCookie).toContain('Max-Age=0')
