@@ -50,7 +50,12 @@ where slug = '<demo-slug>';
 - If the slug is not specified, use `yiu-qualy-ai-demo` for the current public demo unless the conversation clearly names another demo slug.
 - Before reporting success after applying SQL, verify the target row's `maintenance_enabled` value.
 - `DEMO_MAINTENANCE_MODE=1` is an emergency global override. If it is set, database `maintenance_enabled = false` will not reopen the demo until the env override is removed or set away from `1`.
-- Admin bypass stays token/cookie based: `?maintenance_bypass=<token>` enables private testing in that browser, and `?maintenance_bypass=off` clears it.
+- Admin bypass stays token/cookie based. If the user asks how to bypass maintenance as admin:
+  - Tell them to set `DEMO_MAINTENANCE_BYPASS_TOKEN` to a long secret token in Netlify/local env.
+  - Give this private testing URL: `/tr/demo/<demo-slug>?maintenance_bypass=<token>`.
+  - Explain that the server verifies the token, stores only a hashed HttpOnly cookie, and cleans the token from the visible URL.
+  - Tell them to clear bypass with `/tr/demo/<demo-slug>?maintenance_bypass=off`.
+  - Remind them that bypass affects only that browser/session; it does not open the demo for customers.
 
 ### After Completing Tasks
 
