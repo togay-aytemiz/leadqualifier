@@ -14,6 +14,7 @@ const {
     recordAiUsageMock,
     repairLinkOnlyRagAnswerMock,
     resolveDemoChatChannelMock,
+    matchExactSkillTriggersMock,
     searchKnowledgeBaseFocusedEvidenceMock,
     searchKnowledgeBaseMock,
 } = vi.hoisted(() => ({
@@ -28,6 +29,7 @@ const {
     recordAiUsageMock: vi.fn(),
     repairLinkOnlyRagAnswerMock: vi.fn(),
     resolveDemoChatChannelMock: vi.fn(),
+    matchExactSkillTriggersMock: vi.fn(),
     searchKnowledgeBaseFocusedEvidenceMock: vi.fn(),
     searchKnowledgeBaseMock: vi.fn(),
 }))
@@ -43,6 +45,10 @@ vi.mock('@/lib/demo-chat/channel', () => ({
 
 vi.mock('@/lib/channels/inbound-ai-pipeline', () => ({
     processInboundAiPipeline: processInboundAiPipelineMock,
+}))
+
+vi.mock('@/lib/skills/actions', () => ({
+    matchExactSkillTriggers: matchExactSkillTriggersMock,
 }))
 
 vi.mock('@/lib/ai/settings', () => ({
@@ -160,6 +166,7 @@ describe('demo chat API route', () => {
         recordAiUsageMock.mockResolvedValue(undefined)
         searchKnowledgeBaseMock.mockResolvedValue([])
         searchKnowledgeBaseFocusedEvidenceMock.mockResolvedValue([])
+        matchExactSkillTriggersMock.mockResolvedValue([])
         buildRagContextMock.mockReturnValue({ context: '', chunks: [], tokenCount: 0 })
         repairLinkOnlyRagAnswerMock.mockReturnValue(null)
         appendCanonicalRagSourceLinksMock.mockImplementation((response: string) => response)
@@ -219,7 +226,7 @@ describe('demo chat API route', () => {
     it('returns a pending message id immediately so polling can recover the AI reply', async () => {
         const res = await POST(createRequest({
             sessionId: 'session-1',
-            message: 'Merhaba',
+            message: 'personelin ücretsiz izin süresi ne kadar',
         }), createContext())
 
         expect(res.status).toBe(202)
@@ -227,6 +234,36 @@ describe('demo chat API route', () => {
         expect(body).toMatchObject({ pending: true })
         expect(typeof body.messageId).toBe('string')
         expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+    })
+
+    it('answers exact skill matches during POST before pending or RAG recovery starts', async () => {
+        matchExactSkillTriggersMock.mockResolvedValueOnce([{
+            skill_id: 'skill-greeting',
+            title: 'Karşılama ve İlk Mesaj',
+            response_text: 'Merhaba, nasıl yardımcı olabilirim?',
+            trigger_text: 'Merhaba',
+            similarity: 1,
+        }])
+
+        const res = await POST(createRequest({
+            sessionId: 'session-1',
+            message: 'Merhaba',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: 'Merhaba, nasıl yardımcı olabilirim?',
+            skillImage: null,
+        })
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            text: 'Merhaba',
+            inboundMessageId: expect.any(String),
+            platform: 'demo_chat',
+            source: 'demo_chat',
+        }))
+        expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalled()
+        expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
     })
 
     it('returns a pending response before a slow AI pipeline can hit the platform timeout', async () => {

@@ -97,7 +97,7 @@ function normalizeExactSkillTrigger(value: string | null | undefined) {
         .replace(/\s+/g, ' ')
 }
 
-async function matchExactSkillTriggers(
+export async function matchExactSkillTriggers(
     query: string,
     organizationId: string,
     limit: number,

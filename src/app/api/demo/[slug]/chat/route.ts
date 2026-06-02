@@ -13,6 +13,8 @@ import { resolveMvpResponseLanguage, type MvpResponseLanguage } from '@/lib/ai/l
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { searchKnowledgeBase, searchKnowledgeBaseFocusedEvidence } from '@/lib/knowledge-base/actions'
+import { matchExactSkillTriggers } from '@/lib/skills/actions'
+import { matchSkillsWithStatus } from '@/lib/skills/match-safe'
 import type { KnowledgeSearchPlanningTurn } from '@/lib/knowledge-base/query-planner'
 import { buildRagContext, type RagChunk } from '@/lib/knowledge-base/rag'
 import { repairLinkOnlyRagAnswer } from '@/lib/knowledge-base/rag-answer-repair'
@@ -1383,6 +1385,42 @@ async function recoverPendingDemoChatReply(input: {
     return findCompletedDemoChatReply(input)
 }
 
+async function tryImmediateDemoSkillReply(input: {
+    supabase: DemoChatServiceClient
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    sessionId: string
+    message: string
+    inboundMessageId: string
+}): Promise<DemoChatPipelineResult | null | 'pending'> {
+    const skillMatchResult = await matchSkillsWithStatus({
+        matcher: () => matchExactSkillTriggers(
+            input.message,
+            input.channel.organizationId,
+            1,
+            input.supabase
+        ),
+        context: {
+            organization_id: input.channel.organizationId,
+            source: 'demo_chat_post'
+        }
+    })
+
+    if (skillMatchResult.status !== 'matched') return null
+
+    const pipelinePromise = runDemoChatPipeline(input)
+    const pipelineResult = await waitForPipelineResult(pipelinePromise, readSyncReplyTimeoutMs())
+    if (pipelineResult.status === 'timeout') {
+        void pipelinePromise.catch((error) => {
+            console.error('Demo Chat: Timed-out immediate skill reply failed', error)
+        })
+        return 'pending'
+    }
+
+    const result = pipelineResult.result
+    if (result.replyText || result.skillImage) return result
+    return null
+}
+
 export async function POST(req: NextRequest, context: RouteContext) {
     let body: DemoChatBody
     try {
@@ -1427,6 +1465,21 @@ export async function POST(req: NextRequest, context: RouteContext) {
     }
 
     const inboundMessageId = uuidv4()
+    const immediateSkillReply = await tryImmediateDemoSkillReply({
+        supabase,
+        channel,
+        sessionId,
+        message,
+        inboundMessageId
+    })
+    if (immediateSkillReply && immediateSkillReply !== 'pending') {
+        return NextResponse.json({
+            pending: false,
+            response: immediateSkillReply.replyText,
+            skillImage: immediateSkillReply.skillImage
+        })
+    }
+
     return NextResponse.json({
         pending: true,
         messageId: inboundMessageId
