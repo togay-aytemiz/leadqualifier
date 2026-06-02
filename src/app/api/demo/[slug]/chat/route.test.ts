@@ -245,6 +245,39 @@ describe('demo chat API route', () => {
         expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
     })
 
+    it('returns maintenance for demo chat posts before Supabase or AI work when the flag is enabled', async () => {
+        vi.stubEnv('DEMO_MAINTENANCE_MODE', '1')
+
+        const res = await POST(createRequest({
+            sessionId: 'session-1',
+            message: 'Merhaba',
+        }), createContext())
+
+        expect(res.status).toBe(503)
+        expect(res.headers.get('retry-after')).toBe('900')
+        await expect(res.json()).resolves.toEqual({ error: 'Demo is under maintenance' })
+        expect(createClientMock).not.toHaveBeenCalled()
+        expect(resolveDemoChatChannelMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+    })
+
+    it('returns maintenance for demo chat polling before Supabase or AI recovery when the flag is enabled', async () => {
+        vi.stubEnv('DEMO_MAINTENANCE_MODE', '1')
+
+        const res = await GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+            message: 'Merhaba',
+        }), createContext())
+
+        expect(res.status).toBe(503)
+        expect(res.headers.get('retry-after')).toBe('900')
+        await expect(res.json()).resolves.toEqual({ error: 'Demo is under maintenance' })
+        expect(createClientMock).not.toHaveBeenCalled()
+        expect(resolveDemoChatChannelMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+    })
+
     it('rejects demo chat posts without a signed access token before running AI', async () => {
         const res = await POST(createRequest({
             sessionId: 'session-1',

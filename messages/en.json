@@ -855,7 +855,12 @@
     "sessionExpired": "Refreshing the demo session. Please send your message again in a moment.",
     "sendFailed": "The message could not be sent. Please try again.",
     "emptyReply": "I could not prepare a clear answer right now. Please try another question.",
-    "imageAlt": "Demo response visual"
+    "imageAlt": "Demo response visual",
+    "maintenanceKicker": "Demo is taking a short break",
+    "maintenanceTitle": "Our team is performing maintenance right now.",
+    "maintenanceDescription": "We are making the experience more stable. Please try again later.",
+    "maintenanceLogoAlt": "Qualy logo",
+    "maintenanceImageAlt": "Qualy demo maintenance visual"
   },
   "General": {
     "title": "General Settings",

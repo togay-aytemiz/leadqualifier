@@ -9,6 +9,7 @@ import {
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
 import { verifyDemoChatAccessToken } from '@/lib/demo-chat/access'
 import { buildDemoChatContactId, resolveDemoChatChannel } from '@/lib/demo-chat/channel'
+import { isDemoMaintenanceModeEnabled } from '@/lib/demo-chat/maintenance'
 import { resolveMvpResponseLanguage, type MvpResponseLanguage } from '@/lib/ai/language'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { recordAiUsage } from '@/lib/ai/usage'
@@ -43,6 +44,7 @@ const FAST_RAG_MATCH_THRESHOLD = 0.5
 const FAST_RAG_RESULT_LIMIT = 6
 const MAX_CONTEXTUAL_SEARCH_QUERY_CHARS = 500
 const MIN_CONTEXTUAL_ANCHOR_TOKEN_COVERAGE = 2
+const DEMO_MAINTENANCE_RETRY_AFTER_SECONDS = 15 * 60
 
 type RouteContext = {
     params: Promise<{ slug: string }>
@@ -124,6 +126,18 @@ function createServiceClient() {
             autoRefreshToken: false,
         },
     })
+}
+
+function createDemoMaintenanceResponse() {
+    return NextResponse.json(
+        { error: 'Demo is under maintenance' },
+        {
+            status: 503,
+            headers: {
+                'Retry-After': String(DEMO_MAINTENANCE_RETRY_AFTER_SECONDS),
+            },
+        }
+    )
 }
 
 type DemoChatServiceClient = ReturnType<typeof createServiceClient>
@@ -1515,6 +1529,10 @@ async function tryImmediateDemoSkillReply(input: {
 }
 
 export async function POST(req: NextRequest, context: RouteContext) {
+    if (isDemoMaintenanceModeEnabled()) {
+        return createDemoMaintenanceResponse()
+    }
+
     let body: DemoChatBody
     try {
         body = await req.json()
@@ -1599,6 +1617,10 @@ export async function POST(req: NextRequest, context: RouteContext) {
 }
 
 export async function GET(req: NextRequest, context: RouteContext) {
+    if (isDemoMaintenanceModeEnabled()) {
+        return createDemoMaintenanceResponse()
+    }
+
     const sessionId = normalizeSessionId(req.nextUrl.searchParams.get('sessionId'))
     const messageId = normalizeSessionId(req.nextUrl.searchParams.get('messageId'))
     const message = readMessageText(req.nextUrl.searchParams.get('message')).slice(0, MAX_MESSAGE_CHARS)

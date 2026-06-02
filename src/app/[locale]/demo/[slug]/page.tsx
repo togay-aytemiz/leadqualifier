@@ -3,8 +3,10 @@ import { setRequestLocale } from 'next-intl/server'
 import { notFound } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import { DemoChatClient } from '@/components/demo-chat/DemoChatClient'
+import { DemoMaintenanceScreen } from '@/components/demo-chat/DemoMaintenanceScreen'
 import { createDemoChatAccessToken } from '@/lib/demo-chat/access'
 import { resolveDemoChatChannel } from '@/lib/demo-chat/channel'
+import { isDemoMaintenanceModeEnabled } from '@/lib/demo-chat/maintenance'
 import { getScopedMessages } from '@/i18n/messages'
 
 export const dynamic = 'force-dynamic'
@@ -17,6 +19,14 @@ type DemoChatPageProps = {
         locale: string
         slug: string
     }>
+}
+
+type DemoMaintenanceMessages = {
+    maintenanceKicker: string
+    maintenanceTitle: string
+    maintenanceDescription: string
+    maintenanceLogoAlt: string
+    maintenanceImageAlt: string
 }
 
 function createServiceClient() {
@@ -39,13 +49,27 @@ export default async function DemoChatPage({ params }: DemoChatPageProps) {
     const { locale, slug } = await params
     setRequestLocale(locale)
 
+    const messages = await getScopedMessages(locale, ['demoChat'])
+    if (isDemoMaintenanceModeEnabled()) {
+        const demoChatMessages = messages.demoChat as DemoMaintenanceMessages
+
+        return (
+            <DemoMaintenanceScreen
+                kicker={demoChatMessages.maintenanceKicker}
+                title={demoChatMessages.maintenanceTitle}
+                description={demoChatMessages.maintenanceDescription}
+                logoAlt={demoChatMessages.maintenanceLogoAlt}
+                imageAlt={demoChatMessages.maintenanceImageAlt}
+            />
+        )
+    }
+
     const supabase = createServiceClient()
     const channel = await resolveDemoChatChannel({ supabase, slug })
     if (!channel) {
         notFound()
     }
 
-    const messages = await getScopedMessages(locale, ['demoChat'])
     const defaultLogoUrl = channel.slug === 'yiu-qualy-ai-demo' ? UNIVERSITY_DEMO_LOGO_URL : null
     const accessToken = createDemoChatAccessToken({ channel })
     if (!accessToken) {

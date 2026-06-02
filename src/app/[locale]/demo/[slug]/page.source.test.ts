@@ -30,4 +30,15 @@ describe('public demo chat page source', () => {
         expect(source).toContain("export const dynamic = 'force-dynamic'")
         expect(source).toContain('export const revalidate = 0')
     })
+
+    it('renders the maintenance screen before creating a Supabase service client when the flag is enabled', () => {
+        const source = fs.readFileSync(SOURCE_PATH, 'utf8')
+        const maintenanceCheckIndex = source.indexOf('isDemoMaintenanceModeEnabled()')
+        const supabaseClientCallIndex = source.indexOf('const supabase = createServiceClient()')
+
+        expect(source).toContain('DemoMaintenanceScreen')
+        expect(maintenanceCheckIndex).toBeGreaterThanOrEqual(0)
+        expect(supabaseClientCallIndex).toBeGreaterThanOrEqual(0)
+        expect(maintenanceCheckIndex).toBeLessThan(supabaseClientCallIndex)
+    })
 })

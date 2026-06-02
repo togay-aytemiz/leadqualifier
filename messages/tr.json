@@ -855,7 +855,12 @@
     "sessionExpired": "Demo oturumu yenileniyor. Lütfen mesajınızı birazdan tekrar gönderin.",
     "sendFailed": "Mesaj gönderilemedi. Lütfen tekrar deneyin.",
     "emptyReply": "Şu anda net bir cevap hazırlayamadım. Lütfen başka bir soru deneyin.",
-    "imageAlt": "Demo yanıt görseli"
+    "imageAlt": "Demo yanıt görseli",
+    "maintenanceKicker": "Demo kısa bir molada",
+    "maintenanceTitle": "Ekibimiz şu an bakım çalışması yapmaktadır.",
+    "maintenanceDescription": "Deneyimi daha stabil hale getirmek için kısa bir bakımdayız. Lütfen daha sonra tekrar deneyiniz.",
+    "maintenanceLogoAlt": "Qualy logosu",
+    "maintenanceImageAlt": "Qualy demo bakım görseli"
   },
   "General": {
     "title": "Genel Ayarlar",
