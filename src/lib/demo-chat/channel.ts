@@ -6,6 +6,7 @@ export interface DemoChatChannel {
     slug: string
     displayName: string
     logoUrl: string | null
+    maintenanceEnabled: boolean
     sharedSecretHash: string | null
 }
 
@@ -30,7 +31,7 @@ export async function resolveDemoChatChannel(args: {
 
     const { data, error } = await args.supabase
         .from('demo_chat_channels')
-        .select('id, organization_id, slug, display_name, logo_url, enabled, shared_secret_hash')
+        .select('id, organization_id, slug, display_name, logo_url, enabled, maintenance_enabled, shared_secret_hash')
         .eq('slug', slug)
         .eq('enabled', true)
         .maybeSingle()
@@ -43,6 +44,7 @@ export async function resolveDemoChatChannel(args: {
         slug: String(data.slug),
         displayName: String(data.display_name),
         logoUrl: typeof data.logo_url === 'string' ? data.logo_url : null,
+        maintenanceEnabled: data.maintenance_enabled === true,
         sharedSecretHash: typeof data.shared_secret_hash === 'string' && data.shared_secret_hash.trim()
             ? data.shared_secret_hash.trim()
             : null,

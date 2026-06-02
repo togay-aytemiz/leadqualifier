@@ -1,0 +1,71 @@
+import { NextRequest, NextResponse } from 'next/server'
+import {
+    DEMO_MAINTENANCE_BYPASS_CLEAR_VALUE,
+    DEMO_MAINTENANCE_BYPASS_COOKIE,
+    DEMO_MAINTENANCE_BYPASS_COOKIE_MAX_AGE_SECONDS,
+    DEMO_MAINTENANCE_BYPASS_PARAM,
+    createDemoMaintenanceBypassCookieValue,
+    isDemoMaintenanceBypassTokenValid,
+} from '@/lib/demo-chat/maintenance'
+
+export const runtime = 'nodejs'
+
+const DEFAULT_DEMO_REDIRECT_PATH = '/tr/demo/yiu-qualy-ai-demo'
+const DEMO_REDIRECT_PATH_PATTERN = /^\/(tr|en)\/demo\/[^/?#]+$/
+
+function buildCleanDemoRedirectUrl(req: NextRequest) {
+    const rawNextPath = req.nextUrl.searchParams.get('next')?.trim() || DEFAULT_DEMO_REDIRECT_PATH
+
+    let redirectUrl: URL
+    try {
+        redirectUrl = new URL(rawNextPath, req.nextUrl.origin)
+    } catch {
+        redirectUrl = new URL(DEFAULT_DEMO_REDIRECT_PATH, req.nextUrl.origin)
+    }
+
+    if (redirectUrl.origin !== req.nextUrl.origin || !DEMO_REDIRECT_PATH_PATTERN.test(redirectUrl.pathname)) {
+        redirectUrl = new URL(DEFAULT_DEMO_REDIRECT_PATH, req.nextUrl.origin)
+    }
+
+    redirectUrl.searchParams.delete(DEMO_MAINTENANCE_BYPASS_PARAM)
+    return redirectUrl
+}
+
+function isSecureRequest(req: NextRequest) {
+    return req.nextUrl.protocol === 'https:'
+}
+
+export async function GET(req: NextRequest) {
+    const bypassValue = req.nextUrl.searchParams.get(DEMO_MAINTENANCE_BYPASS_PARAM)
+    const redirectUrl = buildCleanDemoRedirectUrl(req)
+    const response = NextResponse.redirect(redirectUrl)
+
+    if (bypassValue === DEMO_MAINTENANCE_BYPASS_CLEAR_VALUE) {
+        response.cookies.set({
+            name: DEMO_MAINTENANCE_BYPASS_COOKIE,
+            value: '',
+            path: '/',
+            maxAge: 0,
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: isSecureRequest(req),
+        })
+        return response
+    }
+
+    if (!isDemoMaintenanceBypassTokenValid(bypassValue)) {
+        return response
+    }
+
+    response.cookies.set({
+        name: DEMO_MAINTENANCE_BYPASS_COOKIE,
+        value: createDemoMaintenanceBypassCookieValue(),
+        path: '/',
+        maxAge: DEMO_MAINTENANCE_BYPASS_COOKIE_MAX_AGE_SECONDS,
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: isSecureRequest(req),
+    })
+
+    return response
+}

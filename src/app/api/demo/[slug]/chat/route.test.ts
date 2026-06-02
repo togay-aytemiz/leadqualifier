@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { createDemoChatAccessToken } from '@/lib/demo-chat/access'
+import {
+    DEMO_MAINTENANCE_BYPASS_COOKIE,
+    createDemoMaintenanceBypassCookieValue,
+} from '@/lib/demo-chat/maintenance'
 
 const {
     appendCanonicalRagSourceLinksMock,
@@ -92,6 +96,7 @@ const demoChannel = {
     slug: 'yiu-aday-asistani',
     displayName: 'YIU Aday Asistanı',
     logoUrl: null,
+    maintenanceEnabled: false,
     sharedSecretHash: 'sha256:demo-secret-hash',
 }
 
@@ -101,11 +106,19 @@ function createAccessToken(channel = demoChannel) {
     return token
 }
 
-function createRequest(body: unknown, options: { token?: string | null; ip?: string } = {}) {
+function createRequest(body: unknown, options: { token?: string | null; ip?: string; cookies?: Record<string, string> } = {}) {
     const token = options.token === undefined ? createAccessToken() : options.token
     const headers = new Headers({ 'content-type': 'application/json' })
     if (token) headers.set('authorization', `Bearer ${token}`)
     if (options.ip) headers.set('x-forwarded-for', options.ip)
+    if (options.cookies) {
+        headers.set(
+            'cookie',
+            Object.entries(options.cookies)
+                .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+                .join('; ')
+        )
+    }
 
     return new NextRequest('https://app.askqualy.com/api/demo/yiu-aday-asistani/chat', {
         method: 'POST',
@@ -114,7 +127,10 @@ function createRequest(body: unknown, options: { token?: string | null; ip?: str
     })
 }
 
-function createGetRequest(searchParams: Record<string, string>, options: { token?: string | null } = {}) {
+function createGetRequest(
+    searchParams: Record<string, string>,
+    options: { token?: string | null; cookies?: Record<string, string> } = {}
+) {
     const url = new URL('https://app.askqualy.com/api/demo/yiu-aday-asistani/chat')
     for (const [key, value] of Object.entries(searchParams)) {
         url.searchParams.set(key, value)
@@ -123,6 +139,14 @@ function createGetRequest(searchParams: Record<string, string>, options: { token
     const token = options.token === undefined ? createAccessToken() : options.token
     const headers = new Headers()
     if (token) headers.set('authorization', `Bearer ${token}`)
+    if (options.cookies) {
+        headers.set(
+            'cookie',
+            Object.entries(options.cookies)
+                .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+                .join('; ')
+        )
+    }
 
     return new NextRequest(url, { headers })
 }
@@ -276,6 +300,91 @@ describe('demo chat API route', () => {
         expect(createClientMock).not.toHaveBeenCalled()
         expect(resolveDemoChatChannelMock).not.toHaveBeenCalled()
         expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+    })
+
+    it('returns maintenance for demo chat posts when the resolved demo channel is in maintenance', async () => {
+        resolveDemoChatChannelMock.mockResolvedValueOnce({
+            ...demoChannel,
+            maintenanceEnabled: true,
+        })
+
+        const res = await POST(createRequest({
+            sessionId: 'db-maintenance-post-session',
+            message: 'Merhaba',
+        }, {
+            ip: '203.0.113.78',
+        }), createContext())
+
+        expect(res.status).toBe(503)
+        expect(res.headers.get('retry-after')).toBe('900')
+        await expect(res.json()).resolves.toEqual({ error: 'Demo is under maintenance' })
+        expect(createClientMock).toHaveBeenCalled()
+        expect(resolveDemoChatChannelMock).toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+    })
+
+    it('returns maintenance for demo chat polling when the resolved demo channel is in maintenance', async () => {
+        resolveDemoChatChannelMock.mockResolvedValueOnce({
+            ...demoChannel,
+            maintenanceEnabled: true,
+        })
+
+        const res = await GET(createGetRequest({
+            sessionId: 'db-maintenance-get-session',
+            messageId: 'db-maintenance-message',
+            message: 'Merhaba',
+        }), createContext())
+
+        expect(res.status).toBe(503)
+        expect(res.headers.get('retry-after')).toBe('900')
+        await expect(res.json()).resolves.toEqual({ error: 'Demo is under maintenance' })
+        expect(createClientMock).toHaveBeenCalled()
+        expect(resolveDemoChatChannelMock).toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+    })
+
+    it('allows demo chat posts through maintenance mode when the admin bypass cookie is valid', async () => {
+        vi.stubEnv('DEMO_MAINTENANCE_MODE', '1')
+        vi.stubEnv('DEMO_MAINTENANCE_BYPASS_TOKEN', 'qualy-admin-maintenance-bypass-token-123')
+        const bypassCookieValue = createDemoMaintenanceBypassCookieValue(
+            'qualy-admin-maintenance-bypass-token-123'
+        )
+
+        const res = await POST(createRequest({
+            sessionId: 'maintenance-bypass-post-session',
+            message: 'Merhaba',
+        }, {
+            ip: '203.0.113.77',
+            cookies: {
+                [DEMO_MAINTENANCE_BYPASS_COOKIE]: bypassCookieValue,
+            },
+        }), createContext())
+
+        expect(res.status).not.toBe(503)
+        expect(createClientMock).toHaveBeenCalled()
+        expect(resolveDemoChatChannelMock).toHaveBeenCalled()
+    })
+
+    it('allows demo chat polling through maintenance mode when the admin bypass cookie is valid', async () => {
+        vi.stubEnv('DEMO_MAINTENANCE_MODE', '1')
+        vi.stubEnv('DEMO_MAINTENANCE_BYPASS_TOKEN', 'qualy-admin-maintenance-bypass-token-123')
+        const bypassCookieValue = createDemoMaintenanceBypassCookieValue(
+            'qualy-admin-maintenance-bypass-token-123'
+        )
+
+        const res = await GET(createGetRequest({
+            sessionId: 'maintenance-bypass-get-session',
+            messageId: 'maintenance-bypass-message',
+            message: 'Merhaba',
+        }, {
+            cookies: {
+                [DEMO_MAINTENANCE_BYPASS_COOKIE]: bypassCookieValue,
+            },
+        }), createContext())
+
+        expect(res.status).not.toBe(503)
+        expect(createClientMock).toHaveBeenCalled()
+        expect(resolveDemoChatChannelMock).toHaveBeenCalled()
     })
 
     it('rejects demo chat posts without a signed access token before running AI', async () => {

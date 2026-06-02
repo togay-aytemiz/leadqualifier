@@ -9,7 +9,10 @@ import {
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
 import { verifyDemoChatAccessToken } from '@/lib/demo-chat/access'
 import { buildDemoChatContactId, resolveDemoChatChannel } from '@/lib/demo-chat/channel'
-import { isDemoMaintenanceModeEnabled } from '@/lib/demo-chat/maintenance'
+import {
+    DEMO_MAINTENANCE_BYPASS_COOKIE,
+    shouldServeDemoMaintenance,
+} from '@/lib/demo-chat/maintenance'
 import { resolveMvpResponseLanguage, type MvpResponseLanguage } from '@/lib/ai/language'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { recordAiUsage } from '@/lib/ai/usage'
@@ -1529,7 +1532,10 @@ async function tryImmediateDemoSkillReply(input: {
 }
 
 export async function POST(req: NextRequest, context: RouteContext) {
-    if (isDemoMaintenanceModeEnabled()) {
+    const bypassCookieValue = req.cookies.get(DEMO_MAINTENANCE_BYPASS_COOKIE)?.value ?? null
+    if (shouldServeDemoMaintenance({
+        bypassCookieValue,
+    })) {
         return createDemoMaintenanceResponse()
     }
 
@@ -1559,6 +1565,12 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const channel = await resolveDemoChatChannel({ supabase, slug })
     if (!channel) {
         return NextResponse.json({ error: 'Demo not found' }, { status: 404 })
+    }
+    if (shouldServeDemoMaintenance({
+        channelMaintenanceEnabled: channel.maintenanceEnabled,
+        bypassCookieValue,
+    })) {
+        return createDemoMaintenanceResponse()
     }
     if (!isDemoChatRequestAuthorized(req, channel)) {
         return NextResponse.json({ error: 'Demo access denied' }, { status: 401 })
@@ -1617,7 +1629,10 @@ export async function POST(req: NextRequest, context: RouteContext) {
 }
 
 export async function GET(req: NextRequest, context: RouteContext) {
-    if (isDemoMaintenanceModeEnabled()) {
+    const bypassCookieValue = req.cookies.get(DEMO_MAINTENANCE_BYPASS_COOKIE)?.value ?? null
+    if (shouldServeDemoMaintenance({
+        bypassCookieValue,
+    })) {
         return createDemoMaintenanceResponse()
     }
 
@@ -1633,6 +1648,12 @@ export async function GET(req: NextRequest, context: RouteContext) {
     const channel = await resolveDemoChatChannel({ supabase, slug })
     if (!channel) {
         return NextResponse.json({ error: 'Demo not found' }, { status: 404 })
+    }
+    if (shouldServeDemoMaintenance({
+        channelMaintenanceEnabled: channel.maintenanceEnabled,
+        bypassCookieValue,
+    })) {
+        return createDemoMaintenanceResponse()
     }
     if (!isDemoChatRequestAuthorized(req, channel)) {
         return NextResponse.json({ error: 'Demo access denied' }, { status: 401 })

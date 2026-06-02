@@ -24,6 +24,7 @@ describe('resolveDemoChatChannel', () => {
             display_name: 'YIU Aday Asistanı',
             logo_url: null,
             enabled: true,
+            maintenance_enabled: true,
             shared_secret_hash: 'sha256:demo-secret-hash',
         })
 
@@ -36,7 +37,27 @@ describe('resolveDemoChatChannel', () => {
             slug: 'yiu-aday-asistani',
             displayName: 'YIU Aday Asistanı',
             logoUrl: null,
+            maintenanceEnabled: true,
             sharedSecretHash: 'sha256:demo-secret-hash',
+        })
+    })
+
+    it('defaults missing maintenance flags to false for older rows or test fixtures', async () => {
+        const supabase = createSupabaseMock({
+            id: 'channel-1',
+            organization_id: 'org-1',
+            slug: 'yiu-aday-asistani',
+            display_name: 'YIU Aday Asistanı',
+            logo_url: null,
+            enabled: true,
+            shared_secret_hash: 'sha256:demo-secret-hash',
+        })
+
+        await expect(resolveDemoChatChannel({
+            supabase: supabase as never,
+            slug: 'yiu-aday-asistani',
+        })).resolves.toMatchObject({
+            maintenanceEnabled: false,
         })
     })
 
