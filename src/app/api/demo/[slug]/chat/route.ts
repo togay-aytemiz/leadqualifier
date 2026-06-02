@@ -108,6 +108,7 @@ type DemoChatRagDiagnostics = {
 }
 
 const demoChatRateLimitBuckets = new Map<string, { windowStartMs: number; count: number }>()
+const demoChatPendingRecoveryPromises = new Map<string, Promise<DemoChatPipelineResult | null>>()
 
 function createServiceClient() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -1448,6 +1449,35 @@ async function recoverPendingDemoChatReply(input: {
     return findCompletedDemoChatReply(input)
 }
 
+function demoChatPendingRecoveryKey(input: {
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    sessionId: string
+    messageId: string
+    kind: 'extractive' | 'shared_pipeline'
+}) {
+    return `${input.channel.id}:${input.sessionId}:${input.messageId}:${input.kind}`
+}
+
+function getOrStartDemoChatPendingRecovery(input: {
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    sessionId: string
+    messageId: string
+    kind: 'extractive' | 'shared_pipeline'
+    recover: () => Promise<DemoChatPipelineResult | null>
+}) {
+    const key = demoChatPendingRecoveryKey(input)
+    const existing = demoChatPendingRecoveryPromises.get(key)
+    if (existing) return existing
+
+    const promise = input.recover().finally(() => {
+        if (demoChatPendingRecoveryPromises.get(key) === promise) {
+            demoChatPendingRecoveryPromises.delete(key)
+        }
+    })
+    demoChatPendingRecoveryPromises.set(key, promise)
+    return promise
+}
+
 async function tryImmediateDemoSkillReply(input: {
     supabase: DemoChatServiceClient
     channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
@@ -1617,12 +1647,18 @@ export async function GET(req: NextRequest, context: RouteContext) {
                 return NextResponse.json({ error: 'Demo rate limit exceeded' }, { status: 429 })
             }
 
-            const extractiveRecoveryPromise = recoverPendingDemoChatReplyExtractively({
-                supabase,
+            const extractiveRecoveryPromise = getOrStartDemoChatPendingRecovery({
                 channel,
                 sessionId,
                 messageId,
-                fallbackMessage: message
+                kind: 'extractive',
+                recover: () => recoverPendingDemoChatReplyExtractively({
+                    supabase,
+                    channel,
+                    sessionId,
+                    messageId,
+                    fallbackMessage: message
+                })
             })
             const extractiveRecoveryResult = await waitForPipelineResult(
                 extractiveRecoveryPromise,
@@ -1645,12 +1681,18 @@ export async function GET(req: NextRequest, context: RouteContext) {
                 })
             }
 
-            const recoveryPromise = recoverPendingDemoChatReply({
-                supabase,
+            const recoveryPromise = getOrStartDemoChatPendingRecovery({
                 channel,
                 sessionId,
                 messageId,
-                fallbackMessage: message
+                kind: 'shared_pipeline',
+                recover: () => recoverPendingDemoChatReply({
+                    supabase,
+                    channel,
+                    sessionId,
+                    messageId,
+                    fallbackMessage: message
+                })
             })
             const recoveryResult = await waitForPipelineResult(
                 recoveryPromise,

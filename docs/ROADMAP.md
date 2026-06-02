@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-06-02):** Public Demo Chat pending-reply polling now deduplicates in-flight extractive RAG and shared-pipeline recovery per demo message. Repeated browser polls for a still-running answer now wait on the same recovery promise instead of starting parallel token-consuming RAG/LLM work, preventing runaway credit growth while testers keep seeing the normal pending state.
+
 > **Update Note (2026-06-02):** Public Demo Chat now persists every accepted tester message to the demo conversation during `POST`, even when the API returns `202 pending` for later RAG recovery. Deterministic scope-help replies also persist both the tester turn and bot answer without running RAG/shared AI, so the operator/admin Inbox remains a complete transcript of what the public tester sees.
 
 > **Update Note (2026-06-02):** Public Demo Chat fast RAG recovery now ensures a demo conversation exists before token-consuming grounded generation, then records generated/polished RAG usage with `metadata.conversation_id`. This keeps `organization_ai_usage` rows connected to the conversation total trigger so Inbox details no longer show `Toplam AI kredisi / Total AI credits` as `0.0` after an AI answer.
@@ -1582,6 +1584,7 @@
 - [x] Prevent public Demo Chat 504 send failures by converting slow shared-pipeline replies into a pending/polling response flow
 - [x] Prevent duplicate public Demo Chat bot bubbles in the operator Inbox by tagging text/image replies by original message id, skipping already-persisted id/kind replies, and filtering legacy duplicates from the thread view
 - [x] Return deterministic Public Demo Chat scope-help answers before RAG or shared AI recovery so `what can I ask?`-style turns cannot remain stuck in polling
+- [x] Deduplicate in-flight Public Demo Chat pending-poll recovery per demo message so repeated browser polls cannot start parallel token-consuming RAG/LLM work
 - [x] Ship P1 Knowledge Base RAG Evidence Pack, selected source chunks, and hybrid RRF retrieval so generated answers cite only evidence-selected chunks while vector, keyword, title/source, and focused evidence all participate in retrieval ranking
 - [x] Extend safe live-QA cleanup to remove deterministic `Codex YIU Mevzuat QA` / `codex-live-yiu-mevzuat-qa-` conversations plus ad-hoc `codex-` demo-chat sessions from pilot Inbox views
 - [x] Extend safe live-QA cleanup to remove deterministic `Codex Live QA` / `codex-live-rag-qa-` RAG-test conversations from pilot Inbox views

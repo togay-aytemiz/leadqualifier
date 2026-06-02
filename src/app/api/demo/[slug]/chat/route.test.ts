@@ -608,6 +608,126 @@ describe('demo chat API route', () => {
         expect(inboundMessagesChain.eq).toHaveBeenCalledWith('metadata->>demo_chat_message_id', 'message-1')
     })
 
+    it('does not start another token-consuming recovery while pending poll recovery is already running', async () => {
+        vi.stubEnv('DEMO_CHAT_SYNC_REPLY_TIMEOUT_MS', '1000')
+
+        const chunk = {
+            content: 'Yüksek İhtisas Üniversitesinde 7 fakülte, 2 meslek yüksekokulu ve 1 enstitü bulunur.',
+            document_id: 'doc-program-count',
+            document_title: 'Akademik Birimler',
+            source_url: 'https://example.edu.tr/akademik-birimler',
+        }
+        searchKnowledgeBaseFocusedEvidenceMock.mockResolvedValue([])
+        searchKnowledgeBaseMock.mockResolvedValue([chunk])
+        buildRagContextMock.mockReturnValue({
+            context: chunk.content,
+            chunks: [chunk],
+            tokenCount: 14,
+        })
+        repairLinkOnlyRagAnswerMock.mockReturnValue(null)
+        appendCanonicalRagSourceLinksMock.mockReturnValue(
+            'Yüksek İhtisas Üniversitesinde 7 fakülte, 2 meslek yüksekokulu ve 1 enstitü bulunur.\nhttps://example.edu.tr/akademik-birimler'
+        )
+
+        let resolveGeneration!: (value: Awaited<ReturnType<typeof generateGroundedRagAnswerMock>>) => void
+        const generationPromise = new Promise<Awaited<ReturnType<typeof generateGroundedRagAnswerMock>>>((resolve) => {
+            resolveGeneration = resolve
+        })
+        generateGroundedRagAnswerMock.mockReturnValue(generationPromise)
+
+        const conversationChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: { id: 'conversation-1' },
+                error: null,
+            })),
+        }
+        conversationChain.eq.mockReturnValue(conversationChain)
+
+        const completedMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(async () => ({
+                data: [],
+                error: null,
+            })),
+        }
+        completedMessagesChain.eq.mockReturnValue(completedMessagesChain)
+
+        const inboundMessagesChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: {
+                    id: 'contact-message-1',
+                    content: 'yüksek ihtisas üniversitesinde kaç bölüm var',
+                },
+                error: null,
+            })),
+        }
+        inboundMessagesChain.eq.mockReturnValue(inboundMessagesChain)
+
+        const duplicateReplyChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: null,
+                error: null,
+            })),
+        }
+        duplicateReplyChain.eq.mockReturnValue(duplicateReplyChain)
+
+        const botInsertChain = {
+            insert: vi.fn(async () => ({ error: null })),
+        }
+        const conversationUpdateChain = {
+            update: vi.fn(() => conversationUpdateChain),
+            eq: vi.fn(async () => ({ error: null })),
+        }
+        const messagesTable = {
+            select: vi.fn((columns: string) => {
+                if (columns === 'id, content') return inboundMessagesChain
+                if (columns.includes('content, metadata')) return completedMessagesChain
+                if (columns === 'id') return duplicateReplyChain
+                return completedMessagesChain
+            }),
+            insert: botInsertChain.insert,
+        }
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                return { select: vi.fn(() => conversationChain), update: conversationUpdateChain.update }
+            }
+            if (table === 'messages') return messagesTable
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValue({ from: fromMock })
+
+        const firstResponse = await GET(createGetRequest({
+            sessionId: 'session-dedupe',
+            messageId: 'message-1',
+            message: 'yüksek ihtisas üniversitesinde kaç bölüm var',
+        }), createContext())
+        expect(firstResponse.status).toBe(202)
+        await expect(firstResponse.json()).resolves.toEqual({ pending: true })
+
+        const secondResponse = await GET(createGetRequest({
+            sessionId: 'session-dedupe',
+            messageId: 'message-1',
+            message: 'yüksek ihtisas üniversitesinde kaç bölüm var',
+        }), createContext())
+        expect(secondResponse.status).toBe(202)
+        await expect(secondResponse.json()).resolves.toEqual({ pending: true })
+
+        expect(searchKnowledgeBaseFocusedEvidenceMock).toHaveBeenCalledTimes(1)
+        expect(searchKnowledgeBaseMock).toHaveBeenCalledTimes(1)
+        expect(generateGroundedRagAnswerMock).toHaveBeenCalledTimes(1)
+
+        resolveGeneration({
+            answer: 'Yüksek İhtisas Üniversitesinde 7 fakülte, 2 meslek yüksekokulu ve 1 enstitü bulunur.',
+            usedGeneration: true,
+            addedEngagement: true,
+            usage: null,
+            model: 'gpt-4o-mini',
+        })
+    })
+
     it('recovers from focused evidence before the shared pipeline during polling', async () => {
         const chunk = {
             content: 'SAĞLIK HİZMETLERİ MESLEK YÜKSEKOKULU\nBAĞLUM YERLEŞKESİ: Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören',

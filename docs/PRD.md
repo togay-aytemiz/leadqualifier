@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
+> **Update Note (2026-06-02):** Public Demo Chat pending-reply polling must be recovery-idempotent while an answer is still running. For a given demo channel/session/message id, repeated `GET` polls should share the same in-flight extractive RAG or shared-pipeline recovery instead of starting another token-consuming generation attempt; the browser may continue showing `202 pending` until the single recovery persists or returns the reply.
+
 > **Update Note (2026-06-02):** Public Demo Chat must keep the public tester transcript and operator/admin Inbox transcript aligned. Every accepted tester message should be persisted to the demo conversation during `POST`, before any pending polling/RAG recovery, and deterministic direct replies such as scope-help should persist a matching bot message without invoking token-consuming AI.
 
 > **Update Note (2026-06-02):** Public Demo Chat fast RAG recovery must link every generated/polished RAG usage row to the persisted demo conversation via `metadata.conversation_id`. If a pending poll reaches fast RAG before the conversation exists, the route should first persist the inbound demo message, then record token usage so the `conversations.ai_usage_*` trigger can update Inbox `Total AI credits`.
