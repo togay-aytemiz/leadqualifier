@@ -7,6 +7,7 @@ import {
     createDemoMaintenanceBypassCookieValue,
     isDemoMaintenanceBypassTokenValid,
 } from '@/lib/demo-chat/maintenance'
+import { resolveMetaOrigin } from '@/lib/channels/meta-origin'
 import { buildLocalizedPath, normalizeAppLocale } from '@/lib/i18n/locale-path'
 
 export const runtime = 'nodejs'
@@ -25,17 +26,24 @@ function normalizeDemoRedirectPath(pathname: string) {
 
 function buildCleanDemoRedirectUrl(req: NextRequest) {
     const rawNextPath = req.nextUrl.searchParams.get('next')?.trim() || DEFAULT_DEMO_REDIRECT_PATH
+    const publicOrigin = resolveMetaOrigin({
+        appUrl: process.env.NEXT_PUBLIC_APP_URL,
+        siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
+        forwardedHost: req.headers.get('x-forwarded-host'),
+        forwardedProto: req.headers.get('x-forwarded-proto'),
+        requestOrigin: req.nextUrl.origin,
+    })
 
     let redirectUrl: URL
     try {
-        redirectUrl = new URL(rawNextPath, req.nextUrl.origin)
+        redirectUrl = new URL(rawNextPath, publicOrigin)
     } catch {
-        redirectUrl = new URL(DEFAULT_DEMO_REDIRECT_PATH, req.nextUrl.origin)
+        redirectUrl = new URL(DEFAULT_DEMO_REDIRECT_PATH, publicOrigin)
     }
 
     const canonicalPath = normalizeDemoRedirectPath(redirectUrl.pathname)
-    if (redirectUrl.origin !== req.nextUrl.origin || !canonicalPath) {
-        redirectUrl = new URL(DEFAULT_DEMO_REDIRECT_PATH, req.nextUrl.origin)
+    if (redirectUrl.origin !== publicOrigin || !canonicalPath) {
+        redirectUrl = new URL(DEFAULT_DEMO_REDIRECT_PATH, publicOrigin)
     } else {
         redirectUrl.pathname = canonicalPath
     }

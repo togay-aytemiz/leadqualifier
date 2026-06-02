@@ -69,6 +69,24 @@ describe('demo maintenance bypass route', () => {
         await expectClientRedirect(res, 'https://app.askqualy.com/demo/yiu-qualy-ai-demo')
     })
 
+    it('uses the configured app origin when Netlify exposes a deploy permalink request origin', async () => {
+        vi.stubEnv('DEMO_MAINTENANCE_BYPASS_TOKEN', 'qualy-admin-maintenance-bypass-token-123')
+        vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.askqualy.com')
+
+        const url = new URL('https://6a1ede7ae585d70008177059--leadqualifier.netlify.app/api/demo/maintenance-bypass')
+        url.searchParams.set(DEMO_MAINTENANCE_BYPASS_PARAM, 'qualy-admin-maintenance-bypass-token-123')
+        url.searchParams.set('next', '/demo/yiu-qualy-ai-demo')
+
+        const res = await GET(new NextRequest(url, {
+            headers: {
+                'x-forwarded-host': 'app.askqualy.com',
+                'x-forwarded-proto': 'https',
+            },
+        }))
+
+        await expectClientRedirect(res, 'https://app.askqualy.com/demo/yiu-qualy-ai-demo')
+    })
+
     it('does not set a bypass cookie when the token is wrong', async () => {
         vi.stubEnv('DEMO_MAINTENANCE_BYPASS_TOKEN', 'qualy-admin-maintenance-bypass-token-123')
 
