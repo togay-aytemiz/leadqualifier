@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-06-02):** Public Demo Chat now persists every accepted tester message to the demo conversation during `POST`, even when the API returns `202 pending` for later RAG recovery. Deterministic scope-help replies also persist both the tester turn and bot answer without running RAG/shared AI, so the operator/admin Inbox remains a complete transcript of what the public tester sees.
+
 > **Update Note (2026-06-02):** Public Demo Chat fast RAG recovery now ensures a demo conversation exists before token-consuming grounded generation, then records generated/polished RAG usage with `metadata.conversation_id`. This keeps `organization_ai_usage` rows connected to the conversation total trigger so Inbox details no longer show `Toplam AI kredisi / Total AI credits` as `0.0` after an AI answer.
 
 > **Update Note (2026-06-02):** Shared inbound replies now evaluate Skills before scheduling, required-intake loading, RAG routing, fallback generation, or other token-consuming work. Public Demo Chat also tries exact Skill triggers during POST, so greeting-style Skill turns can answer immediately instead of entering the pending polling plus fast-RAG recovery loop. Messages without a Skill match continue through scheduling and Knowledge Base recovery. ASCII-written Turkish help/scope messages are also classified as Turkish so Turkish user turns do not drift into English replies.
@@ -729,6 +731,7 @@
   - [x] Lead snapshot grouped under Key Information with contact header restored
   - [x] Conversation details panel now shows cumulative AI credit usage (all AI operations) since conversation start
   - [x] Conversation AI credit totals are now persisted on the conversation record (trigger + backfill), and inbox details read the stored total without per-open recomputation
+  - [x] Public Demo Chat tester turns now persist to the operator Inbox during POST even when the public API returns pending, and deterministic direct replies persist matching bot messages
   - [x] Public Demo Chat fast RAG usage rows now carry `conversation_id` metadata after the demo conversation exists, restoring Inbox Total AI Credits accumulation for generated demo answers
   - [x] Conversation-level AI processing pause toggle in Inbox details (desktop + mobile) to stop AI replies and lead extraction per contact
   - [x] Inbox Key Information now places conversation AI pause control directly under Total AI Credits

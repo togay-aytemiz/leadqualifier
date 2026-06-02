@@ -131,6 +131,62 @@ function createContext(slug = 'yiu-aday-asistani') {
     return { params: Promise.resolve({ slug }) }
 }
 
+function createConversationLookupChain(id: string | null) {
+    const chain = {
+        eq: vi.fn(),
+        maybeSingle: vi.fn(async () => ({
+            data: id ? { id } : null,
+            error: null,
+        })),
+    }
+    chain.eq.mockReturnValue(chain)
+    return chain
+}
+
+function createDemoTextPersistenceMock(conversationIds: Array<string | null> = ['conversation-1']) {
+    const conversations = conversationIds.map((id) => createConversationLookupChain(id))
+    const duplicateReplyChain = {
+        eq: vi.fn(),
+        maybeSingle: vi.fn(async () => ({
+            data: null,
+            error: null,
+        })),
+    }
+    duplicateReplyChain.eq.mockReturnValue(duplicateReplyChain)
+
+    const botInsertChain = {
+        insert: vi.fn(async () => ({ error: null })),
+    }
+    const conversationUpdateChain = {
+        update: vi.fn(() => conversationUpdateChain),
+        eq: vi.fn(async () => ({ error: null })),
+    }
+    const fromMock = vi.fn((table: string) => {
+        if (table === 'conversations') {
+            const chain = conversations.shift()
+            if (!chain) return { update: conversationUpdateChain.update }
+            return {
+                select: vi.fn(() => chain),
+                update: conversationUpdateChain.update,
+            }
+        }
+        if (table === 'messages') {
+            return {
+                select: vi.fn(() => duplicateReplyChain),
+                insert: botInsertChain.insert,
+            }
+        }
+        throw new Error(`Unexpected table ${table}`)
+    })
+
+    return {
+        botInsertChain,
+        duplicateReplyChain,
+        conversationUpdateChain,
+        fromMock,
+    }
+}
+
 describe('demo chat API route', () => {
     beforeEach(() => {
         vi.clearAllMocks()
@@ -233,7 +289,11 @@ describe('demo chat API route', () => {
         const body = await res.json()
         expect(body).toMatchObject({ pending: true })
         expect(typeof body.messageId).toBe('string')
-        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            text: 'personelin ücretsiz izin süresi ne kadar',
+            inboundMessageId: body.messageId,
+            skipAutomation: true,
+        }))
     })
 
     it('answers exact skill matches during POST before pending or RAG recovery starts', async () => {
@@ -276,10 +336,57 @@ describe('demo chat API route', () => {
         const body = await res.json()
         expect(body).toMatchObject({ pending: true })
         expect(typeof body.messageId).toBe('string')
-        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            text: 'personelin ücretsiz izin süresi ne kadar',
+            inboundMessageId: body.messageId,
+            skipAutomation: true,
+        }))
     })
 
     it('answers demo scope-help questions immediately instead of entering the pending recovery loop', async () => {
+        const conversationChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: { id: 'conversation-1' },
+                error: null,
+            })),
+        }
+        conversationChain.eq.mockReturnValue(conversationChain)
+
+        const duplicateReplyChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: null,
+                error: null,
+            })),
+        }
+        duplicateReplyChain.eq.mockReturnValue(duplicateReplyChain)
+
+        const botInsertChain = {
+            insert: vi.fn(async () => ({ error: null })),
+        }
+        const conversationUpdateChain = {
+            update: vi.fn(() => conversationUpdateChain),
+            eq: vi.fn(async () => ({ error: null })),
+        }
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                return {
+                    select: vi.fn(() => conversationChain),
+                    update: conversationUpdateChain.update,
+                }
+            }
+            if (table === 'messages') {
+                return {
+                    select: vi.fn(() => duplicateReplyChain),
+                    insert: botInsertChain.insert,
+                }
+            }
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+        processInboundAiPipelineMock.mockImplementationOnce(async () => undefined)
+
         const res = await POST(createRequest({
             sessionId: 'session-1',
             message: 'sana başka hangi konularda soru sorabilirim',
@@ -293,10 +400,30 @@ describe('demo chat API route', () => {
         })
         expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalled()
         expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
-        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            text: 'sana başka hangi konularda soru sorabilirim',
+            inboundMessageId: expect.any(String),
+            skipAutomation: true,
+        }))
+        const inboundMessageId = processInboundAiPipelineMock.mock.calls[0]?.[0]?.inboundMessageId
+        expect(botInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
+            conversation_id: 'conversation-1',
+            organization_id: 'org-1',
+            sender_type: 'bot',
+            content: expect.stringContaining('aday öğrenci'),
+            metadata: expect.objectContaining({
+                demo_chat_reply_kind: 'text',
+                demo_chat_reply_source: 'scope_help',
+                demo_chat_reply_to_message_id: inboundMessageId,
+            }),
+        }))
     })
 
     it('keeps Turkish scope-help replies Turkish even when the message has no Turkish-specific letters', async () => {
+        const { botInsertChain, fromMock } = createDemoTextPersistenceMock()
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+        processInboundAiPipelineMock.mockImplementationOnce(async () => undefined)
+
         const res = await POST(createRequest({
             sessionId: 'session-1',
             message: 'sana hangi konuda soru sorabilirim',
@@ -308,26 +435,23 @@ describe('demo chat API route', () => {
             response: expect.stringContaining('Bu demo asistana'),
             skillImage: null,
         })
-        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            text: 'sana hangi konuda soru sorabilirim',
+            skipAutomation: true,
+        }))
+        expect(botInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
+            content: expect.stringContaining('Bu demo asistana'),
+            metadata: expect.objectContaining({
+                demo_chat_reply_kind: 'text',
+                demo_chat_reply_source: 'scope_help',
+            }),
+        }))
     })
 
     it('recovers already-pending demo scope-help polls without running RAG or the shared pipeline', async () => {
-        const conversationChain = {
-            eq: vi.fn(),
-            maybeSingle: vi.fn(async () => ({
-                data: null,
-                error: null,
-            })),
-        }
-        conversationChain.eq.mockReturnValue(conversationChain)
-
-        const fromMock = vi.fn((table: string) => {
-            if (table === 'conversations') {
-                return { select: vi.fn(() => conversationChain) }
-            }
-            throw new Error(`Unexpected table ${table}`)
-        })
+        const { botInsertChain, fromMock } = createDemoTextPersistenceMock([null, 'conversation-1'])
         createClientMock.mockReturnValueOnce({ from: fromMock })
+        processInboundAiPipelineMock.mockImplementationOnce(async () => undefined)
 
         const res = await GET(createGetRequest({
             sessionId: 'session-1',
@@ -343,7 +467,20 @@ describe('demo chat API route', () => {
         })
         expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalled()
         expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
-        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            text: 'sana başka hangi konularda soru sorabilirim',
+            inboundMessageId: 'message-1',
+            skipAutomation: true,
+        }))
+        expect(botInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
+            conversation_id: 'conversation-1',
+            content: expect.stringContaining('aday öğrenci'),
+            metadata: expect.objectContaining({
+                demo_chat_reply_kind: 'text',
+                demo_chat_reply_source: 'scope_help',
+                demo_chat_reply_to_message_id: 'message-1',
+            }),
+        }))
     })
 
     it('returns a completed pending reply from persisted demo bot messages', async () => {
@@ -2470,7 +2607,16 @@ describe('demo chat API route', () => {
         expect(firstBody.messageId).toEqual(expect.any(String))
         expect(secondBody.messageId).toEqual(expect.any(String))
         expect(firstBody.messageId).not.toBe(secondBody.messageId)
-        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            text: 'Birinci soru',
+            inboundMessageId: firstBody.messageId,
+            skipAutomation: true,
+        }))
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            text: 'İkinci soru',
+            inboundMessageId: secondBody.messageId,
+            skipAutomation: true,
+        }))
     })
 
     it('rate-limits repeated demo chat posts per client session before running AI again', async () => {
@@ -2488,6 +2634,10 @@ describe('demo chat API route', () => {
         expect(firstResponse.status).toBe(202)
         expect(secondResponse.status).toBe(429)
         await expect(secondResponse.json()).resolves.toEqual({ error: 'Demo rate limit exceeded' })
-        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).toHaveBeenCalledTimes(1)
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            text: 'İlk soru',
+            skipAutomation: true,
+        }))
     })
 })

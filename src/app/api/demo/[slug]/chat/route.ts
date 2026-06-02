@@ -1256,12 +1256,13 @@ async function buildExtractiveDemoChatReply(input: {
     return hasConversationHistory ? null : buildBroadSearchReply()
 }
 
-async function persistDemoChatExtractiveReply(input: {
+async function persistDemoChatTextReply(input: {
     supabase: DemoChatServiceClient
     channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
     sessionId: string
     messageId: string
-    reply: DemoChatExtractiveReply
+    replyText: string
+    metadata: Record<string, unknown>
 }) {
     const conversationId = await findDemoChatConversationId(input)
     if (!conversationId) return false
@@ -1286,16 +1287,11 @@ async function persistDemoChatExtractiveReply(input: {
             conversation_id: conversationId,
             organization_id: input.channel.organizationId,
             sender_type: 'bot',
-            content: input.reply.replyText,
+            content: input.replyText,
             metadata: {
                 demo_chat_reply_to_message_id: input.messageId,
                 demo_chat_reply_kind: 'text',
-                is_rag: true,
-                rag_extractive: true,
-                rag_generate: input.reply.generation,
-                rag_polish: input.reply.polish,
-                rag_diagnostics: input.reply.diagnostics,
-                sources: collectDemoReplySourceIds(input.reply)
+                ...input.metadata
             }
         })
 
@@ -1311,6 +1307,62 @@ async function persistDemoChatExtractiveReply(input: {
 
     if (updateError) throw updateError
     return true
+}
+
+async function persistDemoChatExtractiveReply(input: {
+    supabase: DemoChatServiceClient
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    sessionId: string
+    messageId: string
+    reply: DemoChatExtractiveReply
+}) {
+    return persistDemoChatTextReply({
+        supabase: input.supabase,
+        channel: input.channel,
+        sessionId: input.sessionId,
+        messageId: input.messageId,
+        replyText: input.reply.replyText,
+        metadata: {
+            is_rag: true,
+            rag_extractive: true,
+            rag_generate: input.reply.generation,
+            rag_polish: input.reply.polish,
+            rag_diagnostics: input.reply.diagnostics,
+            sources: collectDemoReplySourceIds(input.reply)
+        }
+    })
+}
+
+async function persistDemoChatScopeHelpReply(input: {
+    supabase: DemoChatServiceClient
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    sessionId: string
+    message: string
+    messageId: string
+    replyText: string
+}) {
+    try {
+        await ingestDemoChatInboundOnly({
+            supabase: input.supabase,
+            channel: input.channel,
+            sessionId: input.sessionId,
+            message: input.message,
+            inboundMessageId: input.messageId
+        })
+
+        await persistDemoChatTextReply({
+            supabase: input.supabase,
+            channel: input.channel,
+            sessionId: input.sessionId,
+            messageId: input.messageId,
+            replyText: input.replyText,
+            metadata: {
+                demo_chat_reply_source: 'scope_help'
+            }
+        })
+    } catch (error) {
+        console.error('Demo Chat: scope-help persistence failed; continuing reply flow', error)
+    }
 }
 
 async function recoverPendingDemoChatReplyExtractively(input: {
@@ -1463,8 +1515,18 @@ export async function POST(req: NextRequest, context: RouteContext) {
     if (!isDemoChatRequestAuthorized(req, channel)) {
         return NextResponse.json({ error: 'Demo access denied' }, { status: 401 })
     }
+    const inboundMessageId = uuidv4()
     const scopeHelpReply = buildDemoScopeHelpReply(message)
     if (scopeHelpReply) {
+        await persistDemoChatScopeHelpReply({
+            supabase,
+            channel,
+            sessionId,
+            message,
+            messageId: inboundMessageId,
+            replyText: scopeHelpReply
+        })
+
         return NextResponse.json({
             pending: false,
             response: scopeHelpReply,
@@ -1475,7 +1537,6 @@ export async function POST(req: NextRequest, context: RouteContext) {
         return NextResponse.json({ error: 'Demo rate limit exceeded' }, { status: 429 })
     }
 
-    const inboundMessageId = uuidv4()
     const immediateSkillReply = await tryImmediateDemoSkillReply({
         supabase,
         channel,
@@ -1488,6 +1549,16 @@ export async function POST(req: NextRequest, context: RouteContext) {
             pending: false,
             response: immediateSkillReply.replyText,
             skillImage: immediateSkillReply.skillImage
+        })
+    }
+
+    if (immediateSkillReply !== 'pending') {
+        await ingestDemoChatInboundOnly({
+            supabase,
+            channel,
+            sessionId,
+            message,
+            inboundMessageId
         })
     }
 
@@ -1526,6 +1597,15 @@ export async function GET(req: NextRequest, context: RouteContext) {
         if (!completedReply) {
             const scopeHelpReply = buildDemoScopeHelpReply(message)
             if (scopeHelpReply) {
+                await persistDemoChatScopeHelpReply({
+                    supabase,
+                    channel,
+                    sessionId,
+                    message,
+                    messageId,
+                    replyText: scopeHelpReply
+                })
+
                 return NextResponse.json({
                     pending: false,
                     response: scopeHelpReply,
