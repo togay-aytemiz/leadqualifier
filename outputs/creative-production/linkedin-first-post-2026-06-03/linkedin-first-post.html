@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Qualy AI LinkedIn First Post</title>
+    <style>
+      @font-face {
+        font-family: "Plus Jakarta Sans";
+        src: url("../../../public/fonts/plus-jakarta-sans/PlusJakartaSans-VariableFont_wght.ttf") format("truetype");
+        font-weight: 200 900;
+        font-style: normal;
+      }
+
+      :root {
+        --bg: #060913;
+        --panel: #ffffff;
+        --ink: #07111f;
+        --muted: #7a8497;
+        --line: rgba(255, 255, 255, 0.14);
+        --violet: #8f83ff;
+        --blue: #82c8ff;
+        --cyan: #56e3dd;
+        --emerald: #22c55e;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #05070f;
+        font-family: "Plus Jakarta Sans", Inter, system-ui, sans-serif;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+      }
+
+      #poster {
+        position: relative;
+        width: 1200px;
+        height: 1500px;
+        overflow: hidden;
+        color: white;
+        background:
+          radial-gradient(circle at 20% 8%, rgba(143, 131, 255, 0.42), transparent 30%),
+          radial-gradient(circle at 78% 23%, rgba(130, 200, 255, 0.22), transparent 27%),
+          radial-gradient(circle at 45% 76%, rgba(86, 227, 221, 0.13), transparent 36%),
+          linear-gradient(140deg, #090c17 0%, #111835 48%, #05070e 100%);
+      }
+
+      body[data-format="square"] #poster {
+        height: 1200px;
+      }
+
+      .grain,
+      .grid,
+      .glow-line {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .grain {
+        opacity: 0.16;
+        background-image:
+          radial-gradient(rgba(255, 255, 255, 0.38) 0.9px, transparent 0.9px),
+          radial-gradient(rgba(255, 255, 255, 0.12) 0.7px, transparent 0.7px);
+        background-position:
+          0 0,
+          18px 18px;
+        background-size:
+          36px 36px,
+          36px 36px;
+        mask-image: linear-gradient(to bottom, black 0%, transparent 84%);
+      }
+
+      .grid {
+        opacity: 0.34;
+        background-image:
+          linear-gradient(var(--line) 1px, transparent 1px),
+          linear-gradient(90deg, var(--line) 1px, transparent 1px);
+        background-size: 132px 132px;
+        mask-image: radial-gradient(circle at 50% 34%, black, transparent 76%);
+      }
+
+      .glow-line::before,
+      .glow-line::after {
+        content: "";
+        position: absolute;
+        height: 2px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, transparent, rgba(139, 199, 255, 0.72), rgba(143, 131, 255, 0.24), transparent);
+        filter: blur(0.2px);
+      }
+
+      .glow-line::before {
+        left: 118px;
+        top: 575px;
+        width: 910px;
+      }
+
+      .glow-line::after {
+        left: 212px;
+        top: 1214px;
+        width: 720px;
+        opacity: 0.58;
+      }
+
+      body[data-format="square"] .glow-line::before {
+        top: 452px;
+      }
+
+      body[data-format="square"] .glow-line::after {
+        top: 1052px;
+      }
+
+      .brand {
+        position: absolute;
+        top: 70px;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: center;
+        z-index: 3;
+      }
+
+      .brand img {
+        width: 196px;
+        height: auto;
+        filter: drop-shadow(0 16px 32px rgba(0, 0, 0, 0.22));
+      }
+
+      .copy {
+        position: absolute;
+        top: 166px;
+        left: 94px;
+        right: 94px;
+        z-index: 3;
+        text-align: center;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 30px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 999px;
+        padding: 10px 18px;
+        background: rgba(255, 255, 255, 0.07);
+        color: #dce7ff;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0;
+        box-shadow: 0 16px 52px rgba(14, 18, 34, 0.28);
+        backdrop-filter: blur(16px);
+      }
+
+      .eyebrow-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: var(--emerald);
+        box-shadow: 0 0 22px rgba(34, 197, 94, 0.85);
+      }
+
+      h1 {
+        margin: 0 auto;
+        max-width: 940px;
+        color: #ffffff;
+        font-size: 124px;
+        font-weight: 820;
+        line-height: 0.95;
+        letter-spacing: 0;
+        text-wrap: balance;
+        text-shadow: 0 18px 64px rgba(0, 0, 0, 0.42);
+      }
+
+      h1 span {
+        color: #c8d5ff;
+      }
+
+      .subline {
+        margin: 28px auto 0;
+        max-width: 740px;
+        color: #d9e1f8;
+        font-size: 36px;
+        line-height: 1.18;
+        font-weight: 660;
+        letter-spacing: 0;
+      }
+
+      .channel-dock {
+        position: absolute;
+        top: 566px;
+        left: 50%;
+        z-index: 4;
+        display: flex;
+        gap: 18px;
+        transform: translateX(-50%);
+      }
+
+      .channel {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 170px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 999px;
+        padding: 12px 18px 12px 14px;
+        background: rgba(255, 255, 255, 0.92);
+        color: #101828;
+        font-size: 20px;
+        font-weight: 800;
+        box-shadow:
+          0 22px 72px rgba(0, 0, 0, 0.22),
+          inset 0 1px 0 rgba(255, 255, 255, 0.95);
+      }
+
+      .channel img {
+        width: 38px;
+        height: 38px;
+        object-fit: contain;
+      }
+
+      .stage {
+        position: absolute;
+        left: 82px;
+        right: 82px;
+        bottom: 92px;
+        z-index: 2;
+        height: 790px;
+      }
+
+      .halo {
+        position: absolute;
+        inset: 28px 0 0 0;
+        border-radius: 70px;
+        background:
+          radial-gradient(circle at 48% 24%, rgba(255, 255, 255, 0.26), transparent 21%),
+          radial-gradient(circle at 86% 78%, rgba(143, 131, 255, 0.24), transparent 30%);
+        filter: blur(30px);
+        opacity: 0.72;
+      }
+
+      .product {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 680px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 46px;
+        background: #f8fafc;
+        box-shadow:
+          0 56px 130px rgba(0, 0, 0, 0.44),
+          inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      }
+
+      .topbar {
+        height: 78px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        border-bottom: 1px solid #e5e9f2;
+        padding: 0 30px;
+        background: rgba(255, 255, 255, 0.94);
+      }
+
+      .traffic {
+        display: flex;
+        gap: 10px;
+      }
+
+      .traffic span {
+        width: 14px;
+        height: 14px;
+        border-radius: 999px;
+        background: #dbe1ea;
+      }
+
+      .topbar-title {
+        margin-right: auto;
+        color: #132033;
+        font-size: 22px;
+        font-weight: 840;
+      }
+
+      .ai-chip {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        border: 1px solid #dbe6ff;
+        border-radius: 999px;
+        padding: 9px 14px;
+        background: #eef4ff;
+        color: #1b55c9;
+        font-size: 16px;
+        font-weight: 850;
+      }
+
+      .ai-chip::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #2563eb;
+        box-shadow: 0 0 16px rgba(37, 99, 235, 0.65);
+      }
+
+      .product-body {
+        display: grid;
+        grid-template-columns: 292px 1fr;
+        height: calc(100% - 78px);
+        color: var(--ink);
+      }
+
+      .inbox-list {
+        border-right: 1px solid #e8edf5;
+        background: #f5f7fb;
+      }
+
+      .list-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 62px;
+        padding: 0 22px;
+        color: #647084;
+        font-size: 14px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .count {
+        display: grid;
+        place-items: center;
+        min-width: 28px;
+        height: 28px;
+        border-radius: 9px;
+        background: #e7ebf2;
+        color: #667085;
+        font-size: 13px;
+      }
+
+      .row {
+        position: relative;
+        display: grid;
+        grid-template-columns: 42px 1fr;
+        gap: 14px;
+        min-height: 112px;
+        border-bottom: 1px solid #e9eef6;
+        padding: 20px 20px 18px;
+        background: white;
+      }
+
+      .row.active {
+        background: #edf5ff;
+      }
+
+      .row.active::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: #4f7dff;
+      }
+
+      .avatar {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 999px;
+        background: #dbeafe;
+        color: #1d4ed8;
+        font-size: 14px;
+        font-weight: 900;
+      }
+
+      .mini-icon {
+        position: absolute;
+        right: -7px;
+        bottom: -9px;
+        width: 25px;
+        height: 25px;
+        border: 3px solid white;
+        border-radius: 999px;
+        background: white;
+      }
+
+      .row-name {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        color: #111827;
+        font-size: 18px;
+        font-weight: 850;
+      }
+
+      .temp {
+        flex: 0 0 auto;
+        border-radius: 999px;
+        padding: 4px 8px;
+        background: #fee2e2;
+        color: #b42318;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .temp.warm {
+        background: #fef3c7;
+        color: #a15c07;
+      }
+
+      .temp.cold {
+        background: #e5e7eb;
+        color: #667085;
+      }
+
+      .preview {
+        margin-top: 9px;
+        color: #667085;
+        font-size: 14px;
+        font-weight: 620;
+        line-height: 1.34;
+      }
+
+      .thread {
+        position: relative;
+        overflow: hidden;
+        padding: 26px 30px;
+        background:
+          linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      }
+
+      .thread-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 28px;
+      }
+
+      .contact {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .contact .avatar {
+        width: 46px;
+        height: 46px;
+      }
+
+      .contact-title {
+        color: #111827;
+        font-size: 22px;
+        font-weight: 900;
+      }
+
+      .contact-sub {
+        margin-top: 2px;
+        color: #7a8497;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .score {
+        width: 174px;
+        border: 1px solid #fecaca;
+        border-radius: 18px;
+        padding: 12px 14px;
+        background: #fff1f2;
+        color: #be123c;
+        font-size: 15px;
+        font-weight: 900;
+      }
+
+      .score-bar {
+        margin-top: 8px;
+        height: 8px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #fecdd3;
+      }
+
+      .score-bar span {
+        display: block;
+        width: 87%;
+        height: 100%;
+        border-radius: inherit;
+        background: #f43f5e;
+      }
+
+      .messages {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        max-width: 620px;
+      }
+
+      .bubble {
+        max-width: 520px;
+        border-radius: 28px;
+        padding: 23px 25px;
+        font-size: 24px;
+        font-weight: 700;
+        line-height: 1.27;
+        box-shadow: 0 12px 30px rgba(16, 24, 40, 0.08);
+      }
+
+      .bubble.customer {
+        border-bottom-left-radius: 8px;
+        background: #eef2f7;
+        color: #182235;
+      }
+
+      .bubble.ai {
+        align-self: flex-start;
+        max-width: 300px;
+        margin-left: 28px;
+        font-size: 22px;
+        border-bottom-right-radius: 8px;
+        background: linear-gradient(135deg, #4f46e5, #7c6dff);
+        color: white;
+      }
+
+      .summary-card {
+        position: absolute;
+        right: 28px;
+        bottom: 38px;
+        width: 360px;
+        border: 1px solid rgba(204, 213, 230, 0.8);
+        border-radius: 28px;
+        padding: 22px;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow:
+          0 30px 70px rgba(32, 45, 82, 0.18),
+          inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      }
+
+      .summary-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 18px;
+        color: #111827;
+        font-size: 23px;
+        font-weight: 940;
+      }
+
+      .spark {
+        display: grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 13px;
+        background: #edf1ff;
+        color: #4f46e5;
+        font-size: 19px;
+      }
+
+      .field {
+        display: grid;
+        grid-template-columns: 112px 1fr;
+        gap: 12px;
+        border-top: 1px solid #eef2f7;
+        padding: 12px 0;
+        font-size: 16px;
+        line-height: 1.25;
+      }
+
+      .field:first-of-type {
+        border-top: 0;
+      }
+
+      .field span:first-child {
+        color: #7a8497;
+        font-weight: 760;
+      }
+
+      .field span:last-child {
+        color: #111827;
+        font-weight: 900;
+      }
+
+      .handover {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+        border-radius: 999px;
+        padding: 10px 13px;
+        background: #ecfdf3;
+        color: #027a48;
+        font-size: 15px;
+        font-weight: 900;
+      }
+
+      .handover::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #12b76a;
+      }
+
+      .ribbon {
+        position: absolute;
+        right: 90px;
+        bottom: 26px;
+        z-index: 5;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 999px;
+        padding: 12px 18px;
+        background: rgba(9, 12, 23, 0.72);
+        color: #dce7ff;
+        font-size: 18px;
+        font-weight: 800;
+        backdrop-filter: blur(16px);
+      }
+
+      .ribbon span {
+        color: white;
+      }
+
+      body[data-format="square"] .brand {
+        top: 46px;
+      }
+
+      body[data-format="square"] .brand img {
+        width: 174px;
+      }
+
+      body[data-format="square"] .copy {
+        top: 126px;
+      }
+
+      body[data-format="square"] .eyebrow {
+        margin-bottom: 20px;
+        font-size: 18px;
+      }
+
+      body[data-format="square"] h1 {
+        font-size: 100px;
+      }
+
+      body[data-format="square"] .subline {
+        margin-top: 20px;
+        font-size: 30px;
+      }
+
+      body[data-format="square"] .channel-dock {
+        top: 456px;
+      }
+
+      body[data-format="square"] .stage {
+        left: 84px;
+        right: 84px;
+        bottom: 76px;
+        height: 620px;
+      }
+
+      body[data-format="square"] .product {
+        height: 560px;
+      }
+
+      body[data-format="square"] .topbar {
+        height: 66px;
+      }
+
+      body[data-format="square"] .product-body {
+        height: calc(100% - 66px);
+      }
+
+      body[data-format="square"] .bubble {
+        font-size: 20px;
+        padding: 18px 21px;
+      }
+
+      body[data-format="square"] .bubble.customer {
+        max-width: 326px;
+        font-size: 18px;
+      }
+
+      body[data-format="square"] .summary-card {
+        width: 332px;
+        bottom: 28px;
+      }
+
+      body[data-format="square"] .ribbon {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="poster" aria-label="Qualy AI yayında LinkedIn görseli">
+      <div class="grid"></div>
+      <div class="grain"></div>
+      <div class="glow-line"></div>
+
+      <div class="brand">
+        <img src="../../../public/logo-white.svg" alt="Qualy" />
+      </div>
+
+      <section class="copy">
+        <div class="eyebrow"><span class="eyebrow-dot"></span>AI destekli gelen kutusu</div>
+        <h1><span>Qualy AI</span> yayında</h1>
+        <p class="subline">Mesajlar tek yerde. Talep net.</p>
+      </section>
+
+      <div class="channel-dock" aria-label="Aktif kanal rozetleri">
+        <div class="channel"><img src="../../../public/whatsapp.svg" alt="" />WhatsApp</div>
+        <div class="channel"><img src="../../../public/instagram.svg" alt="" />Instagram</div>
+        <div class="channel"><img src="../../../public/Telegram.svg" alt="" />Telegram</div>
+      </div>
+
+      <section class="stage">
+        <div class="halo"></div>
+        <div class="product">
+          <div class="topbar">
+            <div class="traffic"><span></span><span></span><span></span></div>
+            <div class="topbar-title">Tek gelen kutusu</div>
+            <div class="ai-chip">Qualy AI aktif</div>
+          </div>
+
+          <div class="product-body">
+            <aside class="inbox-list">
+              <div class="list-head">
+                <span>Öncelik</span>
+                <span class="count">3</span>
+              </div>
+              <div class="row active">
+                <div class="avatar">AK<img class="mini-icon" src="../../../public/whatsapp.svg" alt="" /></div>
+                <div>
+                  <div class="row-name"><span>Ayşe K.</span><span class="temp">Sıcak</span></div>
+                  <div class="preview">Cumartesi için cilt bakımı randevusu var mı?</div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="avatar">MD<img class="mini-icon" src="../../../public/instagram.svg" alt="" /></div>
+                <div>
+                  <div class="row-name"><span>Mert D.</span><span class="temp warm">Ilık</span></div>
+                  <div class="preview">Paket detaylarını paylaşabilir misiniz?</div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="avatar">DT<img class="mini-icon" src="../../../public/Telegram.svg" alt="" /></div>
+                <div>
+                  <div class="row-name"><span>Deniz T.</span><span class="temp cold">Soğuk</span></div>
+                  <div class="preview">Belge talebi destek ekibine iletildi.</div>
+                </div>
+              </div>
+            </aside>
+
+            <section class="thread">
+              <div class="thread-head">
+                <div class="contact">
+                  <div class="avatar">AK</div>
+                  <div>
+                    <div class="contact-title">Ayşe K.</div>
+                    <div class="contact-sub">WhatsApp üzerinden aktif</div>
+                  </div>
+                </div>
+                <div class="score">
+                  Skor 8.7
+                  <div class="score-bar"><span></span></div>
+                </div>
+              </div>
+
+              <div class="messages">
+                <div class="bubble customer">Cumartesi için cilt bakımı randevusu var mı?</div>
+                <div class="bubble ai">Uygun saatleri kontrol edebilirim. Saat aralığı nedir?</div>
+              </div>
+
+              <div class="summary-card">
+                <div class="summary-title"><span class="spark">✦</span>AI talep özeti</div>
+                <div class="field"><span>Hizmet</span><span>Cilt bakımı</span></div>
+                <div class="field"><span>Zaman</span><span>Cumartesi</span></div>
+                <div class="field"><span>Öncelik</span><span>Yüksek</span></div>
+                <div class="field"><span>Eksik bilgi</span><span>Saat aralığı</span></div>
+                <div class="handover">Operatör devralabilir</div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <div class="ribbon">Skills + Bilgi Bankası ile <span>kontrollü AI yanıtları</span></div>
+    </main>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      document.body.dataset.format = params.get("format") === "square" ? "square" : "portrait";
+    </script>
+  </body>
+</html>

@@ -1,0 +1,64 @@
+{
+  "id": "qualy-linkedin-first-post-2026-06-03",
+  "createdAt": "2026-06-03",
+  "channel": "LinkedIn",
+  "status": "review-ready",
+  "primaryExport": "qualy-linkedin-first-post-1200x1500.png",
+  "exports": [
+    {
+      "file": "qualy-linkedin-first-post-1200x1500.png",
+      "format": "PNG",
+      "dimensions": "1200x1500",
+      "use": "Primary LinkedIn feed image"
+    },
+    {
+      "file": "qualy-linkedin-first-post-1200x1200.png",
+      "format": "PNG",
+      "dimensions": "1200x1200",
+      "use": "Square fallback crop"
+    }
+  ],
+  "source": "linkedin-first-post.html",
+  "copy": {
+    "headline": "Qualy AI yayında",
+    "supportLine": "Mesajlar tek yerde. Talep net.",
+    "eyebrow": "AI destekli gelen kutusu",
+    "footerChip": "Skills + Bilgi Bankası ile kontrollü AI yanıtları"
+  },
+  "featureGrounding": [
+    "Unified inbox for active messaging channels",
+    "Qualy AI customer replies from Skills and Knowledge Base",
+    "AI request summary",
+    "Intent or priority score",
+    "Missing-information collection",
+    "Operator handover"
+  ],
+  "visibleChannels": [
+    "WhatsApp",
+    "Instagram",
+    "Telegram"
+  ],
+  "intentionalExclusions": [
+    "No Messenger active badge because the current app code marks Messenger as coming soon.",
+    "No campaigns, broadcasts, flow builder, CRM charts, revenue metrics, testimonials, customer logos, or unsupported automation claims.",
+    "No generated competitor branding or copied respond.io layouts."
+  ],
+  "styleReferences": [
+    "Local respond.io reference images in /Users/togay/.codex/skills/qualy-social-visuals/assets/respondio-references/",
+    "respond.io public site and LinkedIn visuals were used for hierarchy and polish only."
+  ],
+  "assetSources": [
+    "public/logo-white.svg",
+    "public/whatsapp.svg",
+    "public/instagram.svg",
+    "public/Telegram.svg",
+    "public/fonts/plus-jakarta-sans/PlusJakartaSans-VariableFont_wght.ttf"
+  ],
+  "compositionMethod": "Deterministic HTML/CSS rendered with Playwright. No ImageGen layer was used, so headline, UI text, logo, and channel icons are exact and editable.",
+  "validation": [
+    "Rendered both exports with Playwright.",
+    "Verified PNG dimensions: 1200x1500 and 1200x1200.",
+    "Visually inspected portrait and square exports for text collisions and feature accuracy.",
+    "Checked image statistics to confirm nonblank exports."
+  ]
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "id": "qualy-linkedin-first-post-portrait",
+    "index": 1,
+    "title": "LinkedIn portrait 4:5",
+    "label": "Qualy AI yayında - 1200x1500",
+    "src": "qualy-linkedin-first-post-1200x1500.png",
+    "href": "qualy-linkedin-first-post-1200x1500.png",
+    "output": "qualy-linkedin-first-post-1200x1500.png",
+    "caption": "Primary LinkedIn feed export. Exact headline and channel assets are deterministic."
+  },
+  {
+    "id": "qualy-linkedin-first-post-square",
+    "index": 2,
+    "title": "LinkedIn square crop",
+    "label": "Qualy AI yayında - 1200x1200",
+    "src": "qualy-linkedin-first-post-1200x1200.png",
+    "href": "qualy-linkedin-first-post-1200x1200.png",
+    "output": "qualy-linkedin-first-post-1200x1200.png",
+    "caption": "Square fallback export for reposting or profile-grid contexts."
+  }
+]

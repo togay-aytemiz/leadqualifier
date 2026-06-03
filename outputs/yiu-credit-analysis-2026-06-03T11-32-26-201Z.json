@@ -1,0 +1,833 @@
+{
+  "generatedAt": "2026-06-03T11:32:26.198Z",
+  "org": {
+    "id": "37222032-c2e8-4125-a027-be39eb6603f8",
+    "name": "alt.bp-emjzv36's Organization",
+    "slug": "bc44ddf8798a485fbd975c3fb5cb1458",
+    "created_at": "2026-05-15T07:52:24.703607+00:00"
+  },
+  "demoChannel": {
+    "id": "dd291fa7-9886-451e-84ce-13e44cacc91e",
+    "slug": "yiu-qualy-ai-demo",
+    "display_name": "YİÜ - Qualy AI Demo"
+  },
+  "totals": {
+    "conversations": 2659,
+    "demoConversations": 114,
+    "demoAnswered": 36,
+    "nonQaAnswered": 36,
+    "qaAnswered": 0,
+    "usageRows": 16614,
+    "usageRowsWithConversation": 10648,
+    "usageRowsWithoutConversation": 5966,
+    "messages": 6102,
+    "platforms": {
+      "demo_chat": 114,
+      "whatsapp": 2541,
+      "telegram": 4
+    }
+  },
+  "segmentSummaries": [
+    {
+      "name": "nonQa demo answered",
+      "count": 36,
+      "avgCreditsPerConversation": 14.13,
+      "median": 3.9,
+      "p75": 13.8,
+      "p90": 34.4,
+      "p95": 56,
+      "max": 140.6,
+      "avgCreditsPerUserMessage": 3.12,
+      "medianCreditsPerUserMessage": 2.5,
+      "p90CreditsPerUserMessage": 7.6,
+      "avgUserMessages": 5.22,
+      "avgBotMessages": 5.28
+    },
+    {
+      "name": "recent 7d nonQa demo answered",
+      "count": 30,
+      "avgCreditsPerConversation": 8.32,
+      "median": 3,
+      "p75": 12,
+      "p90": 15.2,
+      "p95": 28.7,
+      "max": 54.2,
+      "avgCreditsPerUserMessage": 2.94,
+      "medianCreditsPerUserMessage": 2.4,
+      "p90CreditsPerUserMessage": 7.6,
+      "avgUserMessages": 4.6,
+      "avgBotMessages": 4.57
+    },
+    {
+      "name": "recent 3d nonQa demo answered",
+      "count": 5,
+      "avgCreditsPerConversation": 14.3,
+      "median": 0.7,
+      "p75": 15.2,
+      "p90": 54.2,
+      "p95": 54.2,
+      "max": 54.2,
+      "avgCreditsPerUserMessage": 4.11,
+      "medianCreditsPerUserMessage": 0.7,
+      "p90CreditsPerUserMessage": 10.84,
+      "avgUserMessages": 2,
+      "avgBotMessages": 2.2
+    },
+    {
+      "name": "single user message nonQa demo",
+      "count": 10,
+      "avgCreditsPerConversation": 2.46,
+      "median": 1.6,
+      "p75": 3.7,
+      "p90": 3.9,
+      "p95": 7.7,
+      "max": 7.7,
+      "avgCreditsPerUserMessage": 2.46,
+      "medianCreditsPerUserMessage": 1.6,
+      "p90CreditsPerUserMessage": 3.9,
+      "avgUserMessages": 1,
+      "avgBotMessages": 1
+    },
+    {
+      "name": "multi user message nonQa demo",
+      "count": 26,
+      "avgCreditsPerConversation": 18.62,
+      "median": 9.2,
+      "p75": 15.7,
+      "p90": 54.2,
+      "p95": 56,
+      "max": 140.6,
+      "avgCreditsPerUserMessage": 3.37,
+      "medianCreditsPerUserMessage": 3.07,
+      "p90CreditsPerUserMessage": 7.6,
+      "avgUserMessages": 6.85,
+      "avgBotMessages": 6.92
+    },
+    {
+      "name": "2-8 user msg realistic nonQa demo",
+      "count": 16,
+      "avgCreditsPerConversation": 15.87,
+      "median": 12,
+      "p75": 15.7,
+      "p90": 34.4,
+      "p95": 54.2,
+      "max": 54.2,
+      "avgCreditsPerUserMessage": 4.6,
+      "medianCreditsPerUserMessage": 4,
+      "p90CreditsPerUserMessage": 9.57,
+      "avgUserMessages": 3.5,
+      "avgBotMessages": 3.5
+    },
+    {
+      "name": "qa/codex answered",
+      "count": 0,
+      "avgCreditsPerConversation": 0,
+      "median": 0,
+      "p75": 0,
+      "p90": 0,
+      "p95": 0,
+      "max": 0,
+      "avgCreditsPerUserMessage": 0,
+      "medianCreditsPerUserMessage": 0,
+      "p90CreditsPerUserMessage": 0,
+      "avgUserMessages": 0,
+      "avgBotMessages": 0
+    },
+    {
+      "name": "all demo answered",
+      "count": 36,
+      "avgCreditsPerConversation": 14.13,
+      "median": 3.9,
+      "p75": 13.8,
+      "p90": 34.4,
+      "p95": 56,
+      "max": 140.6,
+      "avgCreditsPerUserMessage": 3.12,
+      "medianCreditsPerUserMessage": 2.5,
+      "p90CreditsPerUserMessage": 7.6,
+      "avgUserMessages": 5.22,
+      "avgBotMessages": 5.28
+    }
+  ],
+  "categoryCredits": {
+    "nonQa": {
+      "rag": 309.8,
+      "lead_extraction": 139.3,
+      "router": 47.2,
+      "fallback": 12.5
+    },
+    "recent7": {
+      "rag": 163.1,
+      "lead_extraction": 59.1,
+      "router": 22.4,
+      "fallback": 5
+    },
+    "recent3": {
+      "rag": 48.8,
+      "lead_extraction": 15,
+      "router": 5.5,
+      "fallback": 2.2
+    },
+    "realistic2to8": {
+      "rag": 162.2,
+      "lead_extraction": 61.2,
+      "router": 22.8,
+      "fallback": 7.7
+    },
+    "qa": {},
+    "allDemo": {
+      "rag": 309.8,
+      "lead_extraction": 139.3,
+      "router": 47.2,
+      "fallback": 12.5
+    },
+    "usageWithoutConversation": {
+      "embedding": 1895.9,
+      "rag": 749.9
+    }
+  },
+  "modelCredits": {
+    "nonQa": {
+      "gpt-4o-mini": 508.8
+    },
+    "recent7": {
+      "gpt-4o-mini": 249.6
+    },
+    "realistic2to8": {
+      "gpt-4o-mini": 253.9
+    }
+  },
+  "usageWithoutConversation": {
+    "count": 5966,
+    "totalCredits": 2645.8
+  },
+  "topConversations": [
+    {
+      "id": "519689ec-d82d-4433-bc04-7159a99a1ea6",
+      "created_at": "2026-05-21T06:41:04.970739+00:00",
+      "last_message_at": "2026-05-23T08:09:22.268+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 140.6,
+      "contact_messages": 20,
+      "bot_messages": 20,
+      "usage_count": 135,
+      "byCategory": {
+        "lead_extraction": 41.9,
+        "rag": 83.6,
+        "router": 13.2,
+        "fallback": 1.9
+      },
+      "byModel": {
+        "gpt-4o-mini": 140.6
+      },
+      "tags": []
+    },
+    {
+      "id": "5a16ea1d-2700-4162-a571-727f2ea30688",
+      "created_at": "2026-05-21T06:39:00.340326+00:00",
+      "last_message_at": "2026-05-21T20:04:25.632+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 56,
+      "contact_messages": 15,
+      "bot_messages": 18,
+      "usage_count": 60,
+      "byCategory": {
+        "rag": 31.5,
+        "lead_extraction": 17.3,
+        "router": 6.2,
+        "fallback": 1
+      },
+      "byModel": {
+        "gpt-4o-mini": 56
+      },
+      "tags": []
+    },
+    {
+      "id": "808bfdb5-5f2a-4d47-8c4e-80abb2a894ce",
+      "created_at": "2026-06-02T11:49:06.548124+00:00",
+      "last_message_at": "2026-06-02T12:51:36.018+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 54.2,
+      "contact_messages": 5,
+      "bot_messages": 6,
+      "usage_count": 51,
+      "byCategory": {
+        "lead_extraction": 9.7,
+        "rag": 38.5,
+        "router": 4.7,
+        "fallback": 1.3
+      },
+      "byModel": {
+        "gpt-4o-mini": 54.2
+      },
+      "tags": []
+    },
+    {
+      "id": "a2aa2285-370d-4dec-ba0f-04267431858e",
+      "created_at": "2026-05-26T11:38:52.466607+00:00",
+      "last_message_at": "2026-05-26T11:43:07.511+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 34.4,
+      "contact_messages": 6,
+      "bot_messages": 6,
+      "usage_count": 33,
+      "byCategory": {
+        "fallback": 2.4,
+        "lead_extraction": 10.4,
+        "router": 2.9,
+        "rag": 18.7
+      },
+      "byModel": {
+        "gpt-4o-mini": 34.4
+      },
+      "tags": []
+    },
+    {
+      "id": "2690c96c-9509-4032-8c58-efd307bf5c6a",
+      "created_at": "2026-05-28T21:24:30.814779+00:00",
+      "last_message_at": "2026-05-28T21:25:40.241+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 28.7,
+      "contact_messages": 3,
+      "bot_messages": 3,
+      "usage_count": 28,
+      "byCategory": {
+        "lead_extraction": 5.1,
+        "rag": 20.8,
+        "router": 2.8
+      },
+      "byModel": {
+        "gpt-4o-mini": 28.7
+      },
+      "tags": []
+    },
+    {
+      "id": "1f6799f3-4c70-45d5-abb7-59a2aeafe54a",
+      "created_at": "2026-05-23T17:08:26.077225+00:00",
+      "last_message_at": "2026-05-25T20:01:17.569+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 20.3,
+      "contact_messages": 4,
+      "bot_messages": 4,
+      "usage_count": 24,
+      "byCategory": {
+        "lead_extraction": 6.7,
+        "rag": 9.4,
+        "router": 2,
+        "fallback": 2.2
+      },
+      "byModel": {
+        "gpt-4o-mini": 20.3
+      },
+      "tags": []
+    },
+    {
+      "id": "6d2e7027-f8e8-40cf-9cdc-bc1b88deae14",
+      "created_at": "2026-05-28T20:59:18.589592+00:00",
+      "last_message_at": "2026-05-28T21:00:31.414+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 15.7,
+      "contact_messages": 3,
+      "bot_messages": 3,
+      "usage_count": 17,
+      "byCategory": {
+        "lead_extraction": 3.4,
+        "rag": 10.4,
+        "router": 1.9
+      },
+      "byModel": {
+        "gpt-4o-mini": 15.7
+      },
+      "tags": []
+    },
+    {
+      "id": "c84aaeb3-fbe2-4321-a56e-29a9b411d488",
+      "created_at": "2026-06-02T10:11:28.802363+00:00",
+      "last_message_at": "2026-06-02T10:53:42.081+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 15.2,
+      "contact_messages": 2,
+      "bot_messages": 2,
+      "usage_count": 16,
+      "byCategory": {
+        "rag": 10.3,
+        "lead_extraction": 3.2,
+        "router": 0.8,
+        "fallback": 0.9
+      },
+      "byModel": {
+        "gpt-4o-mini": 15.2
+      },
+      "tags": []
+    },
+    {
+      "id": "bbe2cf73-e9c4-4c25-8b98-9ceb7cfb81e0",
+      "created_at": "2026-05-28T20:47:12.694723+00:00",
+      "last_message_at": "2026-05-28T20:47:59.299+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 14.2,
+      "contact_messages": 3,
+      "bot_messages": 3,
+      "usage_count": 12,
+      "byCategory": {
+        "lead_extraction": 2.6,
+        "rag": 10.9,
+        "router": 0.7
+      },
+      "byModel": {
+        "gpt-4o-mini": 14.2
+      },
+      "tags": []
+    },
+    {
+      "id": "4997ee7a-08ae-4444-b1da-1598a2015d00",
+      "created_at": "2026-05-28T17:37:07.573142+00:00",
+      "last_message_at": "2026-05-28T17:43:07.929+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 13.8,
+      "contact_messages": 10,
+      "bot_messages": 9,
+      "usage_count": 13,
+      "byCategory": {
+        "lead_extraction": 4,
+        "rag": 6.9,
+        "router": 1.7,
+        "fallback": 1.2
+      },
+      "byModel": {
+        "gpt-4o-mini": 13.8
+      },
+      "tags": []
+    },
+    {
+      "id": "f03c411a-278b-4dfd-925a-c08c11e381eb",
+      "created_at": "2026-05-28T20:56:00.380155+00:00",
+      "last_message_at": "2026-05-28T20:56:51.632+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 12.8,
+      "contact_messages": 3,
+      "bot_messages": 3,
+      "usage_count": 13,
+      "byCategory": {
+        "lead_extraction": 2.5,
+        "rag": 8.9,
+        "router": 1.4
+      },
+      "byModel": {
+        "gpt-4o-mini": 12.8
+      },
+      "tags": []
+    },
+    {
+      "id": "d8336bd6-eb9a-46bf-95b4-97277f9a5a60",
+      "created_at": "2026-05-28T04:29:47.652656+00:00",
+      "last_message_at": "2026-05-28T04:30:50.219+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 12,
+      "contact_messages": 3,
+      "bot_messages": 3,
+      "usage_count": 12,
+      "byCategory": {
+        "lead_extraction": 3.5,
+        "rag": 7.5,
+        "router": 1
+      },
+      "byModel": {
+        "gpt-4o-mini": 12
+      },
+      "tags": []
+    },
+    {
+      "id": "34e3139f-c7db-4800-9f80-3cdac6d41dd8",
+      "created_at": "2026-05-28T21:03:09.442267+00:00",
+      "last_message_at": "2026-05-28T21:04:08.116+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 11.4,
+      "contact_messages": 3,
+      "bot_messages": 3,
+      "usage_count": 12,
+      "byCategory": {
+        "lead_extraction": 2.5,
+        "rag": 7.5,
+        "router": 1.4
+      },
+      "byModel": {
+        "gpt-4o-mini": 11.4
+      },
+      "tags": []
+    },
+    {
+      "id": "51271e44-6549-443c-bce8-64617bb299fe",
+      "created_at": "2026-05-28T04:18:02.382825+00:00",
+      "last_message_at": "2026-05-28T04:19:11.044+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 9.2,
+      "contact_messages": 3,
+      "bot_messages": 2,
+      "usage_count": 10,
+      "byCategory": {
+        "lead_extraction": 2.6,
+        "rag": 5.7,
+        "router": 0.9
+      },
+      "byModel": {
+        "gpt-4o-mini": 9.2
+      },
+      "tags": []
+    },
+    {
+      "id": "c92cbd9e-7110-45f3-b6dd-c98ee75d79b9",
+      "created_at": "2026-05-27T16:09:56.238448+00:00",
+      "last_message_at": "2026-05-27T16:10:59.209+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 7.8,
+      "contact_messages": 2,
+      "bot_messages": 2,
+      "usage_count": 9,
+      "byCategory": {
+        "lead_extraction": 2.4,
+        "fallback": 0.9,
+        "router": 0.6,
+        "rag": 3.9
+      },
+      "byModel": {
+        "gpt-4o-mini": 7.8
+      },
+      "tags": []
+    },
+    {
+      "id": "03254449-9936-45c5-be36-ac426acb4c5d",
+      "created_at": "2026-05-28T20:21:26.572619+00:00",
+      "last_message_at": "2026-05-28T20:21:39.267+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 7.7,
+      "contact_messages": 1,
+      "bot_messages": 1,
+      "usage_count": 8,
+      "byCategory": {
+        "lead_extraction": 1.6,
+        "rag": 5.7,
+        "router": 0.4
+      },
+      "byModel": {
+        "gpt-4o-mini": 7.7
+      },
+      "tags": []
+    },
+    {
+      "id": "2e57071f-c204-4f18-8d75-c342ed3f1a09",
+      "created_at": "2026-05-20T17:07:00.147607+00:00",
+      "last_message_at": "2026-05-20T19:53:29.591+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 7.2,
+      "contact_messages": 4,
+      "bot_messages": 4,
+      "usage_count": 8,
+      "byCategory": {
+        "lead_extraction": 3.2,
+        "rag": 3.5,
+        "router": 0.5
+      },
+      "byModel": {
+        "gpt-4o-mini": 7.2
+      },
+      "tags": []
+    },
+    {
+      "id": "f66fdade-0e93-4998-b62b-edb1b80087c2",
+      "created_at": "2026-05-28T20:52:51.600574+00:00",
+      "last_message_at": "2026-05-28T20:53:24.35+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 5.6,
+      "contact_messages": 2,
+      "bot_messages": 2,
+      "usage_count": 7,
+      "byCategory": {
+        "lead_extraction": 1.7,
+        "rag": 3.2,
+        "router": 0.7
+      },
+      "byModel": {
+        "gpt-4o-mini": 5.6
+      },
+      "tags": []
+    },
+    {
+      "id": "0c3fbf23-c208-449b-bbb3-42f0705aaefc",
+      "created_at": "2026-05-28T20:30:24.58757+00:00",
+      "last_message_at": "2026-05-28T20:30:33.434+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 3.9,
+      "contact_messages": 1,
+      "bot_messages": 1,
+      "usage_count": 4,
+      "byCategory": {
+        "lead_extraction": 0.8,
+        "rag": 2.9,
+        "router": 0.2
+      },
+      "byModel": {
+        "gpt-4o-mini": 3.9
+      },
+      "tags": []
+    },
+    {
+      "id": "de72aaf1-d2a0-4144-8ffd-dd4505de7351",
+      "created_at": "2026-05-28T20:25:15.401619+00:00",
+      "last_message_at": "2026-05-28T20:25:26.217+00:00",
+      "contact_name": "Demo ziyaretçi",
+      "credits": 3.7,
+      "contact_messages": 1,
+      "bot_messages": 1,
+      "usage_count": 4,
+      "byCategory": {
+        "lead_extraction": 0.8,
+        "rag": 2.7,
+        "router": 0.2
+      },
+      "byModel": {
+        "gpt-4o-mini": 3.7
+      },
+      "tags": []
+    }
+  ],
+  "recentSample": [
+    {
+      "id": "808bfdb5-5f2a-4d47-8c4e-80abb2a894ce",
+      "last_message_at": "2026-06-02T12:51:36.018+00:00",
+      "credits": 54.2,
+      "contact_messages": 5,
+      "bot_messages": 6,
+      "byCategory": {
+        "lead_extraction": 9.7,
+        "rag": 38.5,
+        "router": 4.7,
+        "fallback": 1.3
+      }
+    },
+    {
+      "id": "c84aaeb3-fbe2-4321-a56e-29a9b411d488",
+      "last_message_at": "2026-06-02T10:53:42.081+00:00",
+      "credits": 15.2,
+      "contact_messages": 2,
+      "bot_messages": 2,
+      "byCategory": {
+        "rag": 10.3,
+        "lead_extraction": 3.2,
+        "router": 0.8,
+        "fallback": 0.9
+      }
+    },
+    {
+      "id": "9278408b-f32c-4337-92ca-7429947ed7cf",
+      "last_message_at": "2026-06-02T09:17:31.083+00:00",
+      "credits": 0.7,
+      "contact_messages": 1,
+      "bot_messages": 1,
+      "byCategory": {
+        "lead_extraction": 0.7
+      }
+    },
+    {
+      "id": "c7813f33-789f-4758-9b4a-b995ff57b093",
+      "last_message_at": "2026-06-02T08:59:32.093+00:00",
+      "credits": 0.7,
+      "contact_messages": 1,
+      "bot_messages": 1,
+      "byCategory": {
+        "lead_extraction": 0.7
+      }
+    },
+    {
+      "id": "1c29d64b-ae33-48f5-b1b9-3fd4d912905d",
+      "last_message_at": "2026-06-02T08:38:01.208+00:00",
+      "credits": 0.7,
+      "contact_messages": 1,
+      "bot_messages": 1,
+      "byCategory": {
+        "lead_extraction": 0.7
+      }
+    },
+    {
+      "id": "2690c96c-9509-4032-8c58-efd307bf5c6a",
+      "last_message_at": "2026-05-28T21:25:40.241+00:00",
+      "credits": 28.7,
+      "contact_messages": 3,
+      "bot_messages": 3,
+      "byCategory": {
+        "lead_extraction": 5.1,
+        "rag": 20.8,
+        "router": 2.8
+      }
+    },
+    {
+      "id": "34e3139f-c7db-4800-9f80-3cdac6d41dd8",
+      "last_message_at": "2026-05-28T21:04:08.116+00:00",
+      "credits": 11.4,
+      "contact_messages": 3,
+      "bot_messages": 3,
+      "byCategory": {
+        "lead_extraction": 2.5,
+        "rag": 7.5,
+        "router": 1.4
+      }
+    },
+    {
+      "id": "6d2e7027-f8e8-40cf-9cdc-bc1b88deae14",
+      "last_message_at": "2026-05-28T21:00:31.414+00:00",
+      "credits": 15.7,
+      "contact_messages": 3,
+      "bot_messages": 3,
+      "byCategory": {
+        "lead_extraction": 3.4,
+        "rag": 10.4,
+        "router": 1.9
+      }
+    },
+    {
+      "id": "f03c411a-278b-4dfd-925a-c08c11e381eb",
+      "last_message_at": "2026-05-28T20:56:51.632+00:00",
+      "credits": 12.8,
+      "contact_messages": 3,
+      "bot_messages": 3,
+      "byCategory": {
+        "lead_extraction": 2.5,
+        "rag": 8.9,
+        "router": 1.4
+      }
+    },
+    {
+      "id": "f66fdade-0e93-4998-b62b-edb1b80087c2",
+      "last_message_at": "2026-05-28T20:53:24.35+00:00",
+      "credits": 5.6,
+      "contact_messages": 2,
+      "bot_messages": 2,
+      "byCategory": {
+        "lead_extraction": 1.7,
+        "rag": 3.2,
+        "router": 0.7
+      }
+    },
+    {
+      "id": "bbe2cf73-e9c4-4c25-8b98-9ceb7cfb81e0",
+      "last_message_at": "2026-05-28T20:47:59.299+00:00",
+      "credits": 14.2,
+      "contact_messages": 3,
+      "bot_messages": 3,
+      "byCategory": {
+        "lead_extraction": 2.6,
+        "rag": 10.9,
+        "router": 0.7
+      }
+    },
+    {
+      "id": "0c3fbf23-c208-449b-bbb3-42f0705aaefc",
+      "last_message_at": "2026-05-28T20:30:33.434+00:00",
+      "credits": 3.9,
+      "contact_messages": 1,
+      "bot_messages": 1,
+      "byCategory": {
+        "lead_extraction": 0.8,
+        "rag": 2.9,
+        "router": 0.2
+      }
+    },
+    {
+      "id": "de72aaf1-d2a0-4144-8ffd-dd4505de7351",
+      "last_message_at": "2026-05-28T20:25:26.217+00:00",
+      "credits": 3.7,
+      "contact_messages": 1,
+      "bot_messages": 1,
+      "byCategory": {
+        "lead_extraction": 0.8,
+        "rag": 2.7,
+        "router": 0.2
+      }
+    },
+    {
+      "id": "03254449-9936-45c5-be36-ac426acb4c5d",
+      "last_message_at": "2026-05-28T20:21:39.267+00:00",
+      "credits": 7.7,
+      "contact_messages": 1,
+      "bot_messages": 1,
+      "byCategory": {
+        "lead_extraction": 1.6,
+        "rag": 5.7,
+        "router": 0.4
+      }
+    },
+    {
+      "id": "6b645775-c4e2-418e-abaf-c3cedeee1cb3",
+      "last_message_at": "2026-05-28T20:20:53.865+00:00",
+      "credits": 1.6,
+      "contact_messages": 1,
+      "bot_messages": 1,
+      "byCategory": {
+        "lead_extraction": 0.7,
+        "fallback": 0.7,
+        "router": 0.2
+      }
+    },
+    {
+      "id": "4997ee7a-08ae-4444-b1da-1598a2015d00",
+      "last_message_at": "2026-05-28T17:43:07.929+00:00",
+      "credits": 13.8,
+      "contact_messages": 10,
+      "bot_messages": 9,
+      "byCategory": {
+        "lead_extraction": 4,
+        "rag": 6.9,
+        "router": 1.7,
+        "fallback": 1.2
+      }
+    },
+    {
+      "id": "e38bc7f9-098d-4558-8407-ba637e31f1b0",
+      "last_message_at": "2026-05-28T06:40:56.695+00:00",
+      "credits": 3,
+      "contact_messages": 11,
+      "bot_messages": 11,
+      "byCategory": {
+        "lead_extraction": 1,
+        "rag": 1.7,
+        "router": 0.3
+      }
+    },
+    {
+      "id": "4ba5a7ce-cc9b-4dc2-8b61-72ae9a87dace",
+      "last_message_at": "2026-05-28T06:34:48.866+00:00",
+      "credits": 3,
+      "contact_messages": 11,
+      "bot_messages": 11,
+      "byCategory": {
+        "lead_extraction": 1,
+        "rag": 1.7,
+        "router": 0.3
+      }
+    },
+    {
+      "id": "8be9750f-2d40-4064-a413-ea5cd4c19a71",
+      "last_message_at": "2026-05-28T06:21:33.535+00:00",
+      "credits": 3,
+      "contact_messages": 11,
+      "bot_messages": 11,
+      "byCategory": {
+        "lead_extraction": 1,
+        "rag": 1.7,
+        "router": 0.3
+      }
+    },
+    {
+      "id": "6c3b426a-7e47-44c3-a5a6-5f3967db6912",
+      "last_message_at": "2026-05-28T06:14:49.979+00:00",
+      "credits": 3,
+      "contact_messages": 11,
+      "bot_messages": 11,
+      "byCategory": {
+        "lead_extraction": 1,
+        "rag": 1.7,
+        "router": 0.3
+      }
+    }
+  ]
+}

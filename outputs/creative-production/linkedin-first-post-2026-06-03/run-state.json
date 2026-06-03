@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "runDirectory": "/Users/togay/Desktop/leadqualifier/outputs/creative-production/linkedin-first-post-2026-06-03",
+  "streamPath": "/Users/togay/Desktop/leadqualifier/outputs/creative-production/linkedin-first-post-2026-06-03/data/stream.json",
+  "runStatePath": "/Users/togay/Desktop/leadqualifier/outputs/creative-production/linkedin-first-post-2026-06-03/run-state.json",
+  "latestActionPath": "/Users/togay/Desktop/leadqualifier/outputs/creative-production/linkedin-first-post-2026-06-03/latest-action.json",
+  "paths": {
+    "streamPath": "/Users/togay/Desktop/leadqualifier/outputs/creative-production/linkedin-first-post-2026-06-03/data/stream.json",
+    "runStatePath": "/Users/togay/Desktop/leadqualifier/outputs/creative-production/linkedin-first-post-2026-06-03/run-state.json",
+    "latestActionPath": "/Users/togay/Desktop/leadqualifier/outputs/creative-production/linkedin-first-post-2026-06-03/latest-action.json"
+  },
+  "itemCount": 2,
+  "items": [
+    {
+      "id": "qualy-linkedin-first-post-portrait",
+      "title": "LinkedIn portrait 4:5",
+      "caption": "Primary LinkedIn feed export. Exact headline and channel assets are deterministic.",
+      "tone": "",
+      "prompt": "",
+      "imageUrl": "/generated/mcp-thumbs/qualy-linkedin-first-post-portrait.jpg",
+      "previewImageUrl": "/generated/mcp-thumbs/qualy-linkedin-first-post-portrait.jpg",
+      "sourceImageUrl": "/generated/qualy-linkedin-first-post-portrait.png"
+    },
+    {
+      "id": "qualy-linkedin-first-post-square",
+      "title": "LinkedIn square crop",
+      "caption": "Square fallback export for reposting or profile-grid contexts.",
+      "tone": "",
+      "prompt": "",
+      "imageUrl": "/generated/mcp-thumbs/qualy-linkedin-first-post-square.jpg",
+      "previewImageUrl": "/generated/mcp-thumbs/qualy-linkedin-first-post-square.jpg",
+      "sourceImageUrl": "/generated/qualy-linkedin-first-post-square.png"
+    }
+  ],
+  "visibleItemIds": [
+    "qualy-linkedin-first-post-portrait",
+    "qualy-linkedin-first-post-square"
+  ],
+  "hiddenImageIds": [],
+  "selectedImageIds": [],
+  "currentImageId": "qualy-linkedin-first-post-portrait",
+  "updatedAt": "2026-06-03T08:06:31.248964Z"
+}

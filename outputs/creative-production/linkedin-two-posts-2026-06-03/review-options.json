@@ -1,0 +1,9 @@
+{
+  "title": "Qualy LinkedIn Visuals",
+  "summary": "Two Turkish-first LinkedIn visuals for Qualy AI, built as a clean continuation of the first launch post while staying inside documented product behavior.",
+  "preset": "image-wall",
+  "showCaptions": false,
+  "showControls": true,
+  "minTileWidth": 420,
+  "contactSheetOutput": "contact-sheet.png"
+}

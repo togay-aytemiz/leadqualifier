@@ -1,0 +1,30 @@
+{
+  "meta": {
+    "title": "Qualy LinkedIn Visuals",
+    "summary": "Two Turkish-first LinkedIn visuals for Qualy AI, built as a clean continuation of the first launch post while staying inside documented product behavior.",
+    "source": "review_renderer",
+    "itemCount": 2
+  },
+  "items": [
+    {
+      "id": "qualy-linkedin-dmler-kaybolmasin",
+      "title": "DM'ler kaybolmas\u0131n.",
+      "caption": "Shows WhatsApp, Instagram, and Telegram feeding into Qualy's unified inbox. Messenger is intentionally omitted because current app code marks it as coming soon.",
+      "tone": "Clean dark SaaS, respond.io-inspired hierarchy, Turkish SMB launch",
+      "prompt": "Deterministic Creative Production export for Qualy AI LinkedIn: headline DM'ler kaybolmas\u0131n.; active channels WhatsApp, Instagram, Telegram; unified inbox, AI reply, AI talep \u00f6zeti, and missing information collection. No fake metrics, no customer proof, no unsupported campaigns or follow-up automation.",
+      "imageUrl": "/generated/mcp-thumbs/qualy-linkedin-dmler-kaybolmasin.jpg",
+      "previewImageUrl": "/generated/mcp-thumbs/qualy-linkedin-dmler-kaybolmasin.jpg",
+      "sourceImageUrl": "/generated/qualy-linkedin-dmler-kaybolmasin.png"
+    },
+    {
+      "id": "qualy-linkedin-talep-hazir",
+      "title": "Takip edilecek talep haz\u0131r.",
+      "caption": "Shows Qualy AI summarizing service, purpose, missing info, priority, and operator handoff. No unsupported CRM charts, automation, or revenue claims.",
+      "tone": "Clean dark SaaS, light product UI crop, operator-control emphasis",
+      "prompt": "Deterministic Creative Production export for Qualy AI LinkedIn: headline Takip edilecek talep haz\u0131r.; Skills + Bilgi Bankas\u0131, AI talep \u00f6zeti, lead/request priority, missing information, and operator takeover. No fake features, no customer logos, no unsupported integrations.",
+      "imageUrl": "/generated/mcp-thumbs/qualy-linkedin-talep-hazir.jpg",
+      "previewImageUrl": "/generated/mcp-thumbs/qualy-linkedin-talep-hazir.jpg",
+      "sourceImageUrl": "/generated/qualy-linkedin-talep-hazir.png"
+    }
+  ]
+}

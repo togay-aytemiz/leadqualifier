@@ -1,0 +1,9 @@
+{
+  "title": "Qualy LinkedIn First Post",
+  "summary": "First LinkedIn launch visual for Qualy AI, using exact Turkish copy, real Qualy/channel assets, and documented product UI concepts.",
+  "preset": "image-wall",
+  "showCaptions": false,
+  "showControls": true,
+  "minTileWidth": 420,
+  "contactSheetOutput": "contact-sheet.png"
+}

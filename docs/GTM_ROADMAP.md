@@ -1,6 +1,6 @@
 # Qualy GTM Roadmap
 
-*Last updated: 2026-05-12*
+*Last updated: 2026-06-03*
 
 > Goal: start showing Qualy to the market before every asset feels perfect. This roadmap favors small, repeatable publishing loops over a big launch package.
 
@@ -74,7 +74,8 @@
 
 - [ ] Write the first founder post in Turkish.
 - [ ] Write a shorter alternative founder post for a softer launch.
-- [ ] Prepare one visual for the first LinkedIn post.
+- [x] Prepare one visual for the first LinkedIn post.
+- [x] Prepare two follow-up LinkedIn visuals for scattered DMs and AI request summaries.
 - [ ] Publish the first founder post without waiting for Product Hunt.
 - [ ] Ask for feedback from founder/operator network.
 - [ ] Collect objections and questions from comments/DMs.
@@ -138,4 +139,5 @@
 - [ ] Generate the first 10 demo conversations.
 - [x] Create the Qualy social visual skill.
 - [ ] Produce the first 6 Instagram post drafts.
+- [x] Produce two follow-up LinkedIn visual drafts.
 - [ ] Produce the first LinkedIn founder post.

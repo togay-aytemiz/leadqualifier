@@ -1,0 +1,14 @@
+{
+  "id": "review-renderer-materialized",
+  "action": "write_moodboard_widget_payload",
+  "label": "Materialized Creative Production image review",
+  "createdAt": "2026-06-03T09:14:36.857595Z",
+  "timestamp": "2026-06-03T09:14:36.857595Z",
+  "title": "Qualy LinkedIn Visuals",
+  "summary": "Two Turkish-first LinkedIn visuals for Qualy AI, built as a clean continuation of the first launch post while staying inside documented product behavior.",
+  "itemCount": 2,
+  "runDirectory": "/Users/togay/Desktop/leadqualifier/outputs/creative-production/linkedin-two-posts-2026-06-03",
+  "streamPath": "/Users/togay/Desktop/leadqualifier/outputs/creative-production/linkedin-two-posts-2026-06-03/data/stream.json",
+  "runStatePath": "/Users/togay/Desktop/leadqualifier/outputs/creative-production/linkedin-two-posts-2026-06-03/run-state.json",
+  "latestActionPath": "/Users/togay/Desktop/leadqualifier/outputs/creative-production/linkedin-two-posts-2026-06-03/latest-action.json"
+}

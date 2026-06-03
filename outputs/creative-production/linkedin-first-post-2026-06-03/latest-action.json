@@ -1,0 +1,14 @@
+{
+  "id": "review-renderer-materialized",
+  "action": "write_moodboard_widget_payload",
+  "label": "Materialized Creative Production image review",
+  "createdAt": "2026-06-03T08:06:31.248964Z",
+  "timestamp": "2026-06-03T08:06:31.248964Z",
+  "title": "Qualy LinkedIn First Post",
+  "summary": "First LinkedIn launch visual for Qualy AI, using exact Turkish copy, real Qualy/channel assets, and documented product UI concepts.",
+  "itemCount": 2,
+  "runDirectory": "/Users/togay/Desktop/leadqualifier/outputs/creative-production/linkedin-first-post-2026-06-03",
+  "streamPath": "/Users/togay/Desktop/leadqualifier/outputs/creative-production/linkedin-first-post-2026-06-03/data/stream.json",
+  "runStatePath": "/Users/togay/Desktop/leadqualifier/outputs/creative-production/linkedin-first-post-2026-06-03/run-state.json",
+  "latestActionPath": "/Users/togay/Desktop/leadqualifier/outputs/creative-production/linkedin-first-post-2026-06-03/latest-action.json"
+}

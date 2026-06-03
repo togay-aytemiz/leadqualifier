@@ -1,0 +1,30 @@
+[
+  {
+    "id": "qualy-linkedin-dmler-kaybolmasin",
+    "index": 1,
+    "title": "DM'ler kaybolmasın.",
+    "label": "Post 1 - Problem to clarity",
+    "src": "qualy-linkedin-dmler-kaybolmasin-1200x1500.png",
+    "href": "qualy-linkedin-dmler-kaybolmasin-1200x1500.png",
+    "output": "qualy-linkedin-dmler-kaybolmasin-1200x1500.png",
+    "family": "QV-02 Problem To Clarity",
+    "tone": "Clean dark SaaS, respond.io-inspired hierarchy, Turkish SMB launch",
+    "best_for": "LinkedIn post about scattered DMs becoming one organized customer request surface.",
+    "caption": "Shows WhatsApp, Instagram, and Telegram feeding into Qualy's unified inbox. Messenger is intentionally omitted because current app code marks it as coming soon.",
+    "prompt": "Deterministic Creative Production export for Qualy AI LinkedIn: headline DM'ler kaybolmasın.; active channels WhatsApp, Instagram, Telegram; unified inbox, AI reply, AI talep özeti, and missing information collection. No fake metrics, no customer proof, no unsupported campaigns or follow-up automation."
+  },
+  {
+    "id": "qualy-linkedin-talep-hazir",
+    "index": 2,
+    "title": "Takip edilecek talep hazır.",
+    "label": "Post 2 - AI request summary",
+    "src": "qualy-linkedin-talep-hazir-1200x1500.png",
+    "href": "qualy-linkedin-talep-hazir-1200x1500.png",
+    "output": "qualy-linkedin-talep-hazir-1200x1500.png",
+    "family": "QV-04 AI Request Summary",
+    "tone": "Clean dark SaaS, light product UI crop, operator-control emphasis",
+    "best_for": "LinkedIn post explaining how Qualy AI summarizes a customer request before human follow-up.",
+    "caption": "Shows Qualy AI summarizing service, purpose, missing info, priority, and operator handoff. No unsupported CRM charts, automation, or revenue claims.",
+    "prompt": "Deterministic Creative Production export for Qualy AI LinkedIn: headline Takip edilecek talep hazır.; Skills + Bilgi Bankası, AI talep özeti, lead/request priority, missing information, and operator takeover. No fake features, no customer logos, no unsupported integrations."
+  }
+]

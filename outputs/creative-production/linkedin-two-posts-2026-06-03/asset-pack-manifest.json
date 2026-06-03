@@ -1,0 +1,60 @@
+{
+  "id": "qualy-linkedin-two-posts-2026-06-03",
+  "title": "Qualy LinkedIn Visual Pack - Two Follow-up Posts",
+  "created_at": "2026-06-03",
+  "format": {
+    "channel": "LinkedIn",
+    "width": 1200,
+    "height": 1500,
+    "aspect_ratio": "4:5"
+  },
+  "creative_direction": {
+    "style": "Clean dark premium SaaS with respond.io-inspired hierarchy and cropped product UI moments.",
+    "language": "Turkish",
+    "templates": [
+      "QV-02 Problem To Clarity",
+      "QV-04 AI Request Summary"
+    ]
+  },
+  "product_boundaries": {
+    "shown": [
+      "Unified inbox",
+      "WhatsApp",
+      "Instagram",
+      "Telegram",
+      "Qualy AI replies from approved knowledge",
+      "AI talep özeti",
+      "Priority scoring",
+      "Missing information collection",
+      "Operator handoff/control"
+    ],
+    "intentionally_omitted": [
+      "Messenger active state",
+      "Campaigns or broadcasts",
+      "Flow builder",
+      "Auto follow-up sequences",
+      "Revenue/customer proof metrics",
+      "Customer logos or testimonials"
+    ]
+  },
+  "source_files": [
+    "linkedin-two-posts.html"
+  ],
+  "exports": [
+    {
+      "id": "qualy-linkedin-dmler-kaybolmasin",
+      "file": "qualy-linkedin-dmler-kaybolmasin-1200x1500.png",
+      "headline": "DM'ler kaybolmasın."
+    },
+    {
+      "id": "qualy-linkedin-talep-hazir",
+      "file": "qualy-linkedin-talep-hazir-1200x1500.png",
+      "headline": "Takip edilecek talep hazır."
+    }
+  ],
+  "provenance": {
+    "method": "Deterministic HTML/CSS composition exported with Playwright; exact Qualy logo and channel icon assets are used from the local project.",
+    "references": "Local Qualy social visual rules and saved respond.io references were used for hierarchy and polish only; no competitor branding or copy was reproduced.",
+    "image_generation": "No freeform image generation layer was used for the final exports, to preserve exact Turkish copy, channel icons, and product-boundary safety."
+  }
+}

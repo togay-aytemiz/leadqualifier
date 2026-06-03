@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Qualy LinkedIn Visuals</title>
+    <style>
+      @font-face {
+        font-family: "Plus Jakarta Sans";
+        src: url("../../../public/fonts/plus-jakarta-sans/PlusJakartaSans-VariableFont_wght.ttf") format("truetype");
+        font-weight: 200 900;
+        font-style: normal;
+      }
+
+      :root {
+        --bg: #060913;
+        --bg-2: #10172a;
+        --ink: #07111f;
+        --muted: #6e7890;
+        --line: rgba(255, 255, 255, 0.14);
+        --panel-line: #e7ebf3;
+        --violet: #8f83ff;
+        --blue: #86c8ff;
+        --cyan: #55e3dd;
+        --green: #22c55e;
+        --amber: #f5b84b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #05070e;
+        font-family: "Plus Jakarta Sans", Inter, system-ui, sans-serif;
+      }
+
+      body {
+        display: grid;
+        gap: 48px;
+        justify-items: center;
+        padding: 48px;
+      }
+
+      .poster {
+        position: relative;
+        width: 1200px;
+        height: 1500px;
+        overflow: hidden;
+        color: white;
+        background:
+          radial-gradient(circle at 18% 9%, rgba(143, 131, 255, 0.36), transparent 30%),
+          radial-gradient(circle at 82% 24%, rgba(134, 200, 255, 0.22), transparent 28%),
+          radial-gradient(circle at 56% 88%, rgba(85, 227, 221, 0.15), transparent 34%),
+          linear-gradient(145deg, #070a14 0%, #111a35 46%, #05070e 100%);
+        isolation: isolate;
+      }
+
+      .poster::before,
+      .poster::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .poster::before {
+        opacity: 0.18;
+        background-image:
+          radial-gradient(rgba(255, 255, 255, 0.4) 0.85px, transparent 0.85px),
+          radial-gradient(rgba(255, 255, 255, 0.14) 0.7px, transparent 0.7px);
+        background-position:
+          0 0,
+          19px 19px;
+        background-size:
+          38px 38px,
+          38px 38px;
+        mask-image: linear-gradient(to bottom, black 0%, transparent 88%);
+      }
+
+      .poster::after {
+        opacity: 0.32;
+        background-image:
+          linear-gradient(var(--line) 1px, transparent 1px),
+          linear-gradient(90deg, var(--line) 1px, transparent 1px);
+        background-size: 132px 132px;
+        mask-image: radial-gradient(circle at 50% 38%, black, transparent 76%);
+      }
+
+      .brand {
+        position: absolute;
+        top: 58px;
+        left: 82px;
+        z-index: 6;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .brand img {
+        width: 178px;
+        height: auto;
+        filter: drop-shadow(0 16px 36px rgba(0, 0, 0, 0.28));
+      }
+
+      .eyebrow {
+        position: absolute;
+        top: 68px;
+        right: 82px;
+        z-index: 6;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 999px;
+        padding: 11px 18px;
+        background: rgba(255, 255, 255, 0.07);
+        color: #dce6ff;
+        font-size: 19px;
+        font-weight: 760;
+        letter-spacing: 0;
+        box-shadow: 0 18px 52px rgba(0, 0, 0, 0.24);
+        backdrop-filter: blur(16px);
+      }
+
+      .eyebrow-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: var(--green);
+        box-shadow: 0 0 22px rgba(34, 197, 94, 0.85);
+      }
+
+      .copy {
+        position: absolute;
+        left: 82px;
+        right: 82px;
+        top: 178px;
+        z-index: 5;
+      }
+
+      h1 {
+        margin: 0;
+        max-width: 890px;
+        color: #fff;
+        font-size: 116px;
+        font-weight: 840;
+        line-height: 0.95;
+        letter-spacing: 0;
+        text-wrap: balance;
+        text-shadow: 0 18px 64px rgba(0, 0, 0, 0.42);
+      }
+
+      .poster.summary h1 {
+        max-width: 1010px;
+        font-size: 108px;
+      }
+
+      h1 span {
+        color: #cdd9ff;
+      }
+
+      .subline {
+        margin: 30px 0 0;
+        max-width: 745px;
+        color: #dce4f8;
+        font-size: 35px;
+        line-height: 1.16;
+        font-weight: 650;
+        letter-spacing: 0;
+      }
+
+      .glow-path {
+        position: absolute;
+        z-index: 1;
+        pointer-events: none;
+      }
+
+      .glow-path.path-a {
+        left: 142px;
+        right: 140px;
+        top: 662px;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(139, 199, 255, 0.82), rgba(143, 131, 255, 0.35), transparent);
+        box-shadow: 0 0 36px rgba(139, 199, 255, 0.36);
+      }
+
+      .glow-path.path-b {
+        left: 206px;
+        right: 218px;
+        bottom: 296px;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(85, 227, 221, 0.5), rgba(143, 131, 255, 0.42), transparent);
+        box-shadow: 0 0 28px rgba(143, 131, 255, 0.3);
+      }
+
+      .orb {
+        position: absolute;
+        z-index: 0;
+        border-radius: 999px;
+        filter: blur(42px);
+        opacity: 0.5;
+        pointer-events: none;
+      }
+
+      .orb.one {
+        width: 380px;
+        height: 380px;
+        left: 632px;
+        top: 374px;
+        background: rgba(143, 131, 255, 0.34);
+      }
+
+      .orb.two {
+        width: 330px;
+        height: 330px;
+        left: 126px;
+        bottom: 170px;
+        background: rgba(85, 227, 221, 0.18);
+      }
+
+      .channel-cloud {
+        position: absolute;
+        top: 500px;
+        left: 82px;
+        right: 82px;
+        z-index: 4;
+        height: 300px;
+      }
+
+      .incoming-card {
+        position: absolute;
+        display: grid;
+        grid-template-columns: 52px 1fr;
+        align-items: center;
+        gap: 14px;
+        min-width: 318px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 26px;
+        padding: 16px 18px;
+        background: rgba(255, 255, 255, 0.9);
+        color: var(--ink);
+        box-shadow:
+          0 22px 64px rgba(0, 0, 0, 0.22),
+          inset 0 1px 0 rgba(255, 255, 255, 0.95);
+      }
+
+      .incoming-card:nth-child(1) {
+        left: 16px;
+        top: 58px;
+        transform: rotate(-3deg);
+      }
+
+      .incoming-card:nth-child(2) {
+        left: 380px;
+        top: 4px;
+        transform: rotate(2.4deg);
+      }
+
+      .incoming-card:nth-child(3) {
+        right: 4px;
+        top: 84px;
+        transform: rotate(-1.4deg);
+      }
+
+      .incoming-card img,
+      .channel-pill img {
+        width: 46px;
+        height: 46px;
+        object-fit: contain;
+      }
+
+      .incoming-label {
+        color: #131d2c;
+        font-size: 20px;
+        font-weight: 830;
+        line-height: 1;
+      }
+
+      .incoming-text {
+        margin-top: 5px;
+        color: #5e687a;
+        font-size: 17px;
+        font-weight: 660;
+        line-height: 1.18;
+      }
+
+      .product-stage {
+        position: absolute;
+        left: 78px;
+        right: 78px;
+        bottom: 82px;
+        z-index: 3;
+        height: 694px;
+      }
+
+      .panel-halo {
+        position: absolute;
+        inset: 22px 0 0 0;
+        border-radius: 58px;
+        background:
+          radial-gradient(circle at 48% 24%, rgba(255, 255, 255, 0.28), transparent 21%),
+          radial-gradient(circle at 86% 78%, rgba(143, 131, 255, 0.24), transparent 30%);
+        filter: blur(30px);
+        opacity: 0.76;
+      }
+
+      .inbox-panel {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 42px;
+        background: #f9fbff;
+        color: var(--ink);
+        box-shadow:
+          0 46px 120px rgba(0, 0, 0, 0.44),
+          inset 0 1px 0 rgba(255, 255, 255, 0.95);
+      }
+
+      .panel-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 88px;
+        border-bottom: 1px solid #e7ebf3;
+        padding: 0 30px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .panel-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: #101828;
+        font-size: 25px;
+        font-weight: 850;
+      }
+
+      .status-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        border: 1px solid #dce4f2;
+        border-radius: 999px;
+        padding: 10px 14px;
+        background: #fff;
+        color: #273344;
+        font-size: 17px;
+        font-weight: 780;
+      }
+
+      .status-chip::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--green);
+        box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.13);
+      }
+
+      .inbox-body {
+        display: grid;
+        grid-template-columns: 352px 1fr;
+        height: calc(100% - 88px);
+      }
+
+      .thread-list {
+        border-right: 1px solid #e7ebf3;
+        background: #f3f6fb;
+        padding: 20px;
+      }
+
+      .thread-row {
+        display: grid;
+        grid-template-columns: 42px 1fr auto;
+        gap: 13px;
+        align-items: center;
+        border: 1px solid transparent;
+        border-radius: 20px;
+        padding: 15px 14px;
+        color: #111827;
+      }
+
+      .thread-row.active {
+        border-color: #dfe6f4;
+        background: #fff;
+        box-shadow: 0 16px 42px rgba(15, 23, 42, 0.08);
+      }
+
+      .avatar {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        background: #e9eff8;
+        color: #44546a;
+        font-size: 15px;
+        font-weight: 860;
+      }
+
+      .thread-name {
+        color: #111827;
+        font-size: 17px;
+        font-weight: 850;
+        line-height: 1.05;
+      }
+
+      .thread-note {
+        margin-top: 5px;
+        color: #7c8799;
+        font-size: 14px;
+        font-weight: 650;
+        line-height: 1.1;
+      }
+
+      .tiny-icon {
+        width: 26px;
+        height: 26px;
+      }
+
+      .conversation {
+        position: relative;
+        padding: 24px 28px;
+        background:
+          radial-gradient(circle at 92% 8%, rgba(143, 131, 255, 0.09), transparent 22%),
+          #fff;
+      }
+
+      .message {
+        max-width: 448px;
+        margin-bottom: 18px;
+        border-radius: 22px;
+        padding: 18px 20px;
+        color: #172033;
+        font-size: 20px;
+        font-weight: 680;
+        line-height: 1.22;
+      }
+
+      .message.customer {
+        border: 1px solid #e5eaf4;
+        background: #f4f7fb;
+      }
+
+      .message.ai {
+        margin-left: auto;
+        border: 1px solid #d7e6ff;
+        background: linear-gradient(135deg, #eff6ff, #f5f2ff);
+        box-shadow: 0 18px 42px rgba(91, 124, 255, 0.13);
+      }
+
+      .ai-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+        color: #4d5bd7;
+        font-size: 15px;
+        font-weight: 860;
+      }
+
+      .spark {
+        display: grid;
+        place-items: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 8px;
+        background: #7068ff;
+        color: #fff;
+        font-size: 13px;
+        line-height: 1;
+      }
+
+      .summary-card {
+        position: absolute;
+        right: 34px;
+        bottom: 35px;
+        width: 390px;
+        border: 1px solid #dde6f5;
+        border-radius: 26px;
+        background: rgba(255, 255, 255, 0.96);
+        color: #101828;
+        padding: 22px;
+        box-shadow: 0 24px 70px rgba(15, 23, 42, 0.14);
+      }
+
+      .summary-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 18px;
+        font-size: 21px;
+        font-weight: 870;
+      }
+
+      .score {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 7px 11px;
+        background: #ecfdf5;
+        color: #067647;
+        font-size: 15px;
+        font-weight: 860;
+      }
+
+      .field {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        border-top: 1px solid #edf1f7;
+        padding: 13px 0;
+        color: #667085;
+        font-size: 15px;
+        font-weight: 720;
+      }
+
+      .field strong {
+        color: #182230;
+        font-size: 16px;
+        font-weight: 850;
+        text-align: right;
+      }
+
+      .footer-pill {
+        position: absolute;
+        left: 82px;
+        right: 82px;
+        bottom: 36px;
+        z-index: 8;
+        display: flex;
+        justify-content: center;
+      }
+
+      .footer-pill span {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 999px;
+        padding: 13px 20px;
+        background: rgba(255, 255, 255, 0.08);
+        color: #dce6ff;
+        font-size: 19px;
+        font-weight: 760;
+        backdrop-filter: blur(18px);
+      }
+
+      .footer-pill span::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--blue);
+        box-shadow: 0 0 20px rgba(134, 200, 255, 0.8);
+      }
+
+      .summary .copy {
+        top: 166px;
+      }
+
+      .summary .product-stage {
+        height: 762px;
+        bottom: 76px;
+      }
+
+      .summary .inbox-panel {
+        inset: 58px 0 0;
+      }
+
+      .summary .inbox-body {
+        grid-template-columns: 330px 1fr;
+      }
+
+      .summary .summary-card {
+        left: 260px;
+        right: auto;
+        top: 230px;
+        bottom: auto;
+        width: 426px;
+        padding: 28px;
+        border-radius: 34px;
+        transform: translateY(0);
+        box-shadow:
+          0 34px 92px rgba(15, 23, 42, 0.2),
+          0 0 0 1px rgba(143, 131, 255, 0.1);
+      }
+
+      .summary .summary-head {
+        font-size: 26px;
+        margin-bottom: 22px;
+      }
+
+      .summary .score {
+        font-size: 16px;
+        padding: 9px 12px;
+      }
+
+      .summary .field {
+        padding: 16px 0;
+        font-size: 16px;
+      }
+
+      .summary .field strong {
+        font-size: 17px;
+      }
+
+      .handoff {
+        position: absolute;
+        right: 36px;
+        bottom: 44px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        border: 1px solid #d9e3f4;
+        border-radius: 999px;
+        padding: 15px 20px;
+        background: #fff;
+        color: #263244;
+        font-size: 18px;
+        font-weight: 830;
+        box-shadow: 0 20px 52px rgba(15, 23, 42, 0.12);
+      }
+
+      .handoff .avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #e2e8f0, #f8fafc);
+        font-size: 14px;
+      }
+
+      .channel-strip {
+        position: absolute;
+        top: 546px;
+        right: 82px;
+        z-index: 5;
+        display: flex;
+        gap: 14px;
+      }
+
+      .channel-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 999px;
+        padding: 12px 16px 12px 13px;
+        background: rgba(255, 255, 255, 0.94);
+        color: #101828;
+        font-size: 18px;
+        font-weight: 840;
+        box-shadow:
+          0 22px 68px rgba(0, 0, 0, 0.22),
+          inset 0 1px 0 rgba(255, 255, 255, 0.95);
+      }
+
+      .summary .message.customer {
+        max-width: 364px;
+      }
+
+      .summary .message.ai {
+        max-width: 390px;
+        margin-left: 28px;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="poster clarity" id="post-dm">
+      <div class="orb one"></div>
+      <div class="orb two"></div>
+      <div class="brand">
+        <img alt="Qualy" src="../../../public/logo-white.svg" />
+      </div>
+      <div class="eyebrow"><span class="eyebrow-dot"></span>AI destekli gelen kutusu</div>
+      <div class="copy">
+        <h1>DM'ler <span>kaybolmasın.</span></h1>
+        <p class="subline">WhatsApp, Instagram ve Telegram mesajları tek operatör ekranında toplansın.</p>
+      </div>
+      <div class="glow-path path-a"></div>
+      <div class="glow-path path-b"></div>
+      <div class="channel-cloud" aria-hidden="true">
+        <div class="incoming-card">
+          <img alt="" src="../../../public/whatsapp.svg" />
+          <div>
+            <div class="incoming-label">WhatsApp</div>
+            <div class="incoming-text">Randevu sorusu geldi</div>
+          </div>
+        </div>
+        <div class="incoming-card">
+          <img alt="" src="../../../public/instagram.svg" />
+          <div>
+            <div class="incoming-label">Instagram</div>
+            <div class="incoming-text">DM'den hizmet talebi</div>
+          </div>
+        </div>
+        <div class="incoming-card">
+          <img alt="" src="../../../public/Telegram.svg" />
+          <div>
+            <div class="incoming-label">Telegram</div>
+            <div class="incoming-text">Yeni müşteri mesajı</div>
+          </div>
+        </div>
+      </div>
+      <div class="product-stage">
+        <div class="panel-halo"></div>
+        <div class="inbox-panel">
+          <div class="panel-topbar">
+            <div class="panel-title">Tek gelen kutusu</div>
+            <div class="status-chip">Qualy AI aktif</div>
+          </div>
+          <div class="inbox-body">
+            <div class="thread-list">
+              <div class="thread-row active">
+                <div class="avatar">EA</div>
+                <div>
+                  <div class="thread-name">Ece A.</div>
+                  <div class="thread-note">Cilt bakımı için uygun saat?</div>
+                </div>
+                <img class="tiny-icon" alt="" src="../../../public/whatsapp.svg" />
+              </div>
+              <div class="thread-row">
+                <div class="avatar">MK</div>
+                <div>
+                  <div class="thread-name">Mert K.</div>
+                  <div class="thread-note">Düğün çekimi paketi</div>
+                </div>
+                <img class="tiny-icon" alt="" src="../../../public/instagram.svg" />
+              </div>
+              <div class="thread-row">
+                <div class="avatar">SN</div>
+                <div>
+                  <div class="thread-name">Selin N.</div>
+                  <div class="thread-note">Klinik bilgi talebi</div>
+                </div>
+                <img class="tiny-icon" alt="" src="../../../public/Telegram.svg" />
+              </div>
+            </div>
+            <div class="conversation">
+              <div class="message customer">Merhaba, bu hafta sonu cilt bakımı için uygunluğunuz var mı?</div>
+              <div class="message ai">
+                <div class="ai-badge"><span class="spark">AI</span>Qualy AI</div>
+                Hangi hizmet ve saat aralığı sizin için uygun? Bilgileri netleştirip ekibe iletebilirim.
+              </div>
+              <div class="summary-card">
+                <div class="summary-head">
+                  AI talep özeti
+                  <span class="score">Öncelik 8.4</span>
+                </div>
+                <div class="field">Hizmet <strong>Cilt bakımı</strong></div>
+                <div class="field">Zaman <strong>Hafta sonu</strong></div>
+                <div class="field">Eksik bilgi <strong>Saat aralığı</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="footer-pill"><span>Dağınık konuşma yerine net talep</span></div>
+    </section>
+
+    <section class="poster summary" id="post-summary">
+      <div class="orb one"></div>
+      <div class="orb two"></div>
+      <div class="brand">
+        <img alt="Qualy" src="../../../public/logo-white.svg" />
+      </div>
+      <div class="eyebrow"><span class="eyebrow-dot"></span>Skills + Bilgi Bankası</div>
+      <div class="copy">
+        <h1>Takip edilecek <span>talep hazır.</span></h1>
+        <p class="subline">Qualy AI konuşmayı özetler, önceliği gösterir ve eksik bilgiyi ayırır.</p>
+      </div>
+      <div class="channel-strip" aria-hidden="true">
+        <div class="channel-pill"><img alt="" src="../../../public/whatsapp.svg" />WhatsApp</div>
+        <div class="channel-pill"><img alt="" src="../../../public/instagram.svg" />Instagram</div>
+        <div class="channel-pill"><img alt="" src="../../../public/Telegram.svg" />Telegram</div>
+      </div>
+      <div class="glow-path path-a"></div>
+      <div class="glow-path path-b"></div>
+      <div class="product-stage">
+        <div class="panel-halo"></div>
+        <div class="inbox-panel">
+          <div class="panel-topbar">
+            <div class="panel-title">Konuşma detayları</div>
+            <div class="status-chip">Operatör kontrolünde</div>
+          </div>
+          <div class="inbox-body">
+            <div class="thread-list">
+              <div class="thread-row active">
+                <div class="avatar">AY</div>
+                <div>
+                  <div class="thread-name">Ayşe Y.</div>
+                  <div class="thread-note">Lazer epilasyon sorusu</div>
+                </div>
+                <img class="tiny-icon" alt="" src="../../../public/instagram.svg" />
+              </div>
+              <div class="thread-row">
+                <div class="avatar">DT</div>
+                <div>
+                  <div class="thread-name">Deniz T.</div>
+                  <div class="thread-note">Fiyat ve seans bilgisi</div>
+                </div>
+                <img class="tiny-icon" alt="" src="../../../public/whatsapp.svg" />
+              </div>
+            </div>
+            <div class="conversation">
+              <div class="message customer">Merhaba, lazer epilasyon için bilgi alabilir miyim?</div>
+              <div class="message ai">
+                <div class="ai-badge"><span class="spark">AI</span>Qualy AI</div>
+                Elbette. Bölge ve daha önce işlem yaptırıp yaptırmadığınızı öğrenebilir miyim?
+              </div>
+              <div class="summary-card">
+                <div class="summary-head">
+                  AI talep özeti
+                  <span class="score">Öncelik 8.7</span>
+                </div>
+                <div class="field">Hizmet <strong>Lazer epilasyon</strong></div>
+                <div class="field">Amaç <strong>Bilgi ve fiyat</strong></div>
+                <div class="field">Eksik bilgi <strong>Bölge bilgisi</strong></div>
+                <div class="field">Sonraki adım <strong>Operatör takip</strong></div>
+              </div>
+              <div class="handoff"><div class="avatar">OP</div>Operatör devralabilir</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="footer-pill"><span>AI yanıtlar, ekip son kararı verir</span></div>
+    </section>
+  </body>
+</html>
