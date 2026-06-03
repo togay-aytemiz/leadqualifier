@@ -13,8 +13,8 @@ const plans: SubscriptionPlanOption[] = [
         localizedPrice: 349,
         currency: 'TRY',
         conversationRange: {
-            min: 90,
-            max: 120
+            min: 30,
+            max: 60
         },
         unitPrice: 0.349
     },
@@ -25,8 +25,8 @@ const plans: SubscriptionPlanOption[] = [
         localizedPrice: 649,
         currency: 'TRY',
         conversationRange: {
-            min: 180,
-            max: 240
+            min: 60,
+            max: 120
         },
         unitPrice: 0.3245
     }
@@ -95,7 +95,7 @@ describe('SubscriptionPlanManager', () => {
         expect(html).toContain('Temel')
         expect(html).toContain('1.000 kredi')
         expect(html).not.toContain('1.000 kredi dahil')
-        expect(html).toContain('Ayda yaklaşık 90-120 konuşma')
+        expect(html).toContain('Ayda yaklaşık 30-60 konuşma')
         expect(html).toContain('Kredi başı')
         expect(html).not.toContain('Aboneliğini yönet')
         expect(html).toContain('Yükselt veya değiştir')

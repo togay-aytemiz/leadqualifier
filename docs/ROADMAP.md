@@ -1,5 +1,9 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-06-03):** Billing pricing surfaces now use the post-RAG-hardening credit model for customer-facing conversation estimates. Public landing and in-app `Settings > Plans` package cards show approximately `30-60`, `60-120`, and `120-250` conversations for the 1000/2000/4000-credit tiers, and one-time top-up ranges follow the same conservative credit-to-conversation calculation instead of the older optimistic 9-12% credit multiplier.
+
+> **Update Note (2026-06-03):** OpenAI File Search RAG migration is now planned as an isolated benchmark before any agent-backbone migration or customer-facing provider switch. The strategy keeps the public demo on the current Supabase RAG path by default, starts from local side-by-side runs over the same curated 50-question set, measures answer correctness, source correctness, refusal safety, latency percentiles, and estimated File Search/model costs, and waits for user-approved story/PDF mappings instead of bulk-uploading every TMP PDF (`docs/plans/2026-06-03-openai-file-search-rag-migration-strategy.md`).
+
 > **Update Note (2026-06-03):** GTM LinkedIn sprint now also has two review-ready follow-up visuals, `DM'ler kaybolmasın.` and `Takip edilecek talep hazır.`, exported as 4:5 PNGs with editable HTML source, Creative Production review metadata, contact sheet, and provenance manifest. The pack continues the first launch-post visual system, uses exact Qualy/channel assets, and shows only WhatsApp, Instagram, and Telegram as active channel badges because Messenger remains a coming-soon placeholder in the current app.
 
 > **Update Note (2026-06-03):** GTM LinkedIn sprint now has a review-ready first launch visual pack for `Qualy AI yayında`, exported as 4:5 and square PNGs with editable HTML source, Creative Production review metadata, and a provenance manifest. The asset stays Turkish-first, uses exact Qualy/channel icons, depicts the real unified inbox, AI talep özeti, scoring/priority, missing-info, and operator-handover concepts, and keeps Messenger out of active badges because the current app code still marks Messenger as coming soon.
@@ -1593,6 +1597,13 @@
 - [x] Add DB-backed `demo_chat_channels.maintenance_enabled` maintenance mode for Public Demo Chat so Supabase can hide/reopen demo slugs at runtime behind a localized maintenance screen and block demo API calls with `503` during unstable live fixes, with `DEMO_MAINTENANCE_MODE=1` as an emergency global override and a private `DEMO_MAINTENANCE_BYPASS_TOKEN` link that grants an admin-only hashed cookie for local/browser testing while customers stay blocked
 - [x] Deduplicate in-flight Public Demo Chat pending-poll recovery per demo message so repeated browser polls cannot start parallel token-consuming RAG/LLM work
 - [x] Ship P1 Knowledge Base RAG Evidence Pack, selected source chunks, and hybrid RRF retrieval so generated answers cite only evidence-selected chunks while vector, keyword, title/source, and focused evidence all participate in retrieval ranking
+- [ ] Run the OpenAI File Search RAG migration benchmark in an isolated branch/local flow before any agent-backbone migration or public demo provider switch
+  - [x] Add the migration strategy and checklist document (`docs/plans/2026-06-03-openai-file-search-rag-migration-strategy.md`)
+  - [ ] Create branch `codex/file-search-rag-spike`
+  - [ ] Build a curated 50-question benchmark from customer-reported failures and known RAG regression categories
+  - [ ] Wait for user-approved story/PDF mappings before uploading any TMP PDFs to OpenAI vector stores
+  - [ ] Run current RAG and OpenAI File Search side by side with answer/source/refusal/latency/cost reporting
+  - [ ] Decide fallback-only, feature-flagged provider, no rollout, or later agent-tool integration from measured results
 - [x] Extend safe live-QA cleanup to remove deterministic `Codex YIU Mevzuat QA` / `codex-live-yiu-mevzuat-qa-` conversations plus ad-hoc `codex-` demo-chat sessions from pilot Inbox views
 - [x] Extend safe live-QA cleanup to remove deterministic `Codex Live QA` / `codex-live-rag-qa-` RAG-test conversations from pilot Inbox views
 - [x] Re-check YİÜ demo uploaded PDFs/contact-table evidence and fix retrieval for the staff leave, TLT acronym, and health-report mazeret-exam questions observed in demo screenshots

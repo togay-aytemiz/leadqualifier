@@ -61,21 +61,21 @@ const FALLBACK_CATALOG: BillingPricingCatalog = {
             credits: 1000,
             priceTry: 349,
             priceUsd: 9.99,
-            conversationRange: { min: 90, max: 120 }
+            conversationRange: { min: 30, max: 60 }
         },
         {
             id: 'growth',
             credits: 2000,
             priceTry: 649,
             priceUsd: 17.99,
-            conversationRange: { min: 180, max: 240 }
+            conversationRange: { min: 60, max: 120 }
         },
         {
             id: 'scale',
             credits: 4000,
             priceTry: 949,
             priceUsd: 26.99,
-            conversationRange: { min: 360, max: 480 }
+            conversationRange: { min: 120, max: 250 }
         }
     ],
     topups: [
@@ -84,21 +84,21 @@ const FALLBACK_CATALOG: BillingPricingCatalog = {
             credits: 250,
             priceTry: 99,
             priceUsd: 2.99,
-            conversationRange: { min: 22, max: 30 }
+            conversationRange: { min: 7, max: 15 }
         },
         {
             id: 'topup_500',
             credits: 500,
             priceTry: 189,
             priceUsd: 5.49,
-            conversationRange: { min: 45, max: 60 }
+            conversationRange: { min: 15, max: 30 }
         },
         {
             id: 'topup_1000',
             credits: 1000,
             priceTry: 349,
             priceUsd: 9.99,
-            conversationRange: { min: 90, max: 120 }
+            conversationRange: { min: 30, max: 60 }
         }
     ]
 }
@@ -111,9 +111,20 @@ function toNonNegativeNumber(value: unknown) {
 
 function mapConversationRange(credits: number): BillingConversationRange {
     const safeCredits = Math.max(0, Math.round(credits))
+    if (safeCredits <= 0) {
+        return { min: 1, max: 1 }
+    }
+
+    const minStep = safeCredits >= 4000 ? 10 : safeCredits >= 500 ? 5 : 1
+    const maxStep = safeCredits >= 4000 ? 50 : safeCredits >= 500 ? 5 : 1
+    const min = safeCredits < 500
+        ? Math.max(1, Math.floor(safeCredits / 35))
+        : Math.max(1, Math.ceil((safeCredits / 35) / minStep) * minStep)
+    const max = Math.max(min, Math.ceil((safeCredits / 17) / maxStep) * maxStep)
+
     return {
-        min: Math.max(1, Math.floor(safeCredits * 0.09)),
-        max: Math.max(1, Math.floor(safeCredits * 0.12))
+        min,
+        max
     }
 }
 

@@ -49,8 +49,8 @@ describe('billing pricing catalog', () => {
             priceTry: 349,
             priceUsd: 9.99,
             conversationRange: {
-                min: 90,
-                max: 120
+                min: 30,
+                max: 60
             }
         })
         expect(result.plans[2]).toMatchObject({
@@ -59,8 +59,8 @@ describe('billing pricing catalog', () => {
             priceTry: 949,
             priceUsd: 26.99,
             conversationRange: {
-                min: 360,
-                max: 480
+                min: 120,
+                max: 250
             }
         })
         expect(result.topups[2]).toMatchObject({
@@ -69,8 +69,8 @@ describe('billing pricing catalog', () => {
             priceTry: 349,
             priceUsd: 9.99,
             conversationRange: {
-                min: 90,
-                max: 120
+                min: 30,
+                max: 60
             }
         })
     })
@@ -111,8 +111,8 @@ describe('billing pricing catalog', () => {
             priceTry: 399,
             priceUsd: 11.99,
             conversationRange: {
-                min: 108,
-                max: 144
+                min: 35,
+                max: 75
             }
         })
         expect(result.plans[2]).toMatchObject({
@@ -121,8 +121,8 @@ describe('billing pricing catalog', () => {
             priceTry: 1290,
             priceUsd: 34.99,
             conversationRange: {
-                min: 450,
-                max: 600
+                min: 150,
+                max: 300
             }
         })
         expect(result.topups[0]).toMatchObject({
@@ -131,8 +131,8 @@ describe('billing pricing catalog', () => {
             priceTry: 109,
             priceUsd: 3.49,
             conversationRange: {
-                min: 22,
-                max: 30
+                min: 7,
+                max: 15
             }
         })
     })
@@ -163,12 +163,16 @@ describe('billing pricing catalog', () => {
 
     it('keeps conversation range calculation stable', () => {
         expect(resolveConversationRangeForCredits(1000)).toEqual({
-            min: 90,
-            max: 120
+            min: 30,
+            max: 60
         })
         expect(resolveConversationRangeForCredits(250)).toEqual({
-            min: 22,
-            max: 30
+            min: 7,
+            max: 15
+        })
+        expect(resolveConversationRangeForCredits(4000)).toEqual({
+            min: 120,
+            max: 250
         })
     })
 })

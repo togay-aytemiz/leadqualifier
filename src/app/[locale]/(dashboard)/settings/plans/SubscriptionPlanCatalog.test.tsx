@@ -15,8 +15,8 @@ const plans: SubscriptionPlanOption[] = [
     localizedPrice: 349,
     currency: 'TRY',
     conversationRange: {
-      min: 90,
-      max: 120,
+      min: 30,
+      max: 60,
     },
     unitPrice: 0.349,
   },
@@ -27,8 +27,8 @@ const plans: SubscriptionPlanOption[] = [
     localizedPrice: 649,
     currency: 'TRY',
     conversationRange: {
-      min: 180,
-      max: 240,
+      min: 60,
+      max: 120,
     },
     unitPrice: 0.3245,
   },
@@ -39,8 +39,8 @@ const plans: SubscriptionPlanOption[] = [
     localizedPrice: 949,
     currency: 'TRY',
     conversationRange: {
-      min: 360,
-      max: 480,
+      min: 120,
+      max: 250,
     },
     unitPrice: 0.23725,
   },

@@ -87,21 +87,21 @@ describe('admin billing manual actions', () => {
                     credits: 1000,
                     priceTry: 349,
                     priceUsd: 9.99,
-                    conversationRange: { min: 90, max: 120 }
+                    conversationRange: { min: 30, max: 60 }
                 },
                 {
                     id: 'growth',
                     credits: 2000,
                     priceTry: 649,
                     priceUsd: 17.99,
-                    conversationRange: { min: 180, max: 240 }
+                    conversationRange: { min: 60, max: 120 }
                 },
                 {
                     id: 'scale',
                     credits: 4000,
                     priceTry: 949,
                     priceUsd: 26.99,
-                    conversationRange: { min: 360, max: 480 }
+                    conversationRange: { min: 120, max: 250 }
                 }
             ],
             topups: []
