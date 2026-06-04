@@ -55,6 +55,48 @@ describe('MessageRichText', () => {
     expect(html).toContain('Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
   })
 
+  it('renders markdown unordered lists as semantic list items', () => {
+    const html = render(
+      'Personelin yıllık ücretli izin hakkı hizmet süresine göre değişir:\n- 1 yıldan 5 yıla kadar: 14 iş günü\n- 5 yıldan fazla, 15 yıldan az: 20 iş günü\n- 15 yıl ve üzeri: 26 iş günü'
+    )
+
+    expect(html).toContain('<ul')
+    expect(html).toContain('<li')
+    expect(html.match(/<li/g)?.length).toBe(3)
+    expect(html).toContain('1 yıldan 5 yıla kadar: 14 iş günü')
+    expect(html).toContain('5 yıldan fazla, 15 yıldan az: 20 iş günü')
+    expect(html).toContain('15 yıl ve üzeri: 26 iş günü')
+  })
+
+  it('normalizes assistant inline hyphen bullets into a readable list', () => {
+    const html = render(
+      'Personelin izin gün sayıları şu şekildedir: - Hizmet süresi 1 yıldan 5 yıla kadar (5 yıl dahil) olanlara 14 iş günü. - Hizmet süresi 5 yıldan fazla 15 yıldan az olanlara 20 iş günü. - Hizmet süresi 15 yıl (dahil) ve daha fazla olanlara 26 iş günü. 18 ve daha küçük yaştaki çalışanlar ile 50 ve daha yukarıdaki yaştaki çalışanlar için ise; - 1 yıldan 14 yıla kadar (14 yıl dahil) olanlara 20 iş günü. - 15 yıl (dahil) ve daha fazla olanlara 26 iş günü. Bu izinler, yıllık ücretli izinlerdir.'
+    )
+
+    expect(html).toContain('<ul')
+    expect(html.match(/<li/g)?.length).toBe(5)
+    expect(html).toContain('Personelin izin gün sayıları şu şekildedir:')
+    expect(html).not.toContain('şu şekildedir: - Hizmet')
+    expect(html).toContain('Hizmet süresi 1 yıldan 5 yıla kadar (5 yıl dahil) olanlara 14 iş günü.')
+    expect(html).toContain('Hizmet süresi 5 yıldan fazla 15 yıldan az olanlara 20 iş günü.')
+    expect(html).toContain('Hizmet süresi 15 yıl (dahil) ve daha fazla olanlara 26 iş günü.')
+    expect(html).toContain('18 ve daha küçük yaştaki çalışanlar ile 50 ve daha yukarıdaki yaştaki çalışanlar için ise;')
+    expect(html).toContain('1 yıldan 14 yıla kadar (14 yıl dahil) olanlara 20 iş günü.')
+    expect(html).toContain('15 yıl (dahil) ve daha fazla olanlara 26 iş günü. Bu izinler, yıllık ücretli izinlerdir.')
+  })
+
+  it('renders markdown ordered lists as semantic list items', () => {
+    const html = render(
+      'Başvuru için:\n1. Formu doldurun\n2. Belgeleri hazırlayın\n3. Öğrenci işleriyle görüşün'
+    )
+
+    expect(html).toContain('<ol')
+    expect(html.match(/<li/g)?.length).toBe(3)
+    expect(html).toContain('Formu doldurun')
+    expect(html).toContain('Belgeleri hazırlayın')
+    expect(html).toContain('Öğrenci işleriyle görüşün')
+  })
+
   it('can render a standalone source URL line with a short display label', () => {
     const url = 'https://yuksekihtisasuniversitesi.edu.tr/Uploads/demo.pdf'
     const html = render(`Cevap burada.\n${url}`, 'Kaynağı aç')

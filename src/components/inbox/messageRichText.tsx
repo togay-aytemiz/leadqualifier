@@ -10,6 +10,10 @@ const TOKEN_PATTERN =
 const BOLD_PATTERN = /(\*\*([^*\n]+)\*\*|\*([^*\n]+)\*)/g
 const STANDALONE_URL_PATTERN = /^https?:\/\/[^\s<]+$/i
 const TRAILING_URL_PUNCTUATION = /[.,!?;:]+$/
+const UNORDERED_LIST_LINE_PATTERN = /^\s*[-*•]\s+(.+)$/
+const ORDERED_LIST_LINE_PATTERN = /^\s*\d+[.)]\s+(.+)$/
+const INLINE_BULLET_SPLIT_PATTERN = /\s+-\s+(?=\S)/g
+const INLINE_SECTION_BEFORE_BULLET_PATTERN = /([.!?])\s+([^-.\n]{8,}?\b(?:için ise|içinse|ise);?)\s+-\s+/gi
 
 function splitTrailingUrlPunctuation(value: string) {
   const trailing = value.match(TRAILING_URL_PUNCTUATION)?.[0] ?? ''
@@ -108,6 +112,85 @@ function isStandaloneUrlLine(line: string) {
   return STANDALONE_URL_PATTERN.test(line.trim())
 }
 
+function matchListLine(line: string) {
+  const unorderedMatch = line.match(UNORDERED_LIST_LINE_PATTERN)
+  if (unorderedMatch) {
+    return {
+      type: 'unordered' as const,
+      content: unorderedMatch[1] ?? '',
+    }
+  }
+
+  const orderedMatch = line.match(ORDERED_LIST_LINE_PATTERN)
+  if (orderedMatch) {
+    return {
+      type: 'ordered' as const,
+      content: orderedMatch[1] ?? '',
+    }
+  }
+
+  return null
+}
+
+function isListLine(line: string) {
+  return matchListLine(line) !== null
+}
+
+function normalizeListLineContinuation(line: string) {
+  const listLineMatch = matchListLine(line.trim())
+  if (!listLineMatch) return null
+
+  const itemSegments = listLineMatch.content.split(INLINE_BULLET_SPLIT_PATTERN)
+  const hasInlineContinuation = itemSegments.length > 1 && /[.!?:;]\s*$/.test(itemSegments[0]?.trim() ?? '')
+  if (!hasInlineContinuation) return [line]
+
+  return itemSegments
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .map((segment) => `- ${segment}`)
+}
+
+function normalizeInlineBulletLine(line: string) {
+  const trimmedLine = line.trim()
+  const normalizedListLine = normalizeListLineContinuation(line)
+  if (normalizedListLine) return normalizedListLine
+
+  if (
+    !trimmedLine
+    || isStandaloneUrlLine(trimmedLine)
+    || /^\s*>\s?/.test(line)
+  ) {
+    return [line]
+  }
+
+  const preparedLine = line.replace(INLINE_SECTION_BEFORE_BULLET_PATTERN, '$1\n$2\n- ')
+  return preparedLine.split('\n').flatMap((preparedSegment) => {
+    const normalizedPreparedListLine = normalizeListLineContinuation(preparedSegment)
+    if (normalizedPreparedListLine) return normalizedPreparedListLine
+
+    const segments = preparedSegment.split(INLINE_BULLET_SPLIT_PATTERN)
+    if (segments.length < 2) return [preparedSegment]
+
+    const intro = segments[0]?.trimEnd() ?? ''
+    const items = segments.slice(1).map((segment) => segment.trim()).filter(Boolean)
+    const hasClearListSignal = segments.length > 2 || /[:;]\s*$/.test(intro)
+    if (!items.length || !hasClearListSignal) return [preparedSegment]
+
+    const normalizedLines = intro.trim() ? [intro.trim()] : []
+    normalizedLines.push(...items.map((item) => `- ${item}`))
+
+    return normalizedLines
+  })
+}
+
+function normalizeMessageContent(content: string) {
+  return content
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .flatMap(normalizeInlineBulletLine)
+    .join('\n')
+}
+
 function resolveStandaloneUrlLabel(
   standaloneUrlLabel: MessageRichTextProps['standaloneUrlLabel'],
   index: number,
@@ -153,6 +236,49 @@ function renderLine(
   return <span key={`line-${index}`}>{parseInlineText(line, `line-${index}`)}</span>
 }
 
+function renderListGroup(input: {
+  lines: string[]
+  startIndex: number
+}) {
+  const firstMatch = matchListLine(input.lines[input.startIndex] ?? '')
+  if (!firstMatch) {
+    return {
+      nextIndex: input.startIndex + 1,
+      node: null,
+    }
+  }
+
+  const items: Array<{ lineIndex: number; content: string }> = []
+  let index = input.startIndex
+
+  while (index < input.lines.length) {
+    const match = matchListLine(input.lines[index] ?? '')
+    if (!match || match.type !== firstMatch.type) break
+
+    items.push({
+      lineIndex: index,
+      content: match.content,
+    })
+    index += 1
+  }
+
+  const className = firstMatch.type === 'ordered'
+    ? 'my-2 ml-5 list-decimal space-y-1 marker:text-current/60'
+    : 'my-2 ml-5 list-disc space-y-1 marker:text-current/60'
+  const children = items.map((item) => (
+    <li key={`line-${item.lineIndex}-list-item`} className="pl-1">
+      {parseInlineText(item.content, `line-${item.lineIndex}-list-item`)}
+    </li>
+  ))
+
+  return {
+    nextIndex: index,
+    node: firstMatch.type === 'ordered'
+      ? <ol key={`line-${input.startIndex}-ordered-list`} className={className}>{children}</ol>
+      : <ul key={`line-${input.startIndex}-unordered-list`} className={className}>{children}</ul>,
+  }
+}
+
 function renderStandaloneUrlGroup(input: {
   lines: string[]
   startIndex: number
@@ -196,7 +322,7 @@ function renderStandaloneUrlGroup(input: {
 }
 
 export function MessageRichText({ content, standaloneUrlLabel }: MessageRichTextProps) {
-  const normalized = content.replace(/\r\n/g, '\n')
+  const normalized = normalizeMessageContent(content)
   const lines = normalized.split('\n')
   const standaloneUrlTotal = standaloneUrlLabel
     ? lines.filter(isStandaloneUrlLine).length
@@ -225,6 +351,18 @@ export function MessageRichText({ content, standaloneUrlLabel }: MessageRichText
       continue
     }
 
+    if (isListLine(lines[index] ?? '')) {
+      const group = renderListGroup({
+        lines,
+        startIndex: index,
+      })
+      if (group.node) {
+        nodes.push(group.node)
+      }
+      index = group.nextIndex
+      continue
+    }
+
     const renderedLine = renderLine(
       lines[index] ?? '',
       index,
@@ -232,7 +370,10 @@ export function MessageRichText({ content, standaloneUrlLabel }: MessageRichText
       -1,
       standaloneUrlTotal
     )
-    const shouldAddBreak = index < lines.length - 1 && !/^\s*>\s?/.test(lines[index + 1] ?? '')
+    const nextLine = lines[index + 1] ?? ''
+    const shouldAddBreak = index < lines.length - 1
+      && !/^\s*>\s?/.test(nextLine)
+      && !isListLine(nextLine)
     nodes.push(
       <Fragment key={`message-line-wrapper-${index}`}>
         {renderedLine}
