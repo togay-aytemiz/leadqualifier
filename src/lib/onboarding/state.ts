@@ -58,6 +58,7 @@ interface ResolveOnboardingStateInput {
   offeringProfile: OfferingProfile | null
   serviceCatalogCount: number
   connectedChannels: Channel[]
+  hasEnabledDemoChatChannel?: boolean
   nowIso?: string
 }
 
@@ -120,6 +121,13 @@ function hasAnyConnectedChannel(channels: Channel[]) {
   return channels.some((channel) => shouldCountChannelAsConnected(channel))
 }
 
+function hasConnectedCustomerEntryPoint(input: {
+  connectedChannels: Channel[]
+  hasEnabledDemoChatChannel?: boolean
+}) {
+  return hasAnyConnectedChannel(input.connectedChannels) || input.hasEnabledDemoChatChannel === true
+}
+
 function hasLearnedChannelConnection(onboardingRow: OrganizationOnboardingStateRow | null) {
   return Boolean(onboardingRow?.channel_connection_completed_at)
 }
@@ -176,6 +184,7 @@ export function resolveOnboardingState({
   offeringProfile,
   serviceCatalogCount,
   connectedChannels,
+  hasEnabledDemoChatChannel,
 }: ResolveOnboardingStateInput): OrganizationOnboardingShellState {
   const showBanner = shouldShowTrialBanner(billingSnapshot)
   const prerequisiteSteps: OrganizationOnboardingStepState[] = [
@@ -203,7 +212,7 @@ export function resolveOnboardingState({
   const channelConnectionComplete =
     hasLearnedChannelConnection(onboardingRow) ||
     (isChannelConnectionPrerequisitesComplete(prerequisiteSteps) &&
-      hasAnyConnectedChannel(connectedChannels))
+      hasConnectedCustomerEntryPoint({ connectedChannels, hasEnabledDemoChatChannel }))
 
   const steps: OrganizationOnboardingStepState[] = [
     ...prerequisiteSteps,
@@ -269,6 +278,7 @@ async function getOrganizationOnboardingShellDataWithSupabase(
     offeringProfile,
     serviceCatalogCount,
     connectedChannels,
+    hasEnabledDemoChatChannel,
   ] = await Promise.all([
     readOrganizationOnboardingStateRow(supabase, organizationId),
     getOrganizationBillingSnapshot(organizationId, { supabase }),
@@ -278,6 +288,7 @@ async function getOrganizationOnboardingShellDataWithSupabase(
     readOfferingProfile(supabase, organizationId),
     readServiceCatalogCount(supabase, organizationId),
     readConnectedChannels(supabase, organizationId),
+    readEnabledDemoChatChannelExists(supabase, organizationId),
   ])
 
   const onboardingState = resolveOnboardingState({
@@ -290,6 +301,7 @@ async function getOrganizationOnboardingShellDataWithSupabase(
     offeringProfile,
     serviceCatalogCount,
     connectedChannels,
+    hasEnabledDemoChatChannel,
   })
 
   return {
@@ -429,4 +441,21 @@ async function readConnectedChannels(supabase: SupabaseClient, organizationId: s
   }
 
   return (data as Channel[] | null) ?? []
+}
+
+async function readEnabledDemoChatChannelExists(supabase: SupabaseClient, organizationId: string) {
+  const { count, error } = (await supabase
+    .from('demo_chat_channels')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', organizationId)
+    .eq('enabled', true)) as OnboardingCountQueryResult
+
+  if (error) {
+    if (!isMissingRelationError(error, 'demo_chat_channels')) {
+      console.error('Failed to count demo chat channels for onboarding:', error)
+    }
+    return false
+  }
+
+  return normalizeCount(count) > 0
 }

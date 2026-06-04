@@ -183,7 +183,8 @@ Local benchmark work can run without creating the organization. The organization
 - Preview organization name/slug: `YİÜ Tanıtım Test` / `yiu-tanitim-test`
 - Preview demo slug: `yiu-tanitim-gunleri-2026`
 - Billing state: `premium_active`, `10000` monthly package credits, 0 used, no top-up carryover.
-- Demo maintenance: disabled for `yiu-tanitim-gunleri-2026`; the channel has a server-side shared secret for browser access-token minting.
+- Demo maintenance: disabled for `yiu-tanitim-gunleri-2026`; the channel has a server-side shared secret for browser access-token minting and now counts as the onboarding/customer-entry connection signal for demo-only orgs.
+- Bot mode: the YİÜ Tanıtım Test org is marked `bot_mode='active'`, `bot_mode_unlock_required=false`, and has `channel_connection_completed_at` recorded so demo conversations can be reviewed from Inbox without connecting a live WhatsApp/Instagram/Telegram provider.
 - Knowledge Base seed: collection `YİÜ Tanıtım Günleri 2026 - Approved Corpus`, `135` documents (`113` PDFs, `22` article/markdown records), `879` chunks.
 - Route bridge: Public Demo Chat polling tries validated OpenAI File Search for the preview demo slug before falling back to the standard Supabase RAG/shared pipeline.
 - Deployable source manifest: `src/lib/knowledge-base/provider-data/yiu-tanitim-gunleri-2026-source-manifest.json`.

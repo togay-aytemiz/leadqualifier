@@ -342,6 +342,57 @@ describe('resolveOnboardingState', () => {
     expect(state.steps.find((step) => step.id === 'connect_whatsapp')?.isComplete).toBe(true)
   })
 
+  it('counts an enabled demo chat channel as complete once prerequisites are complete', () => {
+    const state = resolveOnboardingState({
+      organizationId: 'org-1',
+      onboardingRow: createOnboardingRow({
+        first_seen_at: '2026-04-01T10:00:00.000Z',
+        intro_acknowledged_at: '2026-04-01T10:01:00.000Z',
+        ai_settings_reviewed_at: '2026-04-01T10:01:30.000Z',
+      }),
+      billingSnapshot: createBillingSnapshot(),
+      knowledgeDocumentCount: 1,
+      customSkillCount: 0,
+      aiSettingsReviewCookieSeen: false,
+      offeringProfile: createOfferingProfile({
+        summary: 'Demo tanıtım asistanı.',
+      }),
+      serviceCatalogCount: 1,
+      connectedChannels: [],
+      hasEnabledDemoChatChannel: true,
+      nowIso: '2026-04-01T10:03:00.000Z',
+    })
+
+    expect(state.steps.find((step) => step.id === 'connect_whatsapp')?.isComplete).toBe(true)
+    expect(state.isComplete).toBe(true)
+    expect(state.completedSteps).toBe(5)
+  })
+
+  it('does not count a demo chat channel before prerequisites are complete', () => {
+    const state = resolveOnboardingState({
+      organizationId: 'org-1',
+      onboardingRow: createOnboardingRow({
+        first_seen_at: '2026-04-01T10:00:00.000Z',
+        intro_acknowledged_at: '2026-04-01T10:01:00.000Z',
+      }),
+      billingSnapshot: createBillingSnapshot(),
+      knowledgeDocumentCount: 1,
+      customSkillCount: 0,
+      aiSettingsReviewCookieSeen: false,
+      offeringProfile: createOfferingProfile({
+        summary: 'Demo tanıtım asistanı.',
+      }),
+      serviceCatalogCount: 1,
+      connectedChannels: [],
+      hasEnabledDemoChatChannel: true,
+      nowIso: '2026-04-01T10:03:00.000Z',
+    })
+
+    expect(state.steps.find((step) => step.id === 'ai_settings_review')?.isComplete).toBe(false)
+    expect(state.steps.find((step) => step.id === 'connect_whatsapp')?.isComplete).toBe(false)
+    expect(state.isComplete).toBe(false)
+  })
+
   it('keeps the final connection step incomplete until the first four steps are complete', () => {
     const state = resolveOnboardingState({
       organizationId: 'org-1',
