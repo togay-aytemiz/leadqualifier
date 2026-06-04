@@ -9,6 +9,7 @@ import {
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
 import { verifyDemoChatAccessToken } from '@/lib/demo-chat/access'
 import { buildDemoChatContactId, resolveDemoChatChannel } from '@/lib/demo-chat/channel'
+import { buildOpenAiFileSearchDemoReply } from '@/lib/demo-chat/openai-file-search'
 import {
     DEMO_MAINTENANCE_BYPASS_COOKIE,
     shouldServeDemoMaintenance,
@@ -966,18 +967,71 @@ async function buildExtractiveDemoChatReply(input: {
                 responseLanguage,
                 chunks
             })
+            const settingsStartedAt = Date.now()
+            const aiSettings = await getOrgAiSettings(input.channel.organizationId, {
+                supabase: input.supabase,
+                locale: responseLanguage
+            })
+            const settingsMs = elapsedMs(settingsStartedAt)
+            const polishStartedAt = Date.now()
+            const polishedDeterministicAnswer = await polishGroundedRagAnswer({
+                answer: microPolishedAnswer.answer,
+                userMessage: message,
+                responseLanguage,
+                chunks,
+                settings: aiSettings,
+                timeoutMs: readFastRagPolishTimeoutMs()
+            })
+            const polishMs = elapsedMs(polishStartedAt)
+
+            if (polishedDeterministicAnswer.usage) {
+                try {
+                    await recordAiUsage({
+                        organizationId: input.channel.organizationId,
+                        category: 'rag',
+                        model: polishedDeterministicAnswer.model,
+                        inputTokens: polishedDeterministicAnswer.usage.inputTokens,
+                        outputTokens: polishedDeterministicAnswer.usage.outputTokens,
+                        totalTokens: polishedDeterministicAnswer.usage.totalTokens,
+                        metadata: {
+                            source: 'demo_chat_rag_deterministic_polish',
+                            response_kind: 'rag_deterministic_polish',
+                            demo_chat_channel_id: input.channel.id,
+                            ...(input.conversationId ? { conversation_id: input.conversationId } : {}),
+                            document_count: chunks.length
+                        },
+                        supabase: input.supabase
+                    })
+                } catch (error) {
+                    console.error('Demo Chat: deterministic RAG polish usage recording failed; continuing reply flow', error)
+                }
+            }
+
+            const deterministicAnswerForReply = polishedDeterministicAnswer.answer.trim()
+                && !isNoAnswerReply(polishedDeterministicAnswer.answer)
+                ? polishedDeterministicAnswer.answer
+                : microPolishedAnswer.answer
+
             return {
-                replyText: appendCanonicalRagSourceLinks(microPolishedAnswer.answer, chunks, {
+                replyText: appendCanonicalRagSourceLinks(deterministicAnswerForReply, chunks, {
                     force: true,
                     limit: 2
                 }),
                 skillImage: null,
                 chunks,
                 generation: null,
-                polish: null,
+                polish: {
+                    usedPolish: polishedDeterministicAnswer.usedPolish,
+                    addedEngagement: polishedDeterministicAnswer.addedEngagement,
+                    model: polishedDeterministicAnswer.model
+                },
                 diagnostics: buildDiagnostics({
                     deterministicFastPath: true,
-                    usedMicroPolish: microPolishedAnswer.usedMicroPolish
+                    usedMicroPolish: microPolishedAnswer.usedMicroPolish,
+                    timingsMs: {
+                        settings: settingsMs,
+                        polish: polishMs
+                    }
                 })
             }
         }
@@ -1408,6 +1462,28 @@ async function recoverPendingDemoChatReplyExtractively(input: {
         const refreshedPendingInbound = await findPendingDemoChatInboundMessage(input)
         inboundMessage = refreshedPendingInbound.message ?? inboundMessage
         conversationId = refreshedPendingInbound.conversationId ?? conversationId
+    }
+
+    const fileSearchReply = await buildOpenAiFileSearchDemoReply({
+        supabase: input.supabase,
+        channel: input.channel,
+        message,
+        conversationId,
+    })
+    if (fileSearchReply) {
+        await persistDemoChatTextReply({
+            supabase: input.supabase,
+            channel: input.channel,
+            sessionId: input.sessionId,
+            messageId: input.messageId,
+            replyText: fileSearchReply.replyText,
+            metadata: fileSearchReply.metadata,
+        })
+
+        return {
+            replyText: fileSearchReply.replyText,
+            skillImage: null,
+        }
     }
 
     const conversationHistory = shouldUseDemoConversationHistoryForRag(message)

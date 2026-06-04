@@ -540,6 +540,7 @@ function buildSystemPrompt(input: {
     responseLanguage: MvpResponseLanguage
     context: string
     conversationHistory?: RagConversationTurn[]
+    includeEngagement: boolean
 }) {
     const basePrompt = withBotNamePrompt(
         input.settings?.prompt || DEFAULT_FLEXIBLE_PROMPT,
@@ -547,6 +548,10 @@ function buildSystemPrompt(input: {
     )
     const languageName = input.responseLanguage === 'tr' ? 'Turkish' : 'English'
     const history = formatConversationHistory(input.conversationHistory ?? [])
+    const engagementInstruction = input.includeEngagement
+        ? `Prefer to include exactly one short role-neutral engagement question or offer when the context contains a directly related adjacent detail. It must be supported by engagement_evidence copied exactly from the context.
+Do not ask about the user's role, status, department, or identity. Do not add generic closers such as "anything else", "başka bir konuda yardımcı olabilir miyim", or "daha fazla bilgi istersen yardımcı olurum".`
+        : 'Do not include an engagement question. Return empty engagement_question, engagement_evidence_id, and engagement_evidence fields.'
 
     return `${basePrompt}
 
@@ -566,8 +571,7 @@ If sources conflict, answer only the part supported by the best matching quote a
 Use recent conversation only to resolve references such as "this program", "there", or "it"; the factual answer must still be grounded in the context quotes.
 If the user asks a context-dependent follow-up and recent conversation does not identify the missing subject, return answer as "NO_ANSWER" instead of guessing from unrelated chunks.
 
-Prefer to include exactly one short role-neutral engagement question or offer when the context contains a directly related adjacent detail. It must be supported by engagement_evidence copied exactly from the context.
-Do not ask about the user's role, status, department, or identity. Do not add generic closers such as "anything else", "başka bir konuda yardımcı olabilir miyim", or "daha fazla bilgi istersen yardımcı olurum".
+${engagementInstruction}
 
 Return JSON only:
 {
@@ -622,6 +626,7 @@ export async function generateGroundedRagAnswer(input: {
     model?: string
     timeoutMs?: number
     createCompletion?: CreateCompletion
+    includeEngagement?: boolean
 }): Promise<RagAnswerGenerateResult> {
     const model = resolveRagGenerateModel(input.model)
     if (!input.userMessage.trim() || input.chunks.length === 0) return fallbackResult(model)
@@ -637,7 +642,8 @@ export async function generateGroundedRagAnswer(input: {
         settings: input.settings,
         responseLanguage: input.responseLanguage,
         context,
-        conversationHistory: input.conversationHistory
+        conversationHistory: input.conversationHistory,
+        includeEngagement: input.includeEngagement !== false
     })
     const userPrompt = `User question: ${input.userMessage}`
 
@@ -687,7 +693,7 @@ export async function generateGroundedRagAnswer(input: {
         return fallbackResult(model, usage)
     }
 
-    const shouldAddEngagement = payload.engagementEvidenceId
+    const shouldAddEngagement = input.includeEngagement !== false && (payload.engagementEvidenceId
         ? isEngagementEvidenceIdSafe({
             pack: evidencePack,
             answer: payload.answer,
@@ -701,7 +707,7 @@ export async function generateGroundedRagAnswer(input: {
             engagementQuestion: payload.engagementQuestion,
             engagementEvidence: payload.engagementEvidence,
             context
-        })
+        }))
 
     return {
         answer: composeAnswer(payload.answer, payload.engagementQuestion, shouldAddEngagement),

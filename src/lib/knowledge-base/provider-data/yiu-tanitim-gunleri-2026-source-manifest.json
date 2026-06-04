@@ -1,0 +1,526 @@
+{
+  "corpusScope": "yiu-tanitim-gunleri-2026-approved-corpus",
+  "vectorStoreId": "vs_6a213186dd6c81919ec51dca2a9913d5",
+  "generatedAt": "2026-06-04T13:38:50.835Z",
+  "sourceCount": 135,
+  "sourcesByFilename": {
+    "yiu-website-academic-001.md": {
+      "title": "YİÜ Website - Academic - 001"
+    },
+    "yiu-website-academic-002.md": {
+      "title": "YİÜ Website - Academic - 002"
+    },
+    "yiu-website-admissions-001.md": {
+      "title": "YİÜ Website - Admissions - 001"
+    },
+    "yiu-website-announcements-001.md": {
+      "title": "YİÜ Website - Announcements - 001"
+    },
+    "yiu-website-announcements-002.md": {
+      "title": "YİÜ Website - Announcements - 002"
+    },
+    "yiu-website-announcements-003.md": {
+      "title": "YİÜ Website - Announcements - 003"
+    },
+    "yiu-website-contact-admin-001.md": {
+      "title": "YİÜ Website - Contact Admin - 001"
+    },
+    "yiu-website-events-001.md": {
+      "title": "YİÜ Website - Events - 001"
+    },
+    "yiu-website-events-002.md": {
+      "title": "YİÜ Website - Events - 002"
+    },
+    "yiu-website-general-001.md": {
+      "title": "YİÜ Website - General - 001"
+    },
+    "yiu-website-general-002.md": {
+      "title": "YİÜ Website - General - 002"
+    },
+    "yiu-website-institutional-001.md": {
+      "title": "YİÜ Website - İnstitutional - 001"
+    },
+    "yiu-website-news-001.md": {
+      "title": "YİÜ Website - News - 001"
+    },
+    "yiu-website-news-002.md": {
+      "title": "YİÜ Website - News - 002"
+    },
+    "001-mevzuat-komisyonu-is-akis-semasi.pdf": {
+      "title": "Mevzuat Komisyonu İş Akış Şeması",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/c483cbb2030f9b25746ae0205ffbd836.pdf"
+    },
+    "002-yok-standart-dosya-plani.pdf": {
+      "title": "YÖK-Standart Dosya Planı",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/a3ee163dcd6d7afb3dde97132458e816.pdf"
+    },
+    "003-yuksekogretim-kurumlari-bilimsel-arastirma-ve-yayin-etigi-yonergesi.pdf": {
+      "title": "Yükseköğretim Kurumları Bilimsel Araştırma ve Yayın Etiği Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/8ca60ba8af71f57623c2db617f078bee.pdf"
+    },
+    "004-yuksekogretim-kurumlari-yonetici-ogretim-elemani-ve-memurlari-disiplin-yonetmeligi.pdf": {
+      "title": "Yükseköğretim Kurumları Yönetici, Öğretim Elemanı ve Memurları Disiplin Yönetmeliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/fd7dbad97d00a866641837ac8313047d.pdf"
+    },
+    "005-cevre-sorunlari-calismalari-uygulama-ve-arastirma-merkezi-yonetmeligi.pdf": {
+      "title": "Çevre Sorunları Çalışmaları Uygulama ve Araştırma Merkezi Yönetmeliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/e657a116cebac3c6e3fab4032e51c998.pdf"
+    },
+    "006-deneysel-calismalar-uygulama-ve-arastirma-merkezi-yonetmeligi.pdf": {
+      "title": "Deneysel Çalışmalar Uygulama ve Araştırma Merkezi Yönetmeliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/204ce87460f153c7c8536e8d3bccaee7.pdf"
+    },
+    "007-dil-ve-konusma-bozukluklari-egitimi-uygulama-ve-arastirma-merkezi-yonetmeligi.pdf": {
+      "title": "Dil ve Konuşma Bozuklukları Eğitimi Uygulama ve Araştırma Merkezi Yönetmeliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/3b61a4702a29682e90f42070e4c06d8f.pdf"
+    },
+    "008-doner-sermaye-isletmesi-yonetmeligi.pdf": {
+      "title": "Döner Sermaye İşletmesi Yönetmeliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/825d55d418fbb540178689419e285320.pdf"
+    },
+    "009-kadin-sorunlari-uygulama-ve-arastirma-merkezi-yonetmeligi.pdf": {
+      "title": "Kadın Sorunları Uygulama ve Araştırma Merkezi Yönetmeliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/225b7bf026734eaac3b9b158e5db32cb.pdf"
+    },
+    "010-kariyer-planlama-uygulama-ve-arastirma-merkezi-yonetmeligi.pdf": {
+      "title": "Kariyer Planlama, Uygulama ve Araştırma Merkezi Yönetmeliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/b5e4261ebeadedbfdab3298ce7d90abc.pdf"
+    },
+    "011-on-lisans-ve-lisans-egitim-ogretim-ve-sinav-yonetmeligi.pdf": {
+      "title": "Ön Lisans ve Lisans Eğitim-Öğretim ve Sınav Yönetmeliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/fd739ffee9e505aa32e57c7980dfcb7f.pdf"
+    },
+    "012-riskli-bebek-takibi-uygulama-ve-arastirma-merkezi-yonetmeligi.pdf": {
+      "title": "Riskli Bebek Takibi Uygulama ve Araştırma Merkezi Yönetmeliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/9caa46c361663f66e8987350a039f2a0.pdf"
+    },
+    "013-saglik-uygulama-ve-arastirma-merkezi-yonetmeligi.pdf": {
+      "title": "Sağlık Uygulama ve Araştırma Merkezi Yönetmeliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/207e1c5e53411e39812ec53b7adf8abb.pdf"
+    },
+    "014-satin-alma-ve-ihale-yonetmeligi.pdf": {
+      "title": "Satın Alma ve İhale Yönetmeliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/762f81fc7ed79afaf6bd95f75270c904.pdf"
+    },
+    "015-sivil-toplum-calismalari-uygulama-ve-arastirma-yonetmeligi.pdf": {
+      "title": "Sivil Toplum Çalışmaları, Uygulama ve Araştırma Yönetmeliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/5ffec08e4e6807999299d16aa425345f.pdf"
+    },
+    "016-surekli-egitim-uygulama-ve-arastirma-merkezi-yonetmeligi.pdf": {
+      "title": "Sürekli Eğitim Uygulama ve Araştırma Merkezi Yönetmeliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/4a7674d0de77e6b019d094d05b6b9cb5.pdf"
+    },
+    "017-uzaktan-egitim-ve-arastirma-merkezi-yonetmeligi.pdf": {
+      "title": "Uzaktan Eğitim ve Araştırma Merkezi Yönetmeliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/f684033ccfae97402ea2c36807b33412.pdf"
+    },
+    "018-yaslilik-calismalari-uygulama-ve-arastirma-merkezi-yonetmeligi.pdf": {
+      "title": "Yaşlılık Çalışmaları Uygulama ve Araştırma Merkezi Yönetmeliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/ec27e8f99df63559e0db04e2a455b32f.pdf"
+    },
+    "019-yiu-ana-yonetmeligi.pdf": {
+      "title": "YİU Ana Yönetmeliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/4523842b03ed238c67253e8fd4a15a63.pdf"
+    },
+    "020-akademik-danismanlik-yonergesi.pdf": {
+      "title": "Akademik Danışmanlık Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/9d9eccf706c65f6a455f6e4dd8ae5e71.pdf"
+    },
+    "021-akademik-personel-yurtici-ve-yurtdisi-gorevlendirme-yonergesi.pdf": {
+      "title": "Akademik Personel Yurtiçi ve Yurtdışı Görevlendirme Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/76b9b3a952e455223c410923f5ee2072.pdf"
+    },
+    "022-akademik-tesvik-degerlendirme-yonergesi.pdf": {
+      "title": "Akademik Teşvik Değerlendirme Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/71df973b9ec110a014b72644554e5292.pdf"
+    },
+    "023-akademik-yukseltilme-ve-atanma-yonergesi.pdf": {
+      "title": "Akademik Yükseltilme ve Atanma Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/6041ddf578cec827bb79386b98de0e6a.pdf"
+    },
+    "024-arsiv-ve-belge-yonetimi-hizmetleri-yonergesi.pdf": {
+      "title": "Arşiv ve Belge Yönetimi Hizmetleri Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/281d7de5ed3535ab7e04997f57fd1070.pdf"
+    },
+    "025-basin-yayin-ve-halkla-iliskiler-musavirligi-yonergesi.pdf": {
+      "title": "Basın Yayın ve Halkla İlişkiler Müşavirliği Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/7f9f22126a8c85ec17b68cc044a91094.pdf"
+    },
+    "026-bidb-bilgisayar-ag-ve-bilisim-kaynaklari-kullanim-yonergesi.pdf": {
+      "title": "BİDB Bilgisayar, Ağ ve Bilişim Kaynakları Kullanım Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/idari_birim_alt_kategorileri_view/icerik_yonetimi_view/35152eefd7169de61817df1dab4e1697.pdf"
+    },
+    "027-bidb-calisma-usul-ve-esaslari-hakkindaki-yonerge.pdf": {
+      "title": "BİDB Çalışma Usul ve Esasları Hakkındaki Yönerge",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/15d607491a6d6b2fdf1a99fba175e271.pdf"
+    },
+    "028-bilimsel-arastirma-projeleri-uygulama-yonergesi.pdf": {
+      "title": "Bilimsel Araştırma Projeleri Uygulama Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/bad88560c47eaab7b90e695f70783a42.pdf"
+    },
+    "029-bologna-esgudum-komisyonu-yonergesi.pdf": {
+      "title": "Bologna Eşgüdüm Komisyonu Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/ad42b252e732e91776a9c03c68d1f248.pdf"
+    },
+    "030-danisma-kurulu-yonergesi.pdf": {
+      "title": "Danışma Kurulu Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/a485bf33804239ccc0cff9637d7017ba.pdf"
+    },
+    "031-diploma-diploma-eki-ve-diger-mezuniyet-belgeleri-yonergesi.pdf": {
+      "title": "Diploma, Diploma Eki ve Diğer Mezuniyet Belgeleri Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/3ae28601af222ce0fa59a7cc43629b0d.pdf"
+    },
+    "032-dokuman-hazirlama-ve-kontrol-yonergesi.pdf": {
+      "title": "Doküman Hazırlama ve Kontrol Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/b049f0cbf626fd179f1b1bd752cacf56.pdf"
+    },
+    "033-egiticilerin-egitimi-kurulu-kurulus-ve-calisma-yonergesi.pdf": {
+      "title": "Eğiticilerin Eğitimi Kurulu Kuruluş ve Çalışma Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/6ad20a319a43da47002657a03d0c86e7.pdf"
+    },
+    "034-engelli-ogrenci-birimi-yonergesi.pdf": {
+      "title": "Engelli Öğrenci Birimi Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/21a50f4ee3423501f6c516c2f71cba1d.pdf"
+    },
+    "035-erasmus-yonergesi.pdf": {
+      "title": "Erasmus + Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/7e835d355c8ad74a919cbe3ac1a64af3.pdf"
+    },
+    "036-girisimsel-olmayan-arastirmalar-etik-kurulu-yonergesi.pdf": {
+      "title": "Girişimsel Olmayan Araştırmalar Etik Kurulu Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/6037c37b5dbd778c112709d498e7fb11.pdf"
+    },
+    "037-hizmet-ici-egitim-yonergesi.pdf": {
+      "title": "Hizmet İçi Eğitim Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/idari_birim_alt_kategorileri_view/icerik_yonetimi_view/e4885c4ec5d2b0e4f9cc04d8e80a1b97.pdf"
+    },
+    "038-imza-yetkileri-yonergesi.pdf": {
+      "title": "İmza Yetkileri Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/60b7898b600c7ff6a53265b14b4dd515.pdf"
+    },
+    "039-is-sagligi-ve-guvenligi-ic-yonergesi.pdf": {
+      "title": "İş Sağlığı ve Güvenliği İç Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/0f60ad0a13aee3ae19a7bc24587a5935.pdf"
+    },
+    "040-izin-kullanimi-yonergesi.pdf": {
+      "title": "İzin Kullanımı Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/idari_birim_alt_kategorileri_view/icerik_yonetimi_view/b0467b3bb92ef2ad7a7c134f7e965e48.pdf"
+    },
+    "041-kalite-guvencesi-yonergesi.pdf": {
+      "title": "Kalite Güvencesi Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/2b5ec4fffa823f25f3c81ef89aa753ca.pdf"
+    },
+    "042-kismi-zamanli-ogrenci-calistirma-yonergesi.pdf": {
+      "title": "Kısmi Zamanlı Öğrenci Çalıştırma Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/8dc1084d0acfa5a07348e5cc36ec95e4.pdf"
+    },
+    "043-kutuphane-ve-dokumantasyon-daire-baskanligi-yonergesi.pdf": {
+      "title": "Kütüphane ve Dökümantasyon Daire Başkanlığı Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/939b0ecb541ece9df9544b1ebffba963.pdf"
+    },
+    "044-kurumsal-risk-yonetimi-yonergesi.pdf": {
+      "title": "Kurumsal Risk Yönetimi Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/e01200cf9f95b292bdf50d02503c2c40.pdf"
+    },
+    "045-mevzuat-komisyonu-yonergesi.pdf": {
+      "title": "Mevzuat Komisyonu Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/827b93e2ea73e0aeedc724a8bc219ad7.pdf"
+    },
+    "046-mezunlar-birimi-yonergesi.pdf": {
+      "title": "Mezunlar Birimi Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/99bebb599894adce83217f276b8a6a8e.pdf"
+    },
+    "047-muafiyet-ve-intibak-islemleri-yonergesi.pdf": {
+      "title": "Muafiyet ve İntibak İşlemleri Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/df997738a224445cf20538540620d011.pdf"
+    },
+    "048-ozel-ogrenci-yonergesi.pdf": {
+      "title": "Özel Öğrenci Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/da632ee052ecfa2220c10fcbfeb69f86.pdf"
+    },
+    "049-saglik-kultur-ve-spor-dairesi-baskanligi-yonergesi.pdf": {
+      "title": "Sağlık, Kültür ve Spor Dairesi Başkanlığı Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/5787bbaaaa7aad3d1e2f9d0ae48d3479.pdf"
+    },
+    "050-sksdb-kultur-ve-sosyal-hizmetler-yonergesi.pdf": {
+      "title": "SKSDB Kültür ve Sosyal Hizmetler Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/c746b841ed0bd11e097dd8409605feb1.pdf"
+    },
+    "051-sksdb-ogrenci-danisma-merkezi-yonergesi.pdf": {
+      "title": "SKSDB Öğrenci Danışma Merkezi Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/b3ee1d16ad0563ee5eb0710d4ab3049c.pdf"
+    },
+    "052-sksdb-ogrenci-topluluklari-yonergesi.pdf": {
+      "title": "SKSDB Öğrenci Toplulukları Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/83e7d3fcf14719a3b363a918a5dde8bb.pdf"
+    },
+    "053-sksdb-spor-faaliyetlerinin-yurutulmesi-ve-duzenlenmesi-hakkinda-yonerge.pdf": {
+      "title": "SKSDB Spor Faaliyetlerinin Yürütülmesi ve Düzenlenmesi Hakkında Yönerge",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/e26ec846c202ad1e757edc4ed81a5dcd.pdf"
+    },
+    "054-sksdb-yemekhane-kantin-ve-kafeteryalarin-denetim-yonergesi.pdf": {
+      "title": "SKSDB Yemekhane, Kantin ve Kafeteryaların Denetim Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/30d7c9e484b51945f7b68e967a8c3103.pdf"
+    },
+    "055-sosyal-ve-beseri-bilimler-arastirma-etik-kurulu.pdf": {
+      "title": "Sosyal ve Beşeri Bilimler Araştırma Etik Kurulu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/b3424a1c76056a80fa107a698f8f8d3b.pdf"
+    },
+    "056-stratejik-plan-yonergesi.pdf": {
+      "title": "Stratejik Plan Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/ac060c943e91b82e423f5b13fdc6dc1b.pdf"
+    },
+    "057-surekli-egitim-merkezi-ve-sertifika-programlari-yonergesi.pdf": {
+      "title": "Sürekli Eğitim Merkezi ve Sertifika Programları Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/c54156a9733d2b7e321d7326a92626e9.pdf"
+    },
+    "058-teknoloji-transfer-ofisi-yonergesi.pdf": {
+      "title": "Teknoloji Transfer Ofisi Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/5657cdb4afd627795f5cf4a1d83bbf4c.pdf"
+    },
+    "059-uluslararasi-iliskiler-koordinatorlugu-yonergesi.pdf": {
+      "title": "Uluslararası İlişkiler Koordinatörlüğü Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/bc8cf56a8f350c2246f7653bb76de1da.pdf"
+    },
+    "060-uluslararasi-iliskiler-ve-degisim-programlari-koordinatorlugu-yonergesi.pdf": {
+      "title": "Uluslararası İlişkiler ve Değişim Programları Koordinatörlüğü Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/aeb598d3d09e311ac4af2196d0edd1bc.pdf"
+    },
+    "061-uluslararasi-ogrenci-kabul-yonergesi.pdf": {
+      "title": "Uluslararası Öğrenci Kabul Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/4728a0a6e51d92550d27470a49609a9c.pdf"
+    },
+    "062-uygulamali-egitimler-yonergesi.pdf": {
+      "title": "Uygulamalı Eğitimler Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/6072716d9faacb4d8cef38fc003c74ee.pdf"
+    },
+    "063-yatay-gecis-cift-anadal-ve-yandal-programi-yonergesi.pdf": {
+      "title": "Yatay Geçiş, Çift Anadal Ve Yandal Programı Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/5521208ce07793a872bf97dc5dda5262.pdf"
+    },
+    "064-yayin-yonergesi.pdf": {
+      "title": "Yayın Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/a8000307970dd11d84d2efe4288598bc.pdf"
+    },
+    "065-yaz-ogretimi-yonergesi.pdf": {
+      "title": "Yaz Öğretimi Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/31d6ea5a75138c40428aa6392dd92192.pdf"
+    },
+    "066-yiu-idari-personele-ait-isyeri-disiplin-yonergesi.pdf": {
+      "title": "YİÜ İdari Personele ait İşyeri Disiplin Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/idari_birim_alt_kategorileri_view/icerik_yonetimi_view/a99ce05d8791bcfa9298deadc7cf8e64.pdf"
+    },
+    "067-lisansustu-egitim-ogretim-ve-sinav-yonetmeligi.pdf": {
+      "title": "Lı̇sansüstü Eğı̇tı̇m-Öğretı̇m Ve Sınav Yönetmelı̇ğı̇",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/bc566ed7781f1ce7b2b70a99e34b15fb.pdf"
+    },
+    "068-lee-yabanci-ogrenci-yonergesi.pdf": {
+      "title": "LEE Yabancı Öğrenci Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/f67166f363c5fec912d84bbd074e79a5.pdf"
+    },
+    "069-surekli-tip-egitimi-kurulu-ve-calisma-yonergesi.pdf": {
+      "title": "Sürekli Tıp Eğitimi Kurulu Ve Çalışma Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/ef9b168e303ce246f3ab6796ba292446.pdf"
+    },
+    "070-tip-fakultesi-cevrimici-sinav-yonergesi.pdf": {
+      "title": "Tıp Fakültesi Çevrimiçi Sınav Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/915912161ee4557687388a5c92e7ff70.pdf"
+    },
+    "071-tip-fakultesi-donem-vi-intorn-hekimlik-egitimi-yonergesi.pdf": {
+      "title": "Tıp Fakültesi Dönem VI İntörn Hekimlik Eğitimi Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/deabad129ce52da610b163277668b04e.pdf"
+    },
+    "072-tip-fakultesi-egitim-ogretim-ve-sinav-uygulamalari-yonergesi.pdf": {
+      "title": "Tıp Fakültesi Eğitim Öğretim Ve Sınav Uygulamaları Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/fdad57054cd0c8ff8a7909c1d3cc533f.pdf"
+    },
+    "073-tip-fakultesi-egitim-ogretim-ve-sinav-yonergesi.pdf": {
+      "title": "Tıp Fakültesi Eğitim- Öğretim Ve Sınav Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/cff0702b4f846d9c0b52b39eb77def36.pdf"
+    },
+    "074-tip-fakultesi-elestirel-dusunce-ve-sanat-kurulu.pdf": {
+      "title": "Tıp Fakültesi Eleştirel Düşünce Ve Sanat Kurulu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/4d66c0e9e78d7f1ab5b15439838d68ef.pdf"
+    },
+    "075-tip-fakultesi-iletisim-becerileri-egitimi-kurulu-yonergesi.pdf": {
+      "title": "Tıp Fakültesi İletişim Becerileri Eğitimi Kurulu Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/9bf39c94d623a1f0a1a1e6a7996be3e1.pdf"
+    },
+    "076-tip-fakultesi-kanita-dayali-tip-kurulu-yonergesi.pdf": {
+      "title": "Tıp Fakültesi Kanıta Dayalı Tıp Kurulu Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/bda1e5e2007d33d3be953a103d8e19e8.pdf"
+    },
+    "077-tip-fakultesi-klinik-beceri-egitimi-yonergesi.pdf": {
+      "title": "Tıp Fakültesi Klinik Beceri Eğitimi Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/60012139826c06ed834be9e277a731e1.pdf"
+    },
+    "078-tip-fakultesi-koordinatorler-kurulu-yonergesi.pdf": {
+      "title": "Tıp Fakültesi Koordinatörler Kurulu Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/33438b351fc383b3680a67599c0aa5c9.pdf"
+    },
+    "079-tip-fakultesi-olcme-ve-degerlendirme-kurulu-yonergesi.pdf": {
+      "title": "Tıp Fakültesi Ölçme Ve Değerlendirme Kurulu Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/fcaaf4bf5e6bfe47506fcce19515055a.pdf"
+    },
+    "080-tip-fakultesi-olcme-ve-degerlendirme-yonergesi.pdf": {
+      "title": "Tıp Fakültesi Ölçme Ve Değerlendirme Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/c9448b6bdb9342c4546f4f9135baa0c2.pdf"
+    },
+    "081-tip-fakultesi-olcme-degerlendirme-yonergesi.pdf": {
+      "title": "Tıp Fakültesi Ölçme-Değerlendirme Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/26a2c177d42f3ecffdbdb71f0cfeedcc.pdf"
+    },
+    "082-tip-fakultesi-program-gelistirme-ve-degerlendirme-kurulu-yonergesi.pdf": {
+      "title": "Tıp Fakültesi Program Geliştirme Ve Değerlendirme Kurulu Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/e1ef915ff355df54ff1274ca51363cf8.pdf"
+    },
+    "083-tip-fakultesi-secmeli-ders-kurulu-yonergesi.pdf": {
+      "title": "Tıp Fakültesi Seçmeli Ders Kurulu Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/5f3c54bec49b1612efbc33823c17849d.pdf"
+    },
+    "084-tip-fakultesi-tipta-uzmanlik-egitimi-yonergesi.pdf": {
+      "title": "Tıp Fakültesi Tıpta Uzmanlık Eğitimi Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/22acdbc3a3eb5906a1d5324cc930bb16.pdf"
+    },
+    "085-tip-fakultesi-ulusal-cekirdek-egitimi-programi-kurulu-yonergesi.pdf": {
+      "title": "Tıp Fakültesi Ulusal Çekirdek Eğitimi Programı Kurulu Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/2e72712d4d2ebe454f3f68630ebd3641.pdf"
+    },
+    "086-dil-ve-konusma-terapisi-bolumu-uygulamali-egitimler-yonergesi.pdf": {
+      "title": "Dil Ve Konuşma Terapisi Bölümü Uygulamalı Eğitimler Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/ad9641feaeb5ef27d2c271f5dcf91713.pdf"
+    },
+    "087-ftr-uygulamali-egitimler-yonergesi.pdf": {
+      "title": "FTR Uygulamalı Eğitimler Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/5608e20594cedee956ce10245b693848.pdf"
+    },
+    "088-hemsirelik-bolumu-uygulamali-ders-yonergesi.pdf": {
+      "title": "Hemşirelik Bölümü Uygulamalı Ders Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/d1e40cfbd06bd40155055b0b4a496e61.pdf"
+    },
+    "089-sbf-cevrimici-sinav-yonergesi.pdf": {
+      "title": "SBF Çevrimiçi Sınav Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/82a33e6e3e56324f3f11ee21d5572b8e.pdf"
+    },
+    "090-sbf-egitim-komisyonu-calisma-yonergesi.pdf": {
+      "title": "SBF Eğitim Komisyonu Çalışma Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/eeafcaa3166b58cc8bc549a7c4b8bf24.pdf"
+    },
+    "091-sbf-egitim-ogretim-ve-sinav-yonergesi.pdf": {
+      "title": "SBF Eğitim-Öğretim Ve Sınav Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/7b6aafaf4ad2668ef7281d4ef2f90d3c.pdf"
+    },
+    "092-sbf-koordinatorler-kurulu-yonergesi.pdf": {
+      "title": "SBF Koordinatörler Kurulu Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/715e44fbf9ec1160f7f0220025d0abb3.pdf"
+    },
+    "093-sbf-olcme-ve-degerlendirme-kurulu-yonergesi.pdf": {
+      "title": "SBF Ölçme ve Değerlendirme Kurulu Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/36cd6883e6ab7c6e369cba89a939ea03.pdf"
+    },
+    "094-sbf-yaz-okulu-yonergesi.pdf": {
+      "title": "SBF Yaz Okulu Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/b68de41c4328864772af9fb084b80c60.pdf"
+    },
+    "095-shmyo-egitim-ogretim-ve-sinav-yonergesi.pdf": {
+      "title": "SHMYO Eğitim-Öğretim Ve Sınav Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/53f9abd11b6e0cea09eab406773e7f61.pdf"
+    },
+    "096-shmyo-koordinatorler-kurulu-yonergesi.pdf": {
+      "title": "SHMYO Koordinatörler Kurulu Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/f02b4790682c5e1dd93ea5a41a84af01.pdf"
+    },
+    "097-myo-egitim-ogretim-yonergesi.pdf": {
+      "title": "MYO Eğitim Öğretim Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/acc1e91ddd64ee423733a99e5b8fc377.pdf"
+    },
+    "098-yabanci-dil-egitim-ogretim-ve-sinav-yonergesi.pdf": {
+      "title": "Yabancı Dil Eğitim- Öğretim Ve Sınav Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/da078c6ce8dd2e2c1a08b64d9be5b730.pdf"
+    },
+    "099-tip-fakultesi-egitim-ogretim-ve-sinav-yonergesi.pdf": {
+      "title": "TIP FAKÜLTESİ EĞİTİM- ÖĞRETİM VE SINAV YÖNERGESİ",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/icerik_yonetimi_view/1efd58697c84b44e7a58977222c363ce.pdf"
+    },
+    "100-tip-fakultesi-tipta-uzmanlik-egitimi-yonergesi.pdf": {
+      "title": "TIP FAKÜLTESİ TIPTA UZMANLIK EĞİTİMİ YÖNERGESİ",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/icerik_yonetimi_view/140dffaf23911b827007ccd1b3587060.pdf"
+    },
+    "101-tip-fakultesi-secmeli-ders-kurulu-yonergesi.pdf": {
+      "title": "TIP FAKÜLTESİ SEÇMELİ DERS KURULU YÖNERGESİ",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/icerik_yonetimi_view/087dbd8381165590d14bb00c239c7874.pdf"
+    },
+    "102-tip-fakultesi-program-gelistirme-ve-degerlendirme-kurulu-yonergesi.pdf": {
+      "title": "TIP FAKÜLTESİ PROGRAM GELİŞTİRME VE DEĞERLENDİRME KURULU YÖNERGESİ",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/icerik_yonetimi_view/3ab065d7ec28aff47954188bd12203ff.pdf"
+    },
+    "103-tip-fakultesi-kanita-dayali-tip-kurulu-yonergesi.pdf": {
+      "title": "TIP FAKÜLTESİ KANITA DAYALI TIP KURULU YÖNERGESİ",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/icerik_yonetimi_view/7ac31280e25fb967f2c2ad23ec103695.pdf"
+    },
+    "104-tip-fakultesi-donem-vi-intorn-hekimlik-egitimi-yonergesi.pdf": {
+      "title": "TIP FAKÜLTESİ DÖNEM VI İNTÖRN HEKİMLİK EĞİTİMİ YÖNERGESİ",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/icerik_yonetimi_view/896477eecc724f4fe06c1b4ec2c294ea.pdf"
+    },
+    "105-tip-fakultesi-ulusal-cekirdek-egitimi-programi-kurulu-yonergesi.pdf": {
+      "title": "TIP FAKÜLTESİ ULUSAL ÇEKİRDEK EĞİTİMİ PROGRAMI KURULU YÖNERGESİ",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/icerik_yonetimi_view/630ea0181ba00b99a8e071cd98b5624b.pdf"
+    },
+    "106-tip-fakultesi-elestirel-dusunce-ve-sanat-kurulu.pdf": {
+      "title": "TIP FAKÜLTESİ ELEŞTİREL DÜŞÜNCE VE SANAT KURULU",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/icerik_yonetimi_view/f155c06c3a38559e837f3868a91a3f9a.pdf"
+    },
+    "107-tip-fakultesi-koordinatorler-kurulu-yonergesi.pdf": {
+      "title": "TIP FAKÜLTESİ KOORDİNATÖRLER KURULU YÖNERGESİ",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/icerik_yonetimi_view/335700af2743e30471235b990d046b20.pdf"
+    },
+    "108-tip-fakultesi-bolum-ana-bilim-dali-ve-bilim-dali-baskanligi-atama-ve-secim-ve-yonetim-ilke.pdf": {
+      "title": "TIP FAKÜLTESİ BÖLÜM ANA BİLİM DALI VE BİLİM DALI BAŞKANLIĞI ATAMA VE SEÇİM VE YÖNETİM İLKE VE ESASLARI",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/icerik_yonetimi_view/a989d0c05ed08de33564a40ceb931c0d.pdf"
+    },
+    "109-tip-fakultesi-egitim-ogretim-ve-sinav-uygulamalri-yonergesi.pdf": {
+      "title": "TIP FAKÜLTESİ EĞİTİM ÖĞRETİM VE SINAV UYGULAMALRI YÖNERGESİ",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/icerik_yonetimi_view/7ff66f418acc6c0adf42770c1e9b8ca4.pdf"
+    },
+    "110-tip-fakultesi-iletisim-becerileri-egitimi-kurulu-yonergesi.pdf": {
+      "title": "TIP FAKÜLTESİ İLETİŞİM BECERİLERİ EĞİTİMİ KURULU YÖNERGESİ",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/icerik_yonetimi_view/8095274afe539a1f1c6119960d7eacf7.pdf"
+    },
+    "111-tip-fakultesi-klinik-beceri-egitimi-yonergesi.pdf": {
+      "title": "TIP FAKÜLTESİ KLİNİK BECERİ EĞİTİMİ YÖNERGESİ",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/icerik_yonetimi_view/740aa9a2b3b59b0eb7cfad71c82cab1f.pdf"
+    },
+    "112-tip-fakultesi-olcme-ve-degerlendirme-kurulu-yonergesi.pdf": {
+      "title": "TIP FAKÜLTESİ ÖLÇME VE DEĞERLENDİRME KURULU YÖNERGESİ",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/icerik_yonetimi_view/5397c9b3340a5eedbda5af2e122ff7d1.pdf"
+    },
+    "113-surekli-tip-egitimi-kurulu-ve-calisma-yonergesi.pdf": {
+      "title": "Sürekli Tıp Eğitimi Kurulu Ve Çalışma Yönergesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/icerik_yonetimi_view/53af6464adc251d42a6ef1ef8e38ab31.pdf"
+    },
+    "brochure-00-overview-contact.md": {
+      "title": "YİÜ Tanıtım Broşürü - Genel Tanıtım ve İletişim"
+    },
+    "brochure-01-tip.md": {
+      "title": "YİÜ Tanıtım Broşürü - Tıp Fakültesi Kontenjan ve Ücretler"
+    },
+    "brochure-02-saglik-bilimleri.md": {
+      "title": "YİÜ Tanıtım Broşürü - Sağlık Bilimleri Fakültesi Kontenjan ve Ücretler"
+    },
+    "brochure-03-spor.md": {
+      "title": "YİÜ Tanıtım Broşürü - Spor Bilimleri Fakültesi Kontenjan ve Ücretler"
+    },
+    "brochure-04-shmyo.md": {
+      "title": "YİÜ Tanıtım Broşürü - Sağlık Hizmetleri Meslek Yüksekokulu Kontenjan ve Ücretler"
+    },
+    "brochure-05-myo.md": {
+      "title": "YİÜ Tanıtım Broşürü - Meslek Yüksekokulu Kontenjan ve Ücretler"
+    },
+    "brochure-06-burs-cift-anadal.md": {
+      "title": "YİÜ Tanıtım Broşürü - Burslar ve Çift Anadal"
+    },
+    "brochure-07-campus-program-map.md": {
+      "title": "YİÜ Tanıtım Broşürü - Program ve Yerleşke Eşleşmeleri"
+    }
+  }
+}

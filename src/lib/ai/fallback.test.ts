@@ -109,6 +109,10 @@ describe('buildFallbackResponse', () => {
         })
 
         expect(response).toBe('Bu konuda elimde net bilgi yok. Şu konularda yardımcı olabilirim: fiyatlar, randevu, iptal/iade, hizmetler. Hangisiyle ilgileniyorsunuz?')
+        expect(getOrgAiSettingsMock).toHaveBeenCalledWith('org-1', {
+            supabase: expect.any(Object),
+            locale: 'tr'
+        })
         expect(openAiCreateMock).not.toHaveBeenCalled()
     })
 })

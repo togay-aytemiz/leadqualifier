@@ -8,6 +8,7 @@ import {
 
 const {
     appendCanonicalRagSourceLinksMock,
+    buildOpenAiFileSearchDemoReplyMock,
     buildDemoChatContactIdMock,
     buildRagContextMock,
     createClientMock,
@@ -23,6 +24,7 @@ const {
     searchKnowledgeBaseMock,
 } = vi.hoisted(() => ({
     appendCanonicalRagSourceLinksMock: vi.fn(),
+    buildOpenAiFileSearchDemoReplyMock: vi.fn(),
     buildDemoChatContactIdMock: vi.fn(),
     buildRagContextMock: vi.fn(),
     createClientMock: vi.fn(),
@@ -45,6 +47,10 @@ vi.mock('@supabase/supabase-js', () => ({
 vi.mock('@/lib/demo-chat/channel', () => ({
     buildDemoChatContactId: buildDemoChatContactIdMock,
     resolveDemoChatChannel: resolveDemoChatChannelMock,
+}))
+
+vi.mock('@/lib/demo-chat/openai-file-search', () => ({
+    buildOpenAiFileSearchDemoReply: buildOpenAiFileSearchDemoReplyMock,
 }))
 
 vi.mock('@/lib/channels/inbound-ai-pipeline', () => ({
@@ -246,6 +252,7 @@ describe('demo chat API route', () => {
         recordAiUsageMock.mockResolvedValue(undefined)
         searchKnowledgeBaseMock.mockResolvedValue([])
         searchKnowledgeBaseFocusedEvidenceMock.mockResolvedValue([])
+        buildOpenAiFileSearchDemoReplyMock.mockResolvedValue(null)
         matchExactSkillTriggersMock.mockResolvedValue([])
         buildRagContextMock.mockReturnValue({ context: '', chunks: [], tokenCount: 0 })
         repairLinkOnlyRagAnswerMock.mockReturnValue(null)
@@ -748,6 +755,126 @@ describe('demo chat API route', () => {
             reprocessExistingInbound: true,
         }))
         expect(inboundMessagesChain.eq).toHaveBeenCalledWith('metadata->>demo_chat_message_id', 'message-1')
+    })
+
+    it('uses OpenAI File Search recovery before standard demo RAG when the provider returns an answer', async () => {
+        const createConversationChain = () => {
+            const chain = {
+                eq: vi.fn(),
+                maybeSingle: vi.fn(async () => ({
+                    data: { id: 'conversation-1' },
+                    error: null,
+                })),
+            }
+            chain.eq.mockReturnValue(chain)
+            return chain
+        }
+
+        const completedMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(async () => ({
+                data: [],
+                error: null,
+            })),
+        }
+        completedMessagesChain.eq.mockReturnValue(completedMessagesChain)
+
+        const inboundMessagesChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: {
+                    id: 'contact-message-1',
+                    content: 'Tıp Fakültesi ücreti ne kadar?',
+                },
+                error: null,
+            })),
+        }
+        inboundMessagesChain.eq.mockReturnValue(inboundMessagesChain)
+
+        const duplicateReplyChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: null,
+                error: null,
+            })),
+        }
+        duplicateReplyChain.eq.mockReturnValue(duplicateReplyChain)
+
+        const botInsertChain = {
+            insert: vi.fn(async () => ({ error: null })),
+        }
+        const conversationUpdateChain = {
+            update: vi.fn(() => conversationUpdateChain),
+            eq: vi.fn(async () => ({ error: null })),
+        }
+        const conversations = [
+            createConversationChain(),
+            createConversationChain(),
+            createConversationChain(),
+        ]
+        const messagesTable = {
+            select: vi.fn((columns: string) => {
+                if (columns.includes('content, metadata')) return completedMessagesChain
+                if (columns.includes('id, content')) return inboundMessagesChain
+                if (columns === 'id') return duplicateReplyChain
+                return completedMessagesChain
+            }),
+            insert: botInsertChain.insert,
+        }
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                const chain = conversations.shift()
+                if (!chain) return { update: conversationUpdateChain.update }
+                return {
+                    select: vi.fn(() => chain),
+                    update: conversationUpdateChain.update,
+                }
+            }
+            if (table === 'messages') return messagesTable
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+        buildOpenAiFileSearchDemoReplyMock.mockResolvedValueOnce({
+            replyText: 'Tıp Fakültesi için broşürde listelenen ücret 990.000 TL olarak geçiyor.\nhttps://example.edu.tr/brosur.pdf',
+            metadata: {
+                is_rag: true,
+                demo_chat_reply_source: 'openai_file_search_validated',
+                rag_provider: 'openai_file_search_validated',
+            },
+        })
+
+        const res = await GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+            message: 'Tıp Fakültesi ücreti ne kadar?',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: 'Tıp Fakültesi için broşürde listelenen ücret 990.000 TL olarak geçiyor.\nhttps://example.edu.tr/brosur.pdf',
+            skillImage: null,
+        })
+        expect(buildOpenAiFileSearchDemoReplyMock).toHaveBeenCalledWith(expect.objectContaining({
+            channel: demoChannel,
+            message: 'Tıp Fakültesi ücreti ne kadar?',
+            conversationId: 'conversation-1',
+        }))
+        expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalled()
+        expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+        expect(botInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
+            conversation_id: 'conversation-1',
+            organization_id: 'org-1',
+            sender_type: 'bot',
+            content: 'Tıp Fakültesi için broşürde listelenen ücret 990.000 TL olarak geçiyor.\nhttps://example.edu.tr/brosur.pdf',
+            metadata: expect.objectContaining({
+                demo_chat_reply_kind: 'text',
+                demo_chat_reply_source: 'openai_file_search_validated',
+                demo_chat_reply_to_message_id: 'message-1',
+                rag_provider: 'openai_file_search_validated',
+            }),
+        }))
     })
 
     it('does not start another token-consuming recovery while pending poll recovery is already running', async () => {
@@ -1788,7 +1915,7 @@ describe('demo chat API route', () => {
         }))
     })
 
-    it('returns deterministic compound demo RAG replies without polish and appends multiple canonical source URLs', async () => {
+    it('returns deterministic compound demo RAG replies through the behavior polish pass before appending sources', async () => {
         const chunks = [
             {
                 content: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir.',
@@ -1899,9 +2026,22 @@ describe('demo chat API route', () => {
             response: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir. Sağlık Hizmetleri Meslek Yüksekokulu Karakaya Mahallesi Bağlum Bulvarı No:1 adresindedir.\nhttps://example.edu.tr/sbf.pdf\nhttps://example.edu.tr/shmyo.pdf',
             skillImage: null,
         })
-        expect(getOrgAiSettingsMock).not.toHaveBeenCalled()
+        expect(getOrgAiSettingsMock).toHaveBeenCalledWith('org-1', {
+            supabase: expect.any(Object),
+            locale: 'tr',
+        })
         expect(generateGroundedRagAnswerMock).not.toHaveBeenCalled()
-        expect(polishGroundedRagAnswerMock).not.toHaveBeenCalled()
+        expect(polishGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
+            answer: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir. Sağlık Hizmetleri Meslek Yüksekokulu Karakaya Mahallesi Bağlum Bulvarı No:1 adresindedir.',
+            userMessage: 'SBF ve SHMYO kampüsleri nerede?',
+            responseLanguage: 'tr',
+            chunks,
+            settings: {
+                prompt: 'Samimi cevap ver.',
+                bot_name: 'Qualy',
+            },
+            timeoutMs: 1800,
+        }))
         expect(recordAiUsageMock).not.toHaveBeenCalled()
         expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalledWith(
             'SBF ve SHMYO kampüsleri nerede?',
@@ -1943,7 +2083,175 @@ describe('demo chat API route', () => {
         expect(botInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
             metadata: expect.objectContaining({
                 rag_generate: null,
-                rag_polish: null,
+                rag_polish: {
+                    usedPolish: false,
+                    addedEngagement: false,
+                    model: 'gpt-4o-mini',
+                },
+            })
+        }))
+    })
+
+    it('applies organization AI settings when polishing deterministic demo RAG replies', async () => {
+        const chunk = {
+            content: [
+                'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.',
+                'Staj uygulamasına ilişkin dönem ve başvuru koşulları program dokümanında açıklanır.',
+            ].join('\n'),
+            document_id: 'doc-tlt',
+            document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+            source_url: 'https://example.edu.tr/tlt.pdf',
+        }
+        searchKnowledgeBaseFocusedEvidenceMock.mockResolvedValueOnce([chunk])
+        buildRagContextMock.mockReturnValueOnce({
+            context: chunk.content,
+            chunks: [chunk],
+            tokenCount: 20,
+        })
+        repairLinkOnlyRagAnswerMock.mockReturnValueOnce(
+            'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.'
+        )
+        getOrgAiSettingsMock.mockResolvedValueOnce({
+            prompt: 'Aday öğrenciye sıcak, canlı ve yön gösteren bir dille cevap ver.',
+            bot_name: 'YIU Aday Asistanı',
+        })
+        polishGroundedRagAnswerMock.mockResolvedValueOnce({
+            answer: [
+                'Tabii, Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günü.',
+                '',
+                'İstersen stajın dönem ve başvuru koşullarını da kısaca çıkarabilirim.',
+            ].join('\n'),
+            usedPolish: true,
+            addedEngagement: true,
+            usage: { inputTokens: 80, outputTokens: 28, totalTokens: 108 },
+            model: 'gpt-4o-mini',
+        })
+        appendCanonicalRagSourceLinksMock.mockReturnValueOnce(
+            'Tabii, Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günü.\n\nİstersen stajın dönem ve başvuru koşullarını da kısaca çıkarabilirim.\nhttps://example.edu.tr/tlt.pdf'
+        )
+
+        const conversationChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: { id: 'conversation-1' },
+                error: null,
+            })),
+        }
+        conversationChain.eq.mockReturnValue(conversationChain)
+
+        const completedMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(async () => ({
+                data: [],
+                error: null,
+            })),
+        }
+        completedMessagesChain.eq.mockReturnValue(completedMessagesChain)
+
+        const inboundMessagesChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: {
+                    id: 'contact-message-1',
+                    content: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı?',
+                },
+                error: null,
+            })),
+        }
+        inboundMessagesChain.eq.mockReturnValue(inboundMessagesChain)
+
+        const botInsertChain = {
+            insert: vi.fn(async () => ({ error: null })),
+        }
+        const duplicateReplyChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: null,
+                error: null,
+            })),
+        }
+        duplicateReplyChain.eq.mockReturnValue(duplicateReplyChain)
+        const conversationUpdateChain = {
+            update: vi.fn(() => conversationUpdateChain),
+            eq: vi.fn(async () => ({ error: null })),
+        }
+
+        const conversations = [conversationChain, conversationChain, conversationChain, conversationChain, conversationChain]
+        const messagesTable = {
+            select: vi.fn((columns: string) => {
+                if (columns.includes('id, content')) return inboundMessagesChain
+                if (columns.includes('content, metadata')) return completedMessagesChain
+                if (columns === 'id') return duplicateReplyChain
+                return completedMessagesChain
+            }),
+            insert: botInsertChain.insert,
+        }
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                const chain = conversations.shift()
+                if (!chain) return conversationUpdateChain
+                return { select: vi.fn(() => chain), update: conversationUpdateChain.update }
+            }
+            if (table === 'messages') return messagesTable
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+        processInboundAiPipelineMock.mockImplementationOnce(async () => undefined)
+
+        const res = await GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+            message: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı?',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: 'Tabii, Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günü.\n\nİstersen stajın dönem ve başvuru koşullarını da kısaca çıkarabilirim.\nhttps://example.edu.tr/tlt.pdf',
+            skillImage: null,
+        })
+        expect(getOrgAiSettingsMock).toHaveBeenCalledWith('org-1', {
+            supabase: expect.any(Object),
+            locale: 'tr',
+        })
+        expect(polishGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
+            answer: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.',
+            userMessage: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı?',
+            responseLanguage: 'tr',
+            chunks: [chunk],
+            settings: {
+                prompt: 'Aday öğrenciye sıcak, canlı ve yön gösteren bir dille cevap ver.',
+                bot_name: 'YIU Aday Asistanı',
+            },
+            timeoutMs: 1800,
+        }))
+        expect(generateGroundedRagAnswerMock).not.toHaveBeenCalled()
+        expect(recordAiUsageMock).toHaveBeenCalledWith(expect.objectContaining({
+            organizationId: 'org-1',
+            category: 'rag',
+            model: 'gpt-4o-mini',
+            inputTokens: 80,
+            outputTokens: 28,
+            totalTokens: 108,
+            metadata: expect.objectContaining({
+                source: 'demo_chat_rag_deterministic_polish',
+                response_kind: 'rag_deterministic_polish',
+                conversation_id: 'conversation-1',
+            })
+        }))
+        expect(appendCanonicalRagSourceLinksMock).toHaveBeenCalledWith(
+            'Tabii, Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günü.\n\nİstersen stajın dönem ve başvuru koşullarını da kısaca çıkarabilirim.',
+            [chunk],
+            expect.objectContaining({ force: true, limit: 2 })
+        )
+        expect(botInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
+            metadata: expect.objectContaining({
+                rag_generate: null,
+                rag_polish: {
+                    usedPolish: true,
+                    addedEngagement: true,
+                    model: 'gpt-4o-mini',
+                },
             })
         }))
     })
@@ -2214,7 +2522,7 @@ describe('demo chat API route', () => {
         )
     })
 
-    it('returns deterministic repaired demo RAG replies without waiting for generation or polish', async () => {
+    it('returns deterministic repaired demo RAG replies without waiting for generation', async () => {
         const chunk = {
             content: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.',
             document_id: 'doc-tlt',
@@ -2313,14 +2621,31 @@ describe('demo chat API route', () => {
             response: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.\nhttps://example.edu.tr/tlt.pdf',
             skillImage: null,
         })
-        expect(getOrgAiSettingsMock).not.toHaveBeenCalled()
+        expect(getOrgAiSettingsMock).toHaveBeenCalledWith('org-1', {
+            supabase: expect.any(Object),
+            locale: 'tr',
+        })
         expect(generateGroundedRagAnswerMock).not.toHaveBeenCalled()
-        expect(polishGroundedRagAnswerMock).not.toHaveBeenCalled()
+        expect(polishGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
+            answer: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.',
+            userMessage: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı?',
+            responseLanguage: 'tr',
+            chunks: [chunk],
+            settings: {
+                prompt: 'Samimi cevap ver.',
+                bot_name: 'Qualy',
+            },
+            timeoutMs: 1800,
+        }))
         expect(recordAiUsageMock).not.toHaveBeenCalled()
         expect(botInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
             metadata: expect.objectContaining({
                 rag_generate: null,
-                rag_polish: null,
+                rag_polish: {
+                    usedPolish: false,
+                    addedEngagement: false,
+                    model: 'gpt-4o-mini',
+                },
             })
         }))
     })
@@ -2485,7 +2810,7 @@ describe('demo chat API route', () => {
         )
     })
 
-    it('returns deterministic contact demo replies without polish before appending sources', async () => {
+    it('returns deterministic contact demo replies through behavior polish before appending sources', async () => {
         const chunk = {
             content: 'Page Title: İletişim\nTelefon +90 312 329 10 10 Fax +90 312 329 10 15 E-Posta yiu@yiu.edu.tr',
             document_id: 'doc-contact',
@@ -2590,9 +2915,22 @@ describe('demo chat API route', () => {
             [chunk],
             expect.objectContaining({ force: true, limit: 2 })
         )
-        expect(getOrgAiSettingsMock).not.toHaveBeenCalled()
+        expect(getOrgAiSettingsMock).toHaveBeenCalledWith('org-1', {
+            supabase: expect.any(Object),
+            locale: 'tr',
+        })
         expect(generateGroundedRagAnswerMock).not.toHaveBeenCalled()
-        expect(polishGroundedRagAnswerMock).not.toHaveBeenCalled()
+        expect(polishGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
+            answer: 'Kurum iletişim bilgisi: Telefon: +90 312 329 10 10 - E-posta: yiu@yiu.edu.tr.',
+            userMessage: 'Yuksek Ihtisas Universitesi genel telefon numarasi nedir?',
+            responseLanguage: 'tr',
+            chunks: [chunk],
+            settings: {
+                prompt: 'Samimi cevap ver.',
+                bot_name: 'Qualy',
+            },
+            timeoutMs: 1800,
+        }))
     })
 
     it('does not insert a duplicate deterministic demo reply if another poll already persisted it', async () => {
@@ -2756,7 +3094,7 @@ describe('demo chat API route', () => {
         })
 
         const responsePromise = GET(createGetRequest({
-            sessionId: 'session-1',
+            sessionId: 'slow-rag-timeout-session',
             messageId: 'message-1',
         }), createContext())
         let settled = false
@@ -2832,7 +3170,7 @@ describe('demo chat API route', () => {
         })
 
         const responsePromise = GET(createGetRequest({
-            sessionId: 'session-1',
+            sessionId: 'slow-poll-session',
             messageId: 'message-1',
             message: 'SBF kampüsü nerede?',
         }), createContext())

@@ -137,7 +137,7 @@ export async function simulateChat(
         }
     }
 
-    const aiSettings = await getOrgAiSettings(organizationId)
+    const aiSettings = await getOrgAiSettings(organizationId, { locale: responseLanguage })
     const matchThreshold = typeof threshold === 'number' ? threshold : aiSettings.match_threshold
     const kbThreshold = matchThreshold
     const requiredIntakeFields = await getRequiredIntakeFields({ organizationId })

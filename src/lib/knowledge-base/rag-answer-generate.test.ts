@@ -367,4 +367,31 @@ describe('generateGroundedRagAnswer', () => {
         expect(result.sourceChunks?.map((chunk) => chunk.document_id)).toEqual(['doc-medu'])
         expect(result.addedEngagement).toBe(false)
     })
+
+    it('can disable in-answer engagement for providers with a separate follow-up stage', async () => {
+        const createCompletion = vi.fn(async () => ({
+            choices: [{
+                message: {
+                    content: JSON.stringify({
+                        answer: 'Evet, Tıbbi Laboratuvar Teknikleri programında yaz stajı var; süresi 20 iş günü.',
+                        used_evidence_ids: ['ev_1'],
+                        engagement_question: 'İstersen staj koşullarını da anlatabilirim.',
+                        engagement_evidence_id: 'ev_1'
+                    })
+                }
+            }],
+            usage: { prompt_tokens: 100, completion_tokens: 40, total_tokens: 140 }
+        }))
+
+        const result = await generateGroundedRagAnswer({
+            userMessage: 'Bu programda yaz stajı var mı?',
+            responseLanguage: 'tr',
+            chunks,
+            includeEngagement: false,
+            createCompletion
+        })
+
+        expect(result.answer).toBe('Evet, Tıbbi Laboratuvar Teknikleri programında yaz stajı var; süresi 20 iş günü.')
+        expect(result.addedEngagement).toBe(false)
+    })
 })

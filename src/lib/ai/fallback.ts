@@ -269,9 +269,12 @@ export async function buildFallbackResponse(options: {
     skipManualRenewal?: boolean
 }) {
     const supabase = options.supabase ?? await createClient()
-    const aiSettings = options.aiSettings ?? await getOrgAiSettings(options.organizationId, { supabase })
-    const topics = await getFallbackTopics(supabase, options.organizationId, FALLBACK_TOPIC_LIMIT)
     const language = resolveFallbackLanguage(options.message, options.preferredLanguage)
+    const aiSettings = options.aiSettings ?? await getOrgAiSettings(options.organizationId, {
+        supabase,
+        locale: language
+    })
+    const topics = await getFallbackTopics(supabase, options.organizationId, FALLBACK_TOPIC_LIMIT)
     const requiredIntakeAnalysis = options.requiredIntakeAnalysis ?? analyzeRequiredIntakeState({
         requiredFields: options.requiredIntakeFields ?? [],
         recentCustomerMessages: options.recentCustomerMessages ?? [],

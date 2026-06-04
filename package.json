@@ -17,6 +17,13 @@
     "test:load:users": "node scripts/load/whatsapp-webhook.scenario.mjs",
     "knowledge:import-crawl": "node scripts/knowledge/import-crawl-corpus.mjs",
     "knowledge:reindex-org": "npx tsx scripts/knowledge/reindex-org-knowledge.ts",
+    "rag:eval": "npx tsx scripts/knowledge/rag-eval-runner.ts",
+    "rag:yiu-pdfs:download": "npx tsx scripts/knowledge/rag-download-yiu-link-pdfs.ts",
+    "rag:yiu-approved-corpus:manifest": "npx tsx scripts/knowledge/rag-build-yiu-approved-corpus-manifest.ts",
+    "rag:yiu-brochure:manifest": "npx tsx scripts/knowledge/rag-build-yiu-brochure-manifest.ts",
+    "rag:yiu-pdfs:cases": "npx tsx scripts/knowledge/rag-build-yiu-link-pdf-cases.ts",
+    "rag:yiu-pdfs:scenario-cases": "npx tsx scripts/knowledge/rag-build-yiu-scenario-cases.ts",
+    "rag:file-search:ingest": "npx tsx scripts/knowledge/rag-file-search-ingest.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\""
   },
   "dependencies": {
