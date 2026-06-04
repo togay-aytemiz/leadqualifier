@@ -1,7 +1,7 @@
 # YIU Admissions File Search Demo Design
 
 Date: 2026-06-04
-Status: Production demo deployed, local implementation, follow-up acceptance, validated/model A/B benchmarks, isolated preview org/demo setup, Knowledge Base seeding, preview-only File Search route bridge, 20-question validated preview smoke, and production-link 5-question smoke completed; model-aware billing, DB-backed provider-config generalization, and customer signoff remain
+Status: Production demo deployed, local implementation, follow-up acceptance, validated/model A/B benchmarks, isolated preview org/demo setup, Knowledge Base seeding, preview-only File Search route bridge, 20-question validated preview smoke, production-link 5-question smoke, and demo university icon binding completed; model-aware billing, DB-backed provider-config generalization, and customer signoff remain
 
 ## Implementation Tracker
 
@@ -73,6 +73,7 @@ Use this section as the live checklist for the brochure File Search work. Update
 - [x] Build a 20-question customer-preview smoke case file across brochure, website HTML, approved PDFs, and unsupported guardrails.
 - [x] Run the 20-question validated File Search smoke after preview route/provider hardening and record report output.
 - [x] Deploy the `yiu-tanitim-gunleri-2026` demo to production and run a production-link smoke.
+- [x] Bind the Yüksek İhtisas Üniversitesi icon to the customer-preview demo channel.
 - [ ] Replace preview slug/env gating with durable DB-backed provider config before reusing File Search for more tenants.
 - [ ] Add provider-stage model-aware usage and actual-cost metering before customer billing or an optional `gpt-5.4-mini` retrieval rollout.
 - [ ] Keep the existing `yiu-qualy-ai-demo` unchanged unless the user explicitly approves a switch.
@@ -182,6 +183,7 @@ Local benchmark work can run without creating the organization. The organization
 - Preview organization id: `50102447-4bb2-4bd5-a332-fb721a3c7949`
 - Preview organization name/slug: `YİÜ Tanıtım Test` / `yiu-tanitim-test`
 - Preview demo slug: `yiu-tanitim-gunleri-2026`
+- Demo logo: `/yuksek-ihtisas-universitesi.png` from the `demo_chat_channels.logo_url` field.
 - Billing state: `premium_active`, `10000` monthly package credits, 0 used, no top-up carryover.
 - Demo maintenance: disabled for `yiu-tanitim-gunleri-2026`; the channel has a server-side shared secret for browser access-token minting and now counts as the onboarding/customer-entry connection signal for demo-only orgs.
 - Bot mode: the YİÜ Tanıtım Test org is marked `bot_mode='active'`, `bot_mode_unlock_required=false`, and has `channel_connection_completed_at` recorded so demo conversations can be reviewed from Inbox without connecting a live WhatsApp/Instagram/Telegram provider.
