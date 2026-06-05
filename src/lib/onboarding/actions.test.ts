@@ -227,16 +227,18 @@ describe('onboarding actions', () => {
       },
       from: vi.fn((table: string) => {
         if (table === 'organization_members') {
+          const single = vi.fn(async () => ({
+            data: { organization_id: 'org-1', role: 'owner' },
+            error: null,
+          }))
+          const organizationMembersEq = vi.fn(() => ({
+            eq: organizationMembersEq,
+            single,
+          }))
+
           return {
             select: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                limit: vi.fn(() => ({
-                  single: vi.fn(async () => ({
-                    data: { organization_id: 'org-1', role: 'owner' },
-                    error: null,
-                  })),
-                })),
-              })),
+              eq: organizationMembersEq,
             })),
           }
         }
@@ -254,5 +256,54 @@ describe('onboarding actions', () => {
       bot_mode: 'shadow',
       bot_mode_unlock_required: false,
     })
+  })
+
+  it('looks up membership for the selected organization before unlocking bot mode', async () => {
+    const { supabase, fromMock } = createOnboardingSupabaseMock()
+    const organizationMembersSingleMock = vi.fn(async () => ({
+      data: { organization_id: 'org-2', role: 'owner' },
+      error: null,
+    }))
+    const organizationMembersSingleContainer = {
+      single: organizationMembersSingleMock,
+    }
+    const organizationMembersEqMock = vi.fn(() => ({
+      eq: organizationMembersEqMock,
+      single: organizationMembersSingleContainer.single,
+    }))
+    const organizationMembersSelectMock = vi.fn(() => ({
+      eq: organizationMembersEqMock,
+    }))
+
+    createClientMock.mockResolvedValue({
+      ...supabase,
+      auth: {
+        getUser: vi.fn(async () => ({
+          data: { user: { id: 'user-1' } },
+        })),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'organization_members') {
+          return {
+            select: organizationMembersSelectMock,
+          }
+        }
+
+        return fromMock(table)
+      }),
+    })
+
+    await expect(
+      completeOrganizationOnboardingBotModeUnlock({
+        organizationId: 'org-2',
+        selectedMode: 'active',
+      })
+    ).resolves.toMatchObject({
+      bot_mode: 'active',
+      bot_mode_unlock_required: false,
+    })
+
+    expect(organizationMembersEqMock).toHaveBeenCalledWith('user_id', 'user-1')
+    expect(organizationMembersEqMock).toHaveBeenCalledWith('organization_id', 'org-2')
   })
 })

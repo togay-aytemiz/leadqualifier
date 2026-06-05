@@ -345,6 +345,8 @@
       "title": "Başlangıç tamamlandı",
       "description": "Qualy artık canlı kullanıma hazır. Bot şu anda kapalı durumda. İsterseniz şimdi dinleyici veya aktif moda geçebilir ya da şimdilik kapalı bırakabilirsiniz.",
       "currentState": "Mevcut bot durumu: Kapalı",
+      "saving": "Seçiminiz kaydediliyor. Birkaç saniye içinde ekran yenilenecek.",
+      "error": "Seçim kaydedilemedi. Lütfen tekrar deneyin; sorun devam ederse sayfayı yenileyin.",
       "options": {
         "active": {
           "title": "Aktif",

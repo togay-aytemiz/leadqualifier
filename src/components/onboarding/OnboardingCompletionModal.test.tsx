@@ -52,4 +52,16 @@ describe('OnboardingCompletionModal source', () => {
     expect(source).toContain('border-amber-200 bg-amber-50')
     expect(source).toContain('border-rose-200 bg-rose-50')
   })
+
+  it('shows saving and retry feedback instead of leaving the overlay inert', () => {
+    const source = fs.readFileSync(FILE_PATH, 'utf8')
+
+    expect(source).toContain('useState<BotModeChoice | null>')
+    expect(source).toContain("t('saving')")
+    expect(source).toContain("t('error')")
+    expect(source).toContain('role="status"')
+    expect(source).toContain('role="alert"')
+    expect(source).toContain('aria-busy={isSelectedPending}')
+    expect(source).toContain('disabled:cursor-wait')
+  })
 })

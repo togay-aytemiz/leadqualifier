@@ -192,7 +192,8 @@ export async function acknowledgeOrganizationOnboardingAiSettings(organizationId
 }
 
 async function getOrganizationMemberForWrite(
-  supabase: Awaited<ReturnType<typeof createClient>>
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string
 ) {
   const {
     data: { user },
@@ -203,7 +204,7 @@ async function getOrganizationMemberForWrite(
     .from('organization_members')
     .select('organization_id, role')
     .eq('user_id', user.id)
-    .limit(1)
+    .eq('organization_id', organizationId)
     .single()
 
   if (error || !member) throw new Error('No organization found')
@@ -220,10 +221,7 @@ export async function completeOrganizationOnboardingBotModeUnlock({
   const supabase = await createClient()
   await assertTenantWriteAllowed(supabase)
 
-  const member = await getOrganizationMemberForWrite(supabase)
-  if (member.organization_id !== organizationId) {
-    throw new Error('Forbidden')
-  }
+  await getOrganizationMemberForWrite(supabase, organizationId)
 
   const onboardingState = await getOrganizationOnboardingState(organizationId, { supabase })
   if (!onboardingState.isComplete) {

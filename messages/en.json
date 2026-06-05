@@ -345,6 +345,8 @@
       "title": "Getting started is complete",
       "description": "Qualy is now ready for live use. The bot is currently off. You can switch to shadow or active mode now, or keep it off for the moment.",
       "currentState": "Current bot mode: Off",
+      "saving": "Saving your choice. The screen will refresh in a few seconds.",
+      "error": "Your choice could not be saved. Please try again; if it continues, refresh the page.",
       "options": {
         "active": {
           "title": "Active",

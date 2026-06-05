@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { CheckCircle2, Ear, Power, Sparkles } from 'lucide-react'
-import { type ReactNode, useTransition } from 'react'
+import { type ReactNode, useState, useTransition } from 'react'
 
 import { completeOrganizationOnboardingBotModeUnlock } from '@/lib/onboarding/actions'
 import type { AiBotMode } from '@/types/database'
@@ -59,19 +59,24 @@ export function OnboardingCompletionModal({
   const t = useTranslations('onboarding.completionModal')
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [selectedMode, setSelectedMode] = useState<BotModeChoice | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   if (!isOpen || !requiresExplicitSelection) {
     return null
   }
 
-  function handleSelect(selectedMode: BotModeChoice) {
+  function handleSelect(nextMode: BotModeChoice) {
     if (isPending) return
+
+    setSelectedMode(nextMode)
+    setErrorMessage(null)
 
     startTransition(async () => {
       try {
         await completeOrganizationOnboardingBotModeUnlock({
           organizationId,
-          selectedMode: selectedMode === 'active' ? 'active' : selectedMode === 'shadow' ? 'shadow' : 'off',
+          selectedMode: nextMode === 'active' ? 'active' : nextMode === 'shadow' ? 'shadow' : 'off',
         })
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('ai-settings-updated'))
@@ -79,6 +84,8 @@ export function OnboardingCompletionModal({
         router.refresh()
       } catch (error) {
         console.error('Failed to unlock bot mode after onboarding completion:', error)
+        setErrorMessage(t('error'))
+        setSelectedMode(null)
       }
     })
   }
@@ -134,16 +141,20 @@ export function OnboardingCompletionModal({
         <div className="mt-6 grid gap-3 lg:grid-cols-3">
           {options.map((option) => {
             const toneClasses = botModeChoiceToneClassMap[option.tone]
+            const isSelectedPending = isPending && selectedMode === option.selectedMode
 
             return (
               <button
                 key={option.key}
                 type="button"
                 disabled={isPending}
+                aria-busy={isSelectedPending}
                 onClick={() => handleSelect(option.selectedMode)}
                 className={cn(
-                  'rounded-2xl border p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-70',
-                  toneClasses.card
+                  'rounded-2xl border p-4 text-left transition-colors disabled:opacity-70',
+                  isPending ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed',
+                  toneClasses.card,
+                  isSelectedPending ? 'ring-2 ring-slate-900/20 ring-offset-2' : null
                 )}
               >
                 <div className="flex items-center gap-3">
@@ -165,6 +176,17 @@ export function OnboardingCompletionModal({
             )
           })}
         </div>
+
+        {isPending ? (
+          <p role="status" className="mt-4 text-sm font-medium text-slate-700">
+            {t('saving')}
+          </p>
+        ) : null}
+        {errorMessage ? (
+          <p role="alert" className="mt-4 text-sm font-medium text-rose-700">
+            {errorMessage}
+          </p>
+        ) : null}
       </div>
     </div>
   )
