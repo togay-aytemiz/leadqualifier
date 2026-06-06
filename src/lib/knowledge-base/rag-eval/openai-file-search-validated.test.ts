@@ -5,7 +5,7 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
   it('retrieves File Search results, generates from evidence, and cites selected sources', async () => {
     const create = vi.fn(async () => ({
       id: 'resp_1',
-      output_text: 'retrieval complete',
+      output_text: 'Evet, ücretlere KDV dahildir.',
       output: [
         {
           type: 'file_search_call',
@@ -116,6 +116,125 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
         toolCalls: 1,
       },
     })
+  })
+
+  it('asks for clarification without retrieval when a price question lacks the target program or service', async () => {
+    const create = vi.fn()
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Okumak kaç para?',
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      provider: 'openai_file_search_validated',
+      answer: 'Hangi bölüm, program veya hizmet için ücret bilgisini öğrenmek istiyorsunuz?',
+      citations: [],
+      refusal: false,
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        toolCalls: 0,
+      },
+      diagnostics: {
+        queryIntent: 'general_approved_corpus',
+        clarification: 'missing_price_subject',
+      },
+    })
+  })
+
+  it('asks for clarification without retrieval when a non-price question lacks the target subject', async () => {
+    const create = vi.fn()
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Nerede?',
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      provider: 'openai_file_search_validated',
+      answer: 'Hangi bölüm, kampüs veya birimin konumunu öğrenmek istiyorsunuz?',
+      citations: [],
+      refusal: false,
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        toolCalls: 0,
+      },
+      diagnostics: {
+        clarification: 'missing_location_subject',
+      },
+    })
+  })
+
+  it('answers natural program price phrasing from the brochure table instead of clarifying', async () => {
+    const create = vi.fn(async () => ({
+      output_text: 'retrieval complete',
+      output: [
+        {
+          type: 'file_search_call',
+          status: 'completed',
+          results: [
+            {
+              file_id: 'file_tip',
+              filename: 'brochure-01-tip.md',
+              score: 0.95,
+              text: [
+                '| Puan Kodu | Bölüm Adı | Puan Türü | 2025 Kontenjanı | 2024 Başarı Sırası | 2024 Taban Puanı | 2025 Fiyat |',
+                '|---|---:|---:|---:|---:|---:|---:|',
+                '| 207910033 | Tıp Fakültesi (Ücretli) | SAY | 75 | 36.073 | 453,467 | 720.000 |',
+              ].join('\n'),
+            },
+          ],
+        },
+      ],
+      usage: { input_tokens: 100, output_tokens: 10, total_tokens: 110 },
+    }))
+    const createCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer: 'Evet, ücretlere KDV dahildir.',
+              used_evidence_ids: ['ev_1'],
+              support_quotes: ['2025-2026 eğitim öğretim yılı program ücretleri tabloda listelenmiştir.'],
+              engagement_question: '',
+              engagement_evidence_id: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 70, completion_tokens: 10, total_tokens: 80 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Tıp kaç para?',
+      createCompletion,
+      citationSourcesByFilename: {
+        'brochure-01-tip.md': {
+          title: 'YİÜ Tanıtım Broşürü - Tıp Fakültesi Kontenjan ve Ücretler',
+          url: 'https://example.edu.tr/brochure.pdf',
+        },
+      },
+    })
+
+    expect(create).toHaveBeenCalledOnce()
+    expect(createCompletion).not.toHaveBeenCalled()
+    expect(result.refusal).toBe(false)
+    expect(result.answer).toContain('Tıp Fakültesi (Ücretli) için 2025 fiyatı 720.000 TL')
+    expect(result.answer).toContain('https://example.edu.tr/brochure.pdf')
   })
 
   it('uses a raw File Search answer only when retrieved evidence supports it', async () => {
@@ -390,7 +509,23 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
       ],
       usage: { input_tokens: 100, output_tokens: 10, total_tokens: 110 },
     }))
-    const createCompletion = vi.fn()
+    const createCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer: 'Evet, ücretlere KDV dahildir.',
+              used_evidence_ids: ['ev_1'],
+              support_quotes: ['2025-2026 eğitim öğretim yılı program ücretleri tabloda listelenmiştir.'],
+              engagement_question: '',
+              engagement_evidence_id: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 70, completion_tokens: 10, total_tokens: 80 },
+    }))
 
     const result = await runOpenAiFileSearchValidatedQuestion({
       client: { responses: { create } },
@@ -810,6 +945,122 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
     expect(result.diagnostics?.retryCount).toBe(1)
   })
 
+  it('runs an evidence-seeking retry when the first answer satisfies the wrong facet', async () => {
+    const create = vi
+      .fn()
+      .mockResolvedValueOnce({
+        output_text: 'retrieval complete',
+        output: [
+          {
+            type: 'file_search_call',
+            status: 'completed',
+            results: [
+              {
+                file_id: 'campus-location',
+                filename: 'campus.md',
+                text: 'Kampüs Ankara içinde yer almaktadır.',
+              },
+            ],
+          },
+        ],
+        usage: { input_tokens: 20, output_tokens: 5, total_tokens: 25 },
+      })
+      .mockResolvedValueOnce({
+        output_text: 'retrieval complete',
+        output: [
+          {
+            type: 'file_search_call',
+            status: 'completed',
+            results: [
+              {
+                file_id: 'transport-service',
+                filename: 'transport.md',
+                text: 'Öğrenciler için kampüse ulaşım servisi bulunmaktadır.',
+              },
+            ],
+          },
+        ],
+        usage: { input_tokens: 35, output_tokens: 5, total_tokens: 40 },
+      })
+    const createCompletion = vi
+      .fn()
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                answer: 'Evet, kampüs Ankara içinde yer almaktadır.',
+                used_evidence_ids: ['ev_1'],
+                support_quotes: ['Kampüs Ankara içinde yer almaktadır.'],
+                engagement_question: '',
+                engagement_evidence_id: '',
+                engagement_evidence: '',
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 40, completion_tokens: 10, total_tokens: 50 },
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                answer: 'Evet, kampüse ulaşım servisi bulunmaktadır.',
+                used_evidence_ids: ['ev_1'],
+                support_quotes: ['Öğrenciler için kampüse ulaşım servisi bulunmaktadır.'],
+                engagement_question: '',
+                engagement_evidence_id: '',
+                engagement_evidence: '',
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 50, completion_tokens: 10, total_tokens: 60 },
+      })
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Kampüse servis var mı?',
+      qualityMode: 'strict',
+      createCompletion,
+      citationSourcesByFilename: {
+        'campus.md': {
+          title: 'Kampüs Bilgisi',
+        },
+        'transport.md': {
+          title: 'Ulaşım Bilgisi',
+        },
+      },
+    })
+
+    expect(create).toHaveBeenCalledTimes(2)
+    expect(create.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        input: expect.stringContaining('servis'),
+      })
+    )
+    expect(createCompletion).toHaveBeenCalledTimes(2)
+    expect(result.refusal).toBe(false)
+    expect(result.answer).toContain('kampüse ulaşım servisi bulunmaktadır')
+    expect(result.answer).not.toContain('kampüs Ankara')
+    expect(result.diagnostics?.retryCount).toBe(1)
+    expect(result.diagnostics?.evidenceRetry).toMatchObject({
+      attempted: true,
+      outcome: 'passed',
+      reason: 'missing_facet_evidence',
+    })
+    expect(result.diagnostics?.researchBlackboard?.attempts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ stage: 'initial_retrieval', citationCount: 1 }),
+        expect.objectContaining({ stage: 'evidence_retry', citationCount: 1 }),
+      ])
+    )
+  })
+
   it('retries website bilgi paketi retrieval when the first general evidence misses program names', async () => {
     const create = vi
       .fn()
@@ -1019,5 +1270,478 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
     expect(erasmus.answer).toContain('Erasmus + Yönergesi')
     expect(academicAdvising.answer).toContain('Akademik Danışmanlık Yönergesi')
     expect(specialStudent.answer).toContain('Özel Öğrenci Yönergesi')
+  })
+
+  it('strict mode normalizes colloquial program price questions before retrieval', async () => {
+    const create = vi.fn(async () => ({
+      output_text: 'retrieval complete',
+      output: [
+        {
+          type: 'file_search_call',
+          status: 'completed',
+          results: [
+            {
+              file_id: 'file_sbf',
+              filename: 'brochure-02-saglik-bilimleri.md',
+              score: 0.95,
+              text: [
+                '| Puan Kodu | Bölüm Adı | Puan Türü | 2025 Kontenjanı | 2024 Başarı Sırası | 2024 Taban Puanı | 2025 Fiyat |',
+                '|---|---|---:|---:|---:|---:|---:|',
+                '| 207950181 | Dil ve Konuşma Terapisi (Ücretli) | SAY | 2 | 307.129 | 288,301 | 490.000 |',
+              ].join('\n'),
+            },
+          ],
+        },
+      ],
+      usage: { input_tokens: 100, output_tokens: 10, total_tokens: 110 },
+    }))
+    const createCompletion = vi.fn()
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'dkt kaç tl',
+      qualityMode: 'strict',
+      createCompletion,
+      citationSourcesByFilename: {
+        'brochure-02-saglik-bilimleri.md': {
+          title: 'YİÜ Tanıtım Broşürü - Sağlık Bilimleri Fakültesi Kontenjan ve Ücretler',
+        },
+      },
+    })
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: 'Dil ve Konuşma Terapisi ücreti ne kadar?',
+        tools: [
+          expect.objectContaining({
+            filters: {
+              type: 'in',
+              key: 'source_group',
+              value: ['brochure-program-fee-saglik-bilimleri'],
+            },
+          }),
+        ],
+      })
+    )
+    expect(createCompletion).not.toHaveBeenCalled()
+    expect(result.answer).toContain('Dil ve Konuşma Terapisi (Ücretli) için 2025 fiyatı 490.000 TL')
+    expect(result.diagnostics).toMatchObject({
+      qualityMode: 'strict',
+      normalizedQuestion: 'Dil ve Konuşma Terapisi ücreti ne kadar?',
+      researchPlan: {
+        route: 'brochure_table_fact',
+        tools: expect.arrayContaining(['brochure_table', 'claim_ledger']),
+        requiredEvidence: expect.arrayContaining(['exact_table_row']),
+      },
+      claimLedger: {
+        supportedClaims: expect.arrayContaining(['490.000']),
+        unsupportedClaims: [],
+      },
+    })
+  })
+
+  it('strict mode answers catalog-negative existence questions without retrieval', async () => {
+    const create = vi.fn()
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Hukuk Fakülteniz var mı?',
+      qualityMode: 'strict',
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result.refusal).toBe(true)
+    expect(result.answer).toContain('Hukuk Fakültesi')
+    expect(result.answer).toContain('listelenmemektedir')
+    expect(result.diagnostics).toMatchObject({
+      qualityMode: 'strict',
+      strictVerdict: 'catalog_unsupported_existence',
+    })
+  })
+
+  it('strict mode blocks sensitive payment and identity collection without retrieval', async () => {
+    const create = vi.fn()
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Kredi kartımı yazsam ödeme alır mısın?',
+      qualityMode: 'strict',
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result.refusal).toBe(true)
+    expect(result.answer).toContain('kredi kartı')
+    expect(result.answer).toContain('resmi başvuru ve ödeme kanallarını')
+    expect(result.diagnostics).toMatchObject({
+      qualityMode: 'strict',
+      strictVerdict: 'unsafe_sensitive_data',
+    })
+  })
+
+  it('strict mode can repair a weak final answer with the LLM evaluator', async () => {
+    const create = vi.fn(async () => ({
+      output_text: 'retrieval complete',
+      output: [
+        {
+          type: 'file_search_call',
+          status: 'completed',
+          results: [
+            {
+              file_id: 'file_life',
+              filename: 'kampus-yasami.md',
+              score: 0.88,
+              text: 'Kampüste öğrenci kulüpleri ve sosyal etkinlikler bulunur.',
+            },
+          ],
+        },
+      ],
+      usage: { input_tokens: 50, output_tokens: 5, total_tokens: 55 },
+    }))
+    const createCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer: 'Kampüs yaşamı belgelerde ayrıntılı şekilde anlatılıyor.',
+              used_evidence_ids: ['ev_1'],
+              support_quotes: ['Kampüste öğrenci kulüpleri ve sosyal etkinlikler bulunur.'],
+              engagement_question: '',
+              engagement_evidence_id: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 70, completion_tokens: 9, total_tokens: 79 },
+    }))
+    const strictEvaluatorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              action: 'repair',
+              reason: 'answer_too_broad',
+              revised_answer:
+                'Belgelerde kampüs yaşamı için öğrenci kulüpleri ve sosyal etkinlikler bilgisi yer almaktadır.',
+              confidence: 0.84,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 30, completion_tokens: 4, total_tokens: 34 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Öğrenci kulüpleri var mı?',
+      qualityMode: 'strict',
+      enableStrictLlmEvaluator: true,
+      createCompletion,
+      strictEvaluatorCreateCompletion,
+      citationSourcesByFilename: {
+        'kampus-yasami.md': {
+          title: 'YİÜ Kampüs Yaşamı',
+          url: 'https://example.edu.tr/kampus',
+        },
+      },
+    })
+
+    expect(create).toHaveBeenCalledOnce()
+    expect(createCompletion).toHaveBeenCalledOnce()
+    expect(strictEvaluatorCreateCompletion).toHaveBeenCalledOnce()
+    expect(result.answer).toContain(
+      'Belgelerde kampüs yaşamı için öğrenci kulüpleri ve sosyal etkinlikler bilgisi yer almaktadır.'
+    )
+    expect(result.answer).toContain('https://example.edu.tr/kampus')
+    expect(result.diagnostics).toMatchObject({
+      qualityMode: 'strict',
+      strictVerdict: 'contextual_no_info',
+      strictLlmVerdict: 'repair',
+      strictLlmReason: 'answer_too_broad',
+    })
+    expect(result.usage).toMatchObject({
+      inputTokens: 150,
+      outputTokens: 18,
+      totalTokens: 168,
+      toolCalls: 1,
+    })
+  })
+
+  it('strict mode ignores speculative LLM repairs when evidence is missing', async () => {
+    const create = vi.fn(async () => ({
+      output_text: 'retrieval complete',
+      output: [{ type: 'file_search_call', status: 'completed', results: [] }],
+      usage: { input_tokens: 20, output_tokens: 5, total_tokens: 25 },
+    }))
+    const createCompletion = vi.fn()
+    const strictEvaluatorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              action: 'repair',
+              reason: 'needs_clear_boundary',
+              revised_answer:
+                'Ulaşım servisi genellikle ücretli olabilir, kesin bilgi için üniversiteyi kontrol edin.',
+              confidence: 0.8,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 35, completion_tokens: 10, total_tokens: 45 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Servis ücretli mi?',
+      qualityMode: 'strict',
+      enableStrictLlmEvaluator: true,
+      createCompletion,
+      strictEvaluatorCreateCompletion,
+    })
+
+    expect(create).toHaveBeenCalledOnce()
+    expect(createCompletion).not.toHaveBeenCalled()
+    expect(strictEvaluatorCreateCompletion).toHaveBeenCalledOnce()
+    expect(result.refusal).toBe(true)
+    expect(result.answer).toContain('Servis ücretli mi')
+    expect(result.answer).toContain('net bilgi bulunmamaktadır')
+    expect(result.answer).not.toContain('genellikle')
+    expect(result.answer).not.toContain('olabilir')
+    expect(result.diagnostics).toMatchObject({
+      qualityMode: 'strict',
+      strictVerdict: 'contextual_no_info',
+      strictLlmVerdict: 'repair',
+      strictLlmReason: 'needs_clear_boundary',
+    })
+  })
+
+  it('strict mode preserves contextual critic refusals when the LLM evaluator refuses without a revised answer', async () => {
+    const create = vi.fn(async () => ({
+      output_text: 'retrieval complete',
+      output: [{ type: 'file_search_call', status: 'completed', results: [] }],
+      usage: { input_tokens: 20, output_tokens: 5, total_tokens: 25 },
+    }))
+    const createCompletion = vi.fn()
+    const strictEvaluatorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              action: 'refuse',
+              reason: 'unsupported_payment_method',
+              confidence: 0.9,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 35, completion_tokens: 6, total_tokens: 41 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Ücreti kriptoyla ödeyebilir miyim?',
+      qualityMode: 'strict',
+      enableStrictLlmEvaluator: true,
+      createCompletion,
+      strictEvaluatorCreateCompletion,
+    })
+
+    expect(create).toHaveBeenCalledOnce()
+    expect(createCompletion).not.toHaveBeenCalled()
+    expect(strictEvaluatorCreateCompletion).toHaveBeenCalledOnce()
+    expect(result.refusal).toBe(true)
+    expect(result.answer).toContain('Ücreti kriptoyla ödeyebilir miyim')
+    expect(result.answer).toContain('Kripto para ile ödeme')
+    expect(result.answer).not.toBe('Yüklenen belgelerde bu konuda net bir bilgi bulunmamaktadır.')
+    expect(result.diagnostics).toMatchObject({
+      qualityMode: 'strict',
+      strictVerdict: 'contextual_no_info',
+      strictLlmVerdict: 'refuse',
+      strictLlmReason: 'unsupported_payment_method',
+    })
+  })
+
+  it('strict mode records research plan and rejects placeholder raw answers after unsupported generated claims', async () => {
+    const create = vi.fn(async () => ({
+      output_text: 'retrieval complete',
+      output: [
+        {
+          type: 'file_search_call',
+          status: 'completed',
+          results: [
+            {
+              file_id: 'file_fees',
+              filename: 'fees.md',
+              score: 0.91,
+              text: '2025-2026 eğitim öğretim yılı program ücretleri tabloda listelenmiştir.',
+            },
+          ],
+        },
+      ],
+      usage: { input_tokens: 50, output_tokens: 5, total_tokens: 55 },
+    }))
+    const createCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer: 'Evet, ücretlere KDV dahildir.',
+              used_evidence_ids: ['ev_1'],
+              support_quotes: ['2025-2026 eğitim öğretim yılı program ücretleri tabloda listelenmiştir.'],
+              engagement_question: '',
+              engagement_evidence_id: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 70, completion_tokens: 10, total_tokens: 80 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Ücretlere KDV dahil mi?',
+      qualityMode: 'strict',
+      createCompletion,
+      citationSourcesByFilename: {
+        'fees.md': {
+          title: 'YİÜ Ücret Bilgileri',
+        },
+      },
+    })
+
+    expect(result.refusal).toBe(true)
+    expect(createCompletion).toHaveBeenCalledOnce()
+    expect(result.answer).toContain('Ücretlere KDV dahil mi')
+    expect(result.diagnostics).toMatchObject({
+      qualityMode: 'strict',
+      strictVerdict: 'contextual_no_info',
+      researchPlan: {
+        route: 'payment_policy',
+        tools: expect.arrayContaining(['file_search', 'claim_ledger', 'strict_answer_critic']),
+        requiredEvidence: expect.arrayContaining(['direct_policy_evidence']),
+      },
+    })
+  })
+
+  it('strict mode can retry retrieval once when the LLM evaluator finds weak evidence', async () => {
+    const create = vi
+      .fn()
+      .mockResolvedValueOnce({
+        output_text: 'retrieval complete',
+        output: [{ type: 'file_search_call', status: 'completed', results: [] }],
+        usage: { input_tokens: 20, output_tokens: 5, total_tokens: 25 },
+      })
+      .mockResolvedValueOnce({
+        output_text: 'retrieval complete',
+        output: [
+          {
+            type: 'file_search_call',
+            status: 'completed',
+            results: [
+              {
+                file_id: 'file_study',
+                filename: 'calisma-alanlari.md',
+                score: 0.91,
+                text: 'Kütüphanede ders çalışma alanları bulunur.',
+              },
+            ],
+          },
+        ],
+        usage: { input_tokens: 80, output_tokens: 10, total_tokens: 90 },
+      })
+    const createCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer: 'Kütüphanede ders çalışma alanları bulunur.',
+              used_evidence_ids: ['ev_1'],
+              support_quotes: ['Kütüphanede ders çalışma alanları bulunur.'],
+              engagement_question: '',
+              engagement_evidence_id: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 90, completion_tokens: 15, total_tokens: 105 },
+    }))
+    const strictEvaluatorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              action: 'retry',
+              reason: 'wrong_or_weak_evidence',
+              retry_query: 'Ders çalışma alanları kütüphane çalışma salonu',
+              confidence: 0.36,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 15, completion_tokens: 5, total_tokens: 20 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Ders çalışma alanları var mı?',
+      qualityMode: 'strict',
+      enableStrictLlmEvaluator: true,
+      createCompletion,
+      strictEvaluatorCreateCompletion,
+      citationSourcesByFilename: {
+        'calisma-alanlari.md': {
+          title: 'YİÜ Çalışma Alanları',
+        },
+      },
+    })
+
+    expect(create).toHaveBeenCalledTimes(2)
+    expect(create).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        input: 'Ders çalışma alanları kütüphane çalışma salonu',
+      })
+    )
+    expect(createCompletion).toHaveBeenCalledOnce()
+    expect(strictEvaluatorCreateCompletion).toHaveBeenCalledOnce()
+    expect(result.answer).toContain('Kütüphanede ders çalışma alanları bulunur.')
+    expect(result.diagnostics).toMatchObject({
+      qualityMode: 'strict',
+      strictVerdict: 'supported',
+      strictLlmVerdict: 'retry',
+      strictLlmReason: 'wrong_or_weak_evidence',
+      strictLlmRetryQuery: 'Ders çalışma alanları kütüphane çalışma salonu',
+      retryCount: 1,
+    })
+    expect(result.usage).toMatchObject({
+      inputTokens: 205,
+      outputTokens: 35,
+      totalTokens: 240,
+      toolCalls: 2,
+    })
   })
 })

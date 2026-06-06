@@ -12,6 +12,36 @@ describe('planBrochureQuery', () => {
     })
   })
 
+  it('recognizes natural price phrasing and marks subjectless price questions for clarification', () => {
+    expect(planBrochureQuery('Tıp kaç para?')).toMatchObject({
+      intent: 'brochure_table_fact',
+      program: 'Tıp Fakültesi',
+      requestedFields: ['price'],
+      sourceGroups: ['brochure-program-fee-tip'],
+      clarification: undefined,
+    })
+
+    expect(planBrochureQuery('Okumak kaç para?')).toMatchObject({
+      intent: 'general_approved_corpus',
+      requestedFields: ['price'],
+      clarification: {
+        reason: 'missing_price_subject',
+        question:
+          'Hangi bölüm, program veya hizmet için ücret bilgisini öğrenmek istiyorsunuz?',
+      },
+    })
+  })
+
+  it('routes discounted program existence wording to the brochure table', () => {
+    expect(planBrochureQuery('Tıp Fakültesi %50 indirimli program var mı?')).toMatchObject({
+      intent: 'brochure_table_fact',
+      programs: ['Tıp Fakültesi'],
+      variants: ['%50 İnd.'],
+      requestedFields: ['price'],
+      sourceGroups: ['brochure-program-fee-tip'],
+    })
+  })
+
   it('keeps success rank separate from quota for burslu Optisyenlik', () => {
     expect(
       planBrochureQuery('Optisyenlik burslu programının başarı sırası ve kontenjanı nedir?')
@@ -21,6 +51,30 @@ describe('planBrochureQuery', () => {
       variant: 'Burslu',
       requestedFields: ['success_rank', 'quota'],
       sourceGroups: ['brochure-program-fee-shmyo'],
+    })
+  })
+
+  it('routes broad base-score and success-rank questions to all brochure table groups', () => {
+    expect(planBrochureQuery('Taban puanlar nedir?')).toMatchObject({
+      intent: 'brochure_table_fact',
+      requestedFields: ['base_score'],
+      sourceGroups: expect.arrayContaining([
+        'brochure-program-fee-tip',
+        'brochure-program-fee-saglik-bilimleri',
+        'brochure-program-fee-shmyo',
+        'brochure-program-fee-myo',
+      ]),
+    })
+
+    expect(planBrochureQuery('Başarı sıralamaları nedir?')).toMatchObject({
+      intent: 'brochure_table_fact',
+      requestedFields: ['success_rank'],
+      sourceGroups: expect.arrayContaining([
+        'brochure-program-fee-tip',
+        'brochure-program-fee-saglik-bilimleri',
+        'brochure-program-fee-shmyo',
+        'brochure-program-fee-myo',
+      ]),
     })
   })
 
@@ -60,6 +114,14 @@ describe('planBrochureQuery', () => {
 
   it('leaves general approved-corpus questions unfiltered', () => {
     expect(planBrochureQuery('Üniversite ne zaman kurulmuştur?')).toMatchObject({
+      intent: 'general_approved_corpus',
+      requestedFields: [],
+      sourceGroups: [],
+    })
+  })
+
+  it('does not route yurtdışı diploma questions to dormitory contact sources', () => {
+    expect(planBrochureQuery('Diplomamız yurtdışında geçiyor mu?')).toMatchObject({
       intent: 'general_approved_corpus',
       requestedFields: [],
       sourceGroups: [],
@@ -129,6 +191,17 @@ describe('planBrochureQuery', () => {
     ).toMatchObject({
       intent: 'unsupported_guardrail',
       guardrailReason: 'future_information',
+    })
+  })
+
+  it('asks clarification for personalized admissions chance questions without score or program', () => {
+    expect(planBrochureQuery('Puanım şu, kazanır mıyım?')).toMatchObject({
+      intent: 'general_approved_corpus',
+      clarification: {
+        reason: 'missing_admissions_profile',
+        question:
+          'Hangi program için değerlendirme yapmak istiyorsunuz? Puanınızı veya başarı sıralamanızı da yazarsanız broşürdeki taban puan ve başarı sırası bilgileriyle karşılaştırabilirim.',
+      },
     })
   })
 

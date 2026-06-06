@@ -105,7 +105,7 @@ function matchingRows(rows: BrochureTableRow[], plan: BrochureQueryPlan) {
   const programs = (plan.programs.length > 0 ? plan.programs : plan.program ? [plan.program] : []).map(
     normalize
   )
-  if (programs.length === 0) return []
+  if (programs.length === 0) return rows
   const variants = plan.variants.length > 0 ? plan.variants : plan.variant ? [plan.variant] : []
   return rows.filter(
     (row) =>
@@ -170,6 +170,24 @@ export function resolveBrochureTableFact(input: {
 }): BrochureTableFactResult | null {
   if (input.plan.intent !== 'brochure_table_fact' || input.plan.requestedFields.length === 0) {
     return null
+  }
+
+  const hasProgramFilter = Boolean(input.plan.program || input.plan.programs.length > 0)
+  if (!hasProgramFilter) {
+    const rows = input.citations.flatMap((citation) => parseBrochureTableRows(citation.quote ?? ''))
+    if (rows.length > 0) {
+      return {
+        answer: renderAnswers(rows, input.plan.requestedFields),
+        row: rows[0]!,
+        rows,
+        citation: {
+          providerSourceId: 'brochure-table:broad-field-summary',
+          title: 'YİÜ Tanıtım Broşürü - Program Taban Puanı ve Başarı Sırası Satırları',
+          quote: rows.map((row) => row.quote).join('\n'),
+        },
+        requestedFields: input.plan.requestedFields,
+      }
+    }
   }
 
   for (const citation of input.citations) {

@@ -80,6 +80,21 @@ describe('brochure table facts', () => {
     expect(result?.answer).not.toContain('başarı sırası 7')
   })
 
+  it('summarizes broad table field questions when no single program is specified', () => {
+    const result = resolveBrochureTableFact({
+      plan: planBrochureQuery('Taban puanlar nedir?'),
+      citations: [tableCitation],
+    })
+
+    expect(result?.rows.map((row) => row.programName)).toEqual([
+      'Optisyenlik (Burslu)',
+      'Optisyenlik (%50 İnd.)',
+      'Tıbbi Tanıtım ve Pazarlama (Burslu)',
+    ])
+    expect(result?.answer).toContain('Optisyenlik (Burslu) için 2024 taban puanı 345,708')
+    expect(result?.answer).toContain('Tıbbi Tanıtım ve Pazarlama (Burslu)')
+  })
+
   it('selects the exact Tıp preparation and English discounted rows', () => {
     const preparation = resolveBrochureTableFact({
       plan: planBrochureQuery('Tıp Fakültesi hazırlık ücreti ne kadar?'),

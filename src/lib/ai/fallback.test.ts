@@ -115,4 +115,38 @@ describe('buildFallbackResponse', () => {
         })
         expect(openAiCreateMock).not.toHaveBeenCalled()
     })
+
+    it('asks for clarification when a price fallback has no concrete service or program subject', async () => {
+        const response = await buildFallbackResponse({
+            organizationId: 'org-1',
+            message: 'Kaç para?',
+            preferredLanguage: 'tr',
+            supabase: createSupabaseMock() as never,
+            trackUsage: false
+        })
+
+        expect(response).toBe('Hangi hizmet, program veya seçenek için ücret bilgisini öğrenmek istiyorsunuz?')
+        expect(openAiCreateMock).not.toHaveBeenCalled()
+    })
+
+    it('asks for clarification for under-specified contact and general-info fallback turns', async () => {
+        const contactResponse = await buildFallbackResponse({
+            organizationId: 'org-1',
+            message: 'İletişim bilgisi nedir?',
+            preferredLanguage: 'tr',
+            supabase: createSupabaseMock() as never,
+            trackUsage: false
+        })
+        const genericResponse = await buildFallbackResponse({
+            organizationId: 'org-1',
+            message: 'Bilgi alabilir miyim?',
+            preferredLanguage: 'tr',
+            supabase: createSupabaseMock() as never,
+            trackUsage: false
+        })
+
+        expect(contactResponse).toBe('Hangi kişi, birim veya hizmet için iletişim bilgisini öğrenmek istiyorsunuz?')
+        expect(genericResponse).toBe('Hangi konu hakkında bilgi almak istiyorsunuz?')
+        expect(openAiCreateMock).not.toHaveBeenCalled()
+    })
 })

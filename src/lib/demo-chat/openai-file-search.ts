@@ -23,6 +23,7 @@ export type OpenAiFileSearchDemoReply = {
 const DEFAULT_FILE_SEARCH_DEMO_SLUGS = ['yiu-tanitim-gunleri-2026']
 const DEFAULT_RETRIEVAL_MODEL = 'gpt-4.1-mini'
 const DEFAULT_ANSWER_MODEL = 'gpt-4o-mini'
+const DEFAULT_EVALUATOR_MODEL = 'gpt-4o-mini'
 
 function readEnabledSlugs() {
     const raw = process.env.DEMO_CHAT_FILE_SEARCH_SLUGS?.trim()
@@ -52,6 +53,22 @@ function readRetrievalModel() {
 function readAnswerModel() {
     return process.env.DEMO_CHAT_FILE_SEARCH_ANSWER_MODEL?.trim()
         || DEFAULT_ANSWER_MODEL
+}
+
+function readQualityMode(): 'validated' | 'strict' {
+    return process.env.DEMO_CHAT_FILE_SEARCH_STRICT_QUALITY === '0'
+        ? 'validated'
+        : 'strict'
+}
+
+function readStrictLlmEvaluatorEnabled(qualityMode: 'validated' | 'strict') {
+    return qualityMode === 'strict' && process.env.DEMO_CHAT_FILE_SEARCH_LLM_EVALUATOR !== '0'
+}
+
+function readStrictEvaluatorModel() {
+    return process.env.DEMO_CHAT_FILE_SEARCH_EVALUATOR_MODEL?.trim()
+        || process.env.OPENAI_RAG_EVALUATOR_MODEL?.trim()
+        || DEFAULT_EVALUATOR_MODEL
 }
 
 function mapCitationMetadata(citations: Array<{
@@ -90,6 +107,9 @@ export async function buildOpenAiFileSearchDemoReply(input: {
         })
         const retrievalModel = readRetrievalModel()
         const answerModel = readAnswerModel()
+        const qualityMode = readQualityMode()
+        const strictLlmEvaluatorEnabled = readStrictLlmEvaluatorEnabled(qualityMode)
+        const strictEvaluatorModel = readStrictEvaluatorModel()
         const vectorStoreId = readVectorStoreId()
         const openai = new OpenAI({ apiKey })
         const result = await runOpenAiFileSearchValidatedQuestion({
@@ -103,6 +123,9 @@ export async function buildOpenAiFileSearchDemoReply(input: {
             maxResults: 8,
             maxOutputTokens: 900,
             settings,
+            qualityMode,
+            enableStrictLlmEvaluator: strictLlmEvaluatorEnabled,
+            strictEvaluatorModel,
         })
         const answer = result.answer.trim()
         if (!answer) return null
@@ -112,9 +135,11 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                 await recordAiUsage({
                     organizationId: input.channel.organizationId,
                     category: 'rag',
-                    model: retrievalModel === answerModel
-                        ? retrievalModel
-                        : `${retrievalModel}+${answerModel}`,
+                    model: strictLlmEvaluatorEnabled
+                        ? `${retrievalModel}+${answerModel}+${strictEvaluatorModel}`
+                        : retrievalModel === answerModel
+                            ? retrievalModel
+                            : `${retrievalModel}+${answerModel}`,
                     inputTokens: result.usage.inputTokens,
                     outputTokens: result.usage.outputTokens,
                     totalTokens: result.usage.totalTokens,
@@ -124,6 +149,9 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                         demo_chat_channel_id: input.channel.id,
                         ...(input.conversationId ? { conversation_id: input.conversationId } : {}),
                         vector_store_id: vectorStoreId,
+                        quality_mode: qualityMode,
+                        strict_llm_evaluator_enabled: strictLlmEvaluatorEnabled,
+                        strict_evaluator_model: strictEvaluatorModel,
                         tool_calls: result.usage.toolCalls,
                         estimated_credits: result.usage.estimatedCredits,
                         diagnostics: result.diagnostics,
@@ -148,6 +176,9 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                     vector_store_id: vectorStoreId,
                     retrieval_model: retrievalModel,
                     answer_model: answerModel,
+                    strict_evaluator_model: strictEvaluatorModel,
+                    strict_llm_evaluator_enabled: strictLlmEvaluatorEnabled,
+                    quality_mode: qualityMode,
                     refusal: result.refusal,
                     timings_ms: result.timingsMs,
                     diagnostics: result.diagnostics,

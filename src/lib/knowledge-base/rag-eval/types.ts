@@ -60,6 +60,46 @@ export type RagProviderResult = {
     queryIntent?: string
     retryCount?: number
     followup?: string
+    clarification?: string
+    qualityMode?: 'validated' | 'strict'
+    normalizedQuestion?: string
+    strictVerdict?: string
+    strictLlmVerdict?: string
+    strictLlmReason?: string
+    strictLlmRetryQuery?: string
+    researchPlan?: {
+      route: string
+      tools: string[]
+      requiredEvidence: string[]
+      sourceGroups: string[]
+      expectedClaims: string[]
+      riskLevel: string
+    }
+    claimLedger?: {
+      requiresDirectEvidence: boolean
+      claims: string[]
+      supportedClaims: string[]
+      unsupportedClaims: string[]
+    }
+    evidenceRetry?: {
+      attempted: boolean
+      outcome?: 'passed' | 'no_evidence' | 'no_supported_answer' | 'critic_rejected'
+      reason?: string
+      query?: string
+      facets?: string[]
+    }
+    researchBlackboard?: {
+      facets: string[]
+      attempts: Array<{
+        stage: string
+        query: string
+        sourceGroups: string[]
+        citationCount: number
+        outcome?: string
+        reason?: string
+      }>
+      finalVerdict?: string
+    }
   }
 }
 

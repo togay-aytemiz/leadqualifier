@@ -1,5 +1,6 @@
 import { calculateUsageCreditCost } from '@/lib/billing/credit-cost'
 import { resolveMvpResponseLanguage } from '@/lib/ai/language'
+import { buildClarificationGateResult } from '@/lib/knowledge-base/rag-clarification'
 import { generateGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-generate'
 import type { RagChunk } from '@/lib/knowledge-base/rag'
 import { buildRagEvidencePack } from '@/lib/knowledge-base/evidence-pack'
@@ -14,6 +15,30 @@ import { resolveBrochureTableFact } from './brochure-table'
 import { resolveApprovedSourceFact } from './approved-source-facts'
 import { buildValidatedFollowup } from './validated-followup'
 import type { RagProviderCitation, RagProviderResult } from './types'
+import { understandStrictQuestion } from './strict-question-understanding'
+import { resolveStrictCatalogAnswer, type StrictCatalogAnswer } from './strict-fact-catalog'
+import {
+  evaluateStrictAnswer,
+  strictSafetyAnswer,
+  type StrictAnswerCriticVerdict,
+} from './strict-answer-critic'
+import { buildStrictClaimLedger, summarizeStrictClaimLedger } from './strict-claim-ledger'
+import {
+  buildStrictResearchPlan,
+  summarizeStrictResearchPlan,
+  type StrictResearchPlan,
+  type StrictResearchPlanDiagnostics,
+} from './strict-research-plan'
+import { classifyStrictQuestionFacets } from './strict-answer-contract'
+import {
+  buildStrictEvidenceRetryPlan,
+  type StrictEvidenceRetryPlan,
+} from './strict-evidence-retry'
+import {
+  evaluateAnswerWithStrictLlm,
+  type StrictLlmCreateCompletion,
+  type StrictLlmEvaluatorResult,
+} from './strict-llm-evaluator'
 
 type CitationSource = {
   title?: string
@@ -40,6 +65,21 @@ type CreateCompletion = (
   }
 }>
 
+type StrictResearchBlackboardAttempt = {
+  stage: string
+  query: string
+  sourceGroups: string[]
+  citationCount: number
+  outcome?: string
+  reason?: string
+}
+
+type StrictResearchBlackboard = {
+  facets: string[]
+  attempts: StrictResearchBlackboardAttempt[]
+  finalVerdict?: string
+}
+
 export type OpenAiFileSearchValidatedQuestionInput = {
   client: OpenAiFileSearchClient
   model: string
@@ -55,6 +95,10 @@ export type OpenAiFileSearchValidatedQuestionInput = {
     bot_name?: string | null
     prompt?: string | null
   }
+  qualityMode?: 'validated' | 'strict'
+  enableStrictLlmEvaluator?: boolean
+  strictEvaluatorModel?: string
+  strictEvaluatorCreateCompletion?: StrictLlmCreateCompletion
 }
 
 const NO_CLEAR_INFORMATION_ANSWER = 'Yüklenen belgelerde bu konuda net bir bilgi bulunmamaktadır.'
@@ -213,6 +257,21 @@ function rawAnswerLooksLikeRefusal(answer: string) {
   )
 }
 
+function rawAnswerLooksLikeProviderPlaceholder(answer: string) {
+  const normalizedAnswer = normalizeForSupport(answer)
+  return /^(?:retrieval complete|search complete|file search complete|retrieved results?|arama tamamlandi)$/i.test(
+    normalizedAnswer
+  )
+}
+
+function llmRepairLooksSpeculativeUnsupported(answer: string) {
+  const normalizedAnswer = normalizeForSupport(answer)
+  if (rawAnswerLooksLikeRefusal(answer)) return false
+  return /(?:genellikle|muhtemelen|tahminen|olabilir|olasi|olasilikla)/.test(
+    normalizedAnswer
+  )
+}
+
 function isUnitSpecificContactQuestion(question: string) {
   const normalizedQuestion = normalizeForSupport(question)
   return (
@@ -261,6 +320,7 @@ function isRawAnswerSupported(input: {
   citations: RagProviderCitation[]
 }) {
   if (!input.answer.trim() || input.citations.length === 0) return false
+  if (rawAnswerLooksLikeProviderPlaceholder(input.answer)) return false
   if (/https?:\/\//i.test(input.answer)) return false
   if (/\bno_answer\b/i.test(input.answer)) return false
   if (!hasCriticalValueSupport(input.answer, input.citations)) return false
@@ -328,6 +388,29 @@ function combinedUsage(
     outputTokens,
     totalTokens,
     toolCalls: retrieval.toolCalls,
+    estimatedCredits: calculateUsageCreditCost({ inputTokens, outputTokens }),
+  }
+}
+
+function usageWithExtra(
+  base: RagProviderResult['usage'],
+  extra: {
+    inputTokens?: number
+    outputTokens?: number
+    totalTokens?: number
+    toolCalls?: number
+  } | null
+): RagProviderResult['usage'] {
+  if (!extra) return base
+  const inputTokens = (base.inputTokens ?? 0) + (extra.inputTokens ?? 0)
+  const outputTokens = (base.outputTokens ?? 0) + (extra.outputTokens ?? 0)
+  const totalTokens = (base.totalTokens ?? 0) + (extra.totalTokens ?? 0)
+  return {
+    ...base,
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    toolCalls: (base.toolCalls ?? 0) + (extra.toolCalls ?? 0),
     estimatedCredits: calculateUsageCreditCost({ inputTokens, outputTokens }),
   }
 }
@@ -584,11 +667,13 @@ function refusalResult(input: {
   generationMs?: number
   plan?: BrochureQueryPlan
   retryCount?: number
+  citations?: RagProviderCitation[]
+  usage?: RagProviderResult['usage']
 }) {
   return {
     provider: 'openai_file_search_validated' as const,
     answer: NO_CLEAR_INFORMATION_ANSWER,
-    citations: [],
+    citations: input.citations ?? [],
     refusal: true,
     timingsMs: {
       total: Date.now() - input.startedAt,
@@ -596,7 +681,7 @@ function refusalResult(input: {
       generation: input.generationMs ?? 0,
       validation: 0,
     },
-    usage: input.retrieval.usage,
+    usage: input.usage ?? input.retrieval.usage,
     diagnostics: input.plan
       ? {
           queryIntent: input.plan.intent,
@@ -638,20 +723,751 @@ function guardrailRefusalResult(input: {
   }
 }
 
+function clarificationResult(input: {
+  startedAt: number
+  queryIntent: string
+  clarification: {
+    reason?: string
+    question: string
+  }
+}): RagProviderResult {
+  return {
+    provider: 'openai_file_search_validated',
+    answer: input.clarification.question,
+    citations: [],
+    refusal: false,
+    timingsMs: {
+      total: Date.now() - input.startedAt,
+      retrieval: 0,
+      generation: 0,
+      validation: 0,
+    },
+    usage: {
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      toolCalls: 0,
+      estimatedCredits: 0,
+    },
+    diagnostics: {
+      queryIntent: input.queryIntent,
+      retryCount: 0,
+      clarification: input.clarification.reason,
+    },
+  }
+}
+
+function zeroUsage() {
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    toolCalls: 0,
+    estimatedCredits: 0,
+  }
+}
+
+function strictDirectResult(input: {
+  startedAt: number
+  answer: string
+  citations: RagProviderCitation[]
+  refusal: boolean
+  strictVerdict: string
+  normalizedQuestion?: string
+  researchPlan?: StrictResearchPlanDiagnostics
+}): RagProviderResult {
+  return {
+    provider: 'openai_file_search_validated',
+    answer: appendSourceUrls(input.answer, input.citations),
+    citations: input.citations,
+    refusal: input.refusal,
+    timingsMs: {
+      total: Date.now() - input.startedAt,
+      retrieval: 0,
+      generation: 0,
+      validation: 0,
+    },
+    usage: zeroUsage(),
+    diagnostics: {
+      retryCount: 0,
+      qualityMode: 'strict',
+      ...(input.normalizedQuestion ? { normalizedQuestion: input.normalizedQuestion } : {}),
+      strictVerdict: input.strictVerdict,
+      ...(input.researchPlan ? { researchPlan: input.researchPlan } : {}),
+    },
+  }
+}
+
 export async function runOpenAiFileSearchValidatedQuestion(
   input: OpenAiFileSearchValidatedQuestionInput
 ): Promise<RagProviderResult> {
   const startedAt = Date.now()
   const retrievalStartedAt = Date.now()
-  const plan = planBrochureQuery(input.question)
-  if (plan.intent === 'unsupported_guardrail') {
-    return guardrailRefusalResult({ startedAt, plan })
+  const qualityMode = input.qualityMode ?? 'validated'
+  const strictUnderstanding =
+    qualityMode === 'strict' ? understandStrictQuestion(input.question) : null
+  const effectiveQuestion = strictUnderstanding?.normalizedQuestion ?? input.question
+  const plan = planBrochureQuery(effectiveQuestion)
+  const strictLlmEvaluatorEnabled = Boolean(
+    strictUnderstanding && input.enableStrictLlmEvaluator
+  )
+  const buildResearchPlan = (
+    catalogAnswer: StrictCatalogAnswer | null = null
+  ): StrictResearchPlan | undefined =>
+    strictUnderstanding
+      ? buildStrictResearchPlan({
+          question: input.question,
+          understanding: strictUnderstanding,
+          brochurePlan: plan,
+          catalogAnswer,
+          enableStrictLlmEvaluator: strictLlmEvaluatorEnabled,
+        })
+      : undefined
+  const researchPlanDiagnostics = (catalogAnswer: StrictCatalogAnswer | null = null) => {
+    const researchPlan = buildResearchPlan(catalogAnswer)
+    return researchPlan ? summarizeStrictResearchPlan(researchPlan) : undefined
   }
+  const researchBlackboard: StrictResearchBlackboard | undefined = strictUnderstanding
+    ? {
+        facets: classifyStrictQuestionFacets(strictUnderstanding),
+        attempts: [],
+      }
+    : undefined
+  const recordResearchAttempt = (attempt: StrictResearchBlackboardAttempt) => {
+    researchBlackboard?.attempts.push(attempt)
+  }
+  const strictDiagnostics = strictUnderstanding
+    ? {
+        qualityMode: 'strict' as const,
+        normalizedQuestion: effectiveQuestion,
+        researchPlan: researchPlanDiagnostics(null),
+      }
+    : undefined
+  const finalize = (
+    result: RagProviderResult,
+    strictVerdict?: string,
+    claimLedger?: ReturnType<typeof buildStrictClaimLedger>
+  ): RagProviderResult => {
+    if (!strictDiagnostics) return result
+    if (strictVerdict && researchBlackboard) {
+      researchBlackboard.finalVerdict = strictVerdict
+    }
+    return {
+      ...result,
+      diagnostics: {
+        ...result.diagnostics,
+        ...strictDiagnostics,
+        ...(strictVerdict ? { strictVerdict } : {}),
+        ...(claimLedger ? { claimLedger: summarizeStrictClaimLedger(claimLedger) } : {}),
+        ...(researchBlackboard ? { researchBlackboard } : {}),
+      },
+    }
+  }
+  const finalizeLlmDiagnostics = (
+    result: RagProviderResult,
+    evaluation: StrictLlmEvaluatorResult
+  ): RagProviderResult => ({
+    ...result,
+    usage: usageWithExtra(result.usage, evaluation.usage),
+    diagnostics: {
+      ...result.diagnostics,
+      strictLlmVerdict: evaluation.verdict.action,
+      strictLlmReason: evaluation.verdict.reason,
+      ...(evaluation.verdict.retryQuery
+        ? { strictLlmRetryQuery: evaluation.verdict.retryQuery }
+        : {}),
+    },
+  })
+  const resultWithEvidenceRetryDiagnostics = (
+    result: RagProviderResult,
+    retryPlan: StrictEvidenceRetryPlan,
+    outcome: 'passed' | 'no_evidence' | 'no_supported_answer' | 'critic_rejected'
+  ): RagProviderResult => ({
+    ...result,
+    diagnostics: {
+      ...result.diagnostics,
+      evidenceRetry: {
+        attempted: true,
+        outcome,
+        reason: retryPlan.reason,
+        query: retryPlan.query,
+        facets: retryPlan.facets,
+      },
+    },
+  })
+  const finalizeCatalog = (catalogAnswer: StrictCatalogAnswer) =>
+    strictDirectResult({
+      startedAt,
+      answer: catalogAnswer.answer,
+      citations: catalogAnswer.citations,
+      refusal: catalogAnswer.refusal,
+      strictVerdict: catalogAnswer.reason,
+      normalizedQuestion: effectiveQuestion,
+      researchPlan: researchPlanDiagnostics(catalogAnswer),
+    })
+  const applyStrictLlmEvaluator = async (
+    result: RagProviderResult,
+    evaluatorCitations: RagProviderCitation[] = result.citations
+  ): Promise<RagProviderResult> => {
+    if (!strictUnderstanding || !strictLlmEvaluatorEnabled) return result
+
+    const evaluation = await evaluateAnswerWithStrictLlm({
+      question: input.question,
+      normalizedQuestion: effectiveQuestion,
+      understanding: strictUnderstanding,
+      answer: result.answer,
+      citations: evaluatorCitations,
+      model: input.strictEvaluatorModel,
+      createCompletion: input.strictEvaluatorCreateCompletion,
+    })
+    if (!evaluation || evaluation.verdict.action === 'pass') {
+      return evaluation ? finalizeLlmDiagnostics(result, evaluation) : result
+    }
+
+    if (evaluation.verdict.action === 'repair' && evaluation.verdict.revisedAnswer) {
+      const speculativeRepair = llmRepairLooksSpeculativeUnsupported(
+        evaluation.verdict.revisedAnswer
+      )
+      const revisedAnswer = speculativeRepair
+        ? result.answer
+        : evaluation.verdict.revisedAnswer
+      const refusal = speculativeRepair ? result.refusal : rawAnswerLooksLikeRefusal(revisedAnswer)
+      return finalizeLlmDiagnostics(
+        {
+          ...result,
+          answer: appendSourceUrls(revisedAnswer, refusal ? [] : evaluatorCitations),
+          citations: refusal ? [] : evaluatorCitations,
+          refusal,
+          timingsMs: {
+            ...result.timingsMs,
+            total: Date.now() - startedAt,
+          },
+        },
+        evaluation
+      )
+    }
+
+    if (evaluation.verdict.action === 'clarify') {
+      const question =
+        evaluation.verdict.clarificationQuestion ??
+        'Tam olarak hangi bölüm, program veya konu için bilgi almak istiyorsunuz?'
+      return finalizeLlmDiagnostics(
+        {
+          ...result,
+          answer: question,
+          citations: [],
+          refusal: false,
+          timingsMs: {
+            ...result.timingsMs,
+            total: Date.now() - startedAt,
+          },
+        },
+        evaluation
+      )
+    }
+
+    if (evaluation.verdict.action === 'retry' && evaluation.verdict.retryQuery) {
+      return runStrictLlmRetry({
+        baseResult: result,
+        evaluation,
+      })
+    }
+
+    const refusalAnswer =
+      evaluation.verdict.revisedAnswer ||
+      (result.refusal && result.answer.trim() ? result.answer : NO_CLEAR_INFORMATION_ANSWER)
+    return finalizeLlmDiagnostics(
+      {
+        ...result,
+        answer: refusalAnswer,
+        citations: [],
+        refusal: true,
+        timingsMs: {
+          ...result.timingsMs,
+          total: Date.now() - startedAt,
+        },
+      },
+      evaluation
+    )
+  }
+  const runEvidenceSeekingRetry = async (
+    baseResult: RagProviderResult,
+    verdict: StrictAnswerCriticVerdict
+  ): Promise<RagProviderResult | null> => {
+    const strictResearchPlan = buildResearchPlan(null)
+    if (!strictUnderstanding || !strictResearchPlan) return null
+
+    const retryPlan = buildStrictEvidenceRetryPlan({
+      question: input.question,
+      understanding: strictUnderstanding,
+      researchPlan: strictResearchPlan,
+      criticReason: verdict.reason,
+    })
+    if (!retryPlan) return null
+
+    const retryStartedAt = Date.now()
+    const retryRetrieval = await runOpenAiFileSearchQuestion({
+      client: input.client,
+      model: input.model,
+      vectorStoreId: input.vectorStoreId,
+      question: retryPlan.query,
+      maxResults: Math.max(input.maxResults ?? 8, retryPlan.maxResults),
+      maxOutputTokens: input.maxOutputTokens,
+      instructionProfile: input.instructionProfile,
+      extraInstructions:
+        'Use the file_search tool and retrieve direct evidence for the missing answer facet. Ignore adjacent facts that do not answer the original user question.',
+      citationSourcesByFilename: input.citationSourcesByFilename,
+      filters: sourceGroupFilter(plan),
+    })
+    const retryRetrievalMs = Date.now() - retryStartedAt
+    const retryCount = (baseResult.diagnostics?.retryCount ?? 0) + 1
+    recordResearchAttempt({
+      stage: 'evidence_retry',
+      query: retryPlan.query,
+      sourceGroups: retryPlan.sourceGroups,
+      citationCount: retryRetrieval.citations.length,
+      reason: retryPlan.reason,
+    })
+
+    const usageAfterRetryRetrieval = usageWithExtra(baseResult.usage, retryRetrieval.usage)
+    const resultAfterRetryRetrieval = resultWithEvidenceRetryDiagnostics(
+      {
+        ...baseResult,
+        timingsMs: {
+          ...baseResult.timingsMs,
+          total: Date.now() - startedAt,
+          retrieval: (baseResult.timingsMs.retrieval ?? 0) + retryRetrievalMs,
+        },
+        usage: usageAfterRetryRetrieval,
+        diagnostics: {
+          ...baseResult.diagnostics,
+          retryCount,
+        },
+      },
+      retryPlan,
+      'no_evidence'
+    )
+
+    const retryChunks = citationsToChunks(retryRetrieval.citations)
+    if (retryChunks.length === 0) return resultAfterRetryRetrieval
+
+    const retryEvidencePack = buildRagEvidencePack({
+      userMessage: effectiveQuestion,
+      chunks: retryChunks,
+    })
+    if (retryEvidencePack.items.length === 0) return resultAfterRetryRetrieval
+
+    const retryGenerationStartedAt = Date.now()
+    const retryGenerated = await generateGroundedRagAnswer({
+      userMessage: effectiveQuestion,
+      responseLanguage: resolveMvpResponseLanguage(effectiveQuestion),
+      chunks: retryChunks,
+      evidencePack: retryEvidencePack,
+      model: input.answerModel,
+      createCompletion: input.createCompletion,
+      includeEngagement: false,
+      settings: input.settings ?? (
+        input.instructionProfile === 'qualy'
+          ? {
+              bot_name: 'Qualy',
+              prompt:
+                'Use a warm, helpful, concise Qualy assistant voice. Answer only from validated evidence. If evidence is insufficient, return NO_ANSWER.',
+            }
+          : undefined
+      ),
+    })
+    const retryGenerationMs = Date.now() - retryGenerationStartedAt
+    const retryAnswer =
+      retryGenerated.usedGeneration && retryGenerated.answer.trim()
+        ? retryGenerated.answer
+        : cleanAnswer(retryRetrieval.answer)
+    const retryCitations =
+      retryGenerated.usedGeneration && retryGenerated.answer.trim()
+        ? selectedCitations(retryRetrieval.citations, retryGenerated.sourceChunks)
+        : supportingCitationsForAnswer(retryAnswer, retryRetrieval.citations)
+    const retryUsage = usageWithExtra(usageAfterRetryRetrieval, retryGenerated.usage)
+
+    if (
+      !retryAnswer ||
+      rawAnswerLooksLikeRefusal(retryAnswer) ||
+      !isRawAnswerSupported({
+        question: effectiveQuestion,
+        answer: retryAnswer,
+        citations: retryCitations,
+      })
+    ) {
+      return resultWithEvidenceRetryDiagnostics(
+        {
+          ...resultAfterRetryRetrieval,
+          timingsMs: {
+            ...resultAfterRetryRetrieval.timingsMs,
+            total: Date.now() - startedAt,
+            generation:
+              (resultAfterRetryRetrieval.timingsMs.generation ?? 0) + retryGenerationMs,
+          },
+          usage: retryUsage,
+        },
+        retryPlan,
+        'no_supported_answer'
+      )
+    }
+
+    const retryFollowup = buildValidatedFollowup({
+      question: effectiveQuestion,
+      answer: retryAnswer,
+      plan,
+      citations: retryCitations,
+      refusal: false,
+    })
+    const retryGroundedAnswer = retryFollowup
+      ? `${retryAnswer}\n\n${retryFollowup}`
+      : retryAnswer
+    const retryResult = resultWithEvidenceRetryDiagnostics(
+      {
+        provider: 'openai_file_search_validated',
+        answer: appendSourceUrls(retryGroundedAnswer, retryCitations),
+        citations: retryCitations,
+        refusal: false,
+        timingsMs: {
+          total: Date.now() - startedAt,
+          retrieval: (baseResult.timingsMs.retrieval ?? 0) + retryRetrievalMs,
+          generation: (baseResult.timingsMs.generation ?? 0) + retryGenerationMs,
+          validation: baseResult.timingsMs.validation ?? 0,
+        },
+        usage: retryUsage,
+        diagnostics: {
+          ...baseResult.diagnostics,
+          queryIntent: plan.intent,
+          retryCount,
+          followup: retryFollowup || undefined,
+        },
+      },
+      retryPlan,
+      'passed'
+    )
+
+    const retryClaimLedger = buildStrictClaimLedger({
+      question: input.question,
+      understanding: strictUnderstanding,
+      answer: retryResult.answer,
+      citations: retryResult.citations,
+    })
+    const retryCritic = evaluateStrictAnswer({
+      question: input.question,
+      understanding: strictUnderstanding,
+      answer: retryResult.answer,
+      citations: retryResult.citations,
+      claimLedger: retryClaimLedger,
+    })
+
+    if (retryCritic.action === 'pass') {
+      return applyStrictLlmEvaluator(finalize(retryResult, retryCritic.reason, retryClaimLedger))
+    }
+
+    return resultWithEvidenceRetryDiagnostics(retryResult, retryPlan, 'critic_rejected')
+  }
+
+  const finalizeWithCritic = async (result: RagProviderResult): Promise<RagProviderResult> => {
+    if (!strictUnderstanding) return result
+    const claimLedger = buildStrictClaimLedger({
+      question: input.question,
+      understanding: strictUnderstanding,
+      answer: result.answer,
+      citations: result.citations,
+    })
+    const verdict = evaluateStrictAnswer({
+      question: input.question,
+      understanding: strictUnderstanding,
+      answer: result.answer,
+      citations: result.citations,
+      claimLedger,
+    })
+    if (verdict.action === 'pass') {
+      return applyStrictLlmEvaluator(finalize(result, verdict.reason, claimLedger))
+    }
+
+    const retryResult = await runEvidenceSeekingRetry(result, verdict)
+    if (retryResult?.diagnostics?.evidenceRetry?.outcome === 'passed') {
+      return retryResult
+    }
+    const resultForRepair = retryResult ?? result
+    const repairedAnswer = verdict.repairedAnswer ?? NO_CLEAR_INFORMATION_ANSWER
+    const repairedCitations = verdict.repairedCitations ?? []
+    const repairedResult = finalize(
+      {
+        ...resultForRepair,
+        answer: appendSourceUrls(repairedAnswer, repairedCitations),
+        citations: repairedCitations,
+        refusal: verdict.refusal ?? true,
+        timingsMs: {
+          ...resultForRepair.timingsMs,
+          total: Date.now() - startedAt,
+          validation: Math.max(resultForRepair.timingsMs.validation ?? 0, 0),
+        },
+      },
+      verdict.reason,
+      claimLedger
+    )
+    if (verdict.reason === 'contextual_no_info') {
+      return applyStrictLlmEvaluator(repairedResult, result.citations)
+    }
+    return repairedResult
+  }
+
+  if (strictUnderstanding?.safety && strictUnderstanding.safety !== 'none') {
+    return strictDirectResult({
+      startedAt,
+      answer: strictSafetyAnswer(strictUnderstanding.safety),
+      citations: [],
+      refusal: true,
+      strictVerdict: 'unsafe_sensitive_data',
+      normalizedQuestion: effectiveQuestion,
+      researchPlan: researchPlanDiagnostics(null),
+    })
+  }
+
+  const catalogAnswer = strictUnderstanding
+    ? resolveStrictCatalogAnswer({
+        question: input.question,
+        understanding: strictUnderstanding,
+      })
+    : null
+  if (catalogAnswer) {
+    return finalizeCatalog(catalogAnswer)
+  }
+
+  if (plan.intent === 'unsupported_guardrail') {
+    return finalize(guardrailRefusalResult({ startedAt, plan }))
+  }
+  const clarification = plan.clarification ?? buildClarificationGateResult({
+    message: effectiveQuestion,
+    language: resolveMvpResponseLanguage(effectiveQuestion),
+    context: 'education',
+  })
+  if (clarification) {
+    return finalize(clarificationResult({
+      startedAt,
+      queryIntent: plan.intent,
+      clarification,
+    }))
+  }
+
+  async function runStrictLlmRetry(inputRetry: {
+    baseResult: RagProviderResult
+    evaluation: StrictLlmEvaluatorResult
+  }): Promise<RagProviderResult> {
+    const retryQuery = inputRetry.evaluation.verdict.retryQuery?.trim()
+    if (!strictUnderstanding || !retryQuery) {
+      return finalizeLlmDiagnostics(inputRetry.baseResult, inputRetry.evaluation)
+    }
+
+    const retryStartedAt = Date.now()
+    const retryRetrieval = await runOpenAiFileSearchQuestion({
+      client: input.client,
+      model: input.model,
+      vectorStoreId: input.vectorStoreId,
+      question: retryQuery,
+      maxResults: Math.max(input.maxResults ?? 8, 12),
+      maxOutputTokens: input.maxOutputTokens,
+      instructionProfile: input.instructionProfile,
+      extraInstructions:
+        'Use the file_search tool and retrieve stronger evidence for the original user question. Keep any direct answer minimal; Qualy will validate and rewrite from retrieved evidence separately.',
+      citationSourcesByFilename: input.citationSourcesByFilename,
+      filters: sourceGroupFilter(plan),
+    })
+    const retryRetrievalMs = Date.now() - retryStartedAt
+    const retryCount = (inputRetry.baseResult.diagnostics?.retryCount ?? 0) + 1
+    const usageAfterRetryRetrieval = usageWithExtra(
+      inputRetry.baseResult.usage,
+      retryRetrieval.usage
+    )
+
+    const retryChunks = citationsToChunks(retryRetrieval.citations)
+    if (retryChunks.length === 0) {
+      return finalizeLlmDiagnostics(
+        finalize(
+          {
+            ...inputRetry.baseResult,
+            answer: NO_CLEAR_INFORMATION_ANSWER,
+            citations: [],
+            refusal: true,
+            timingsMs: {
+              ...inputRetry.baseResult.timingsMs,
+              total: Date.now() - startedAt,
+              retrieval: (inputRetry.baseResult.timingsMs.retrieval ?? 0) + retryRetrievalMs,
+            },
+            usage: usageAfterRetryRetrieval,
+            diagnostics: {
+              ...inputRetry.baseResult.diagnostics,
+              queryIntent: plan.intent,
+              retryCount,
+            },
+          },
+          'insufficient_answer'
+        ),
+        inputRetry.evaluation
+      )
+    }
+
+    const retryEvidencePack = buildRagEvidencePack({
+      userMessage: effectiveQuestion,
+      chunks: retryChunks,
+    })
+    if (retryEvidencePack.items.length === 0) {
+      return finalizeLlmDiagnostics(
+        finalize(
+          {
+            ...inputRetry.baseResult,
+            answer: NO_CLEAR_INFORMATION_ANSWER,
+            citations: [],
+            refusal: true,
+            timingsMs: {
+              ...inputRetry.baseResult.timingsMs,
+              total: Date.now() - startedAt,
+              retrieval: (inputRetry.baseResult.timingsMs.retrieval ?? 0) + retryRetrievalMs,
+            },
+            usage: usageAfterRetryRetrieval,
+            diagnostics: {
+              ...inputRetry.baseResult.diagnostics,
+              queryIntent: plan.intent,
+              retryCount,
+            },
+          },
+          'insufficient_answer'
+        ),
+        inputRetry.evaluation
+      )
+    }
+
+    const retryGenerationStartedAt = Date.now()
+    const retryGenerated = await generateGroundedRagAnswer({
+      userMessage: effectiveQuestion,
+      responseLanguage: resolveMvpResponseLanguage(effectiveQuestion),
+      chunks: retryChunks,
+      evidencePack: retryEvidencePack,
+      model: input.answerModel,
+      createCompletion: input.createCompletion,
+      includeEngagement: false,
+      settings: input.settings ?? (
+        input.instructionProfile === 'qualy'
+          ? {
+              bot_name: 'Qualy',
+              prompt:
+                'Use a warm, helpful, concise Qualy assistant voice. Answer only from validated evidence. If evidence is insufficient, return NO_ANSWER.',
+            }
+          : undefined
+      ),
+    })
+    const retryGenerationMs = Date.now() - retryGenerationStartedAt
+
+    const retryAnswer =
+      retryGenerated.usedGeneration && retryGenerated.answer.trim()
+        ? retryGenerated.answer
+        : cleanAnswer(retryRetrieval.answer)
+    const retryCitations =
+      retryGenerated.usedGeneration && retryGenerated.answer.trim()
+        ? selectedCitations(retryRetrieval.citations, retryGenerated.sourceChunks)
+        : supportingCitationsForAnswer(retryAnswer, retryRetrieval.citations)
+    const retryUsage = usageWithExtra(usageAfterRetryRetrieval, retryGenerated.usage)
+
+    if (
+      !retryAnswer ||
+      rawAnswerLooksLikeRefusal(retryAnswer) ||
+      !isRawAnswerSupported({
+        question: effectiveQuestion,
+        answer: retryAnswer,
+        citations: retryCitations,
+      })
+    ) {
+      return finalizeLlmDiagnostics(
+        finalize(
+          {
+            ...inputRetry.baseResult,
+            answer: NO_CLEAR_INFORMATION_ANSWER,
+            citations: [],
+            refusal: true,
+            timingsMs: {
+              total: Date.now() - startedAt,
+              retrieval: (inputRetry.baseResult.timingsMs.retrieval ?? 0) + retryRetrievalMs,
+              generation:
+                (inputRetry.baseResult.timingsMs.generation ?? 0) + retryGenerationMs,
+              validation: inputRetry.baseResult.timingsMs.validation ?? 0,
+            },
+            usage: retryUsage,
+            diagnostics: {
+              ...inputRetry.baseResult.diagnostics,
+              queryIntent: plan.intent,
+              retryCount,
+            },
+          },
+          'insufficient_answer'
+        ),
+        inputRetry.evaluation
+      )
+    }
+
+    const retryFollowup = buildValidatedFollowup({
+      question: effectiveQuestion,
+      answer: retryAnswer,
+      plan,
+      citations: retryCitations,
+      refusal: false,
+    })
+    const retryGroundedAnswer = retryFollowup
+      ? `${retryAnswer}\n\n${retryFollowup}`
+      : retryAnswer
+    let retryResult: RagProviderResult = {
+      provider: 'openai_file_search_validated',
+      answer: appendSourceUrls(retryGroundedAnswer, retryCitations),
+      citations: retryCitations,
+      refusal: false,
+      timingsMs: {
+        total: Date.now() - startedAt,
+        retrieval: (inputRetry.baseResult.timingsMs.retrieval ?? 0) + retryRetrievalMs,
+        generation: (inputRetry.baseResult.timingsMs.generation ?? 0) + retryGenerationMs,
+        validation: inputRetry.baseResult.timingsMs.validation ?? 0,
+      },
+      usage: retryUsage,
+      diagnostics: {
+        ...inputRetry.baseResult.diagnostics,
+        queryIntent: plan.intent,
+        retryCount,
+        followup: retryFollowup || undefined,
+      },
+    }
+
+    const retryCritic = evaluateStrictAnswer({
+      question: input.question,
+      understanding: strictUnderstanding,
+      answer: retryResult.answer,
+      citations: retryResult.citations,
+    })
+    if (retryCritic.action !== 'pass') {
+      const repairedAnswer = retryCritic.repairedAnswer ?? NO_CLEAR_INFORMATION_ANSWER
+      const repairedCitations = retryCritic.repairedCitations ?? []
+      retryResult = {
+        ...retryResult,
+        answer: appendSourceUrls(repairedAnswer, repairedCitations),
+        citations: repairedCitations,
+        refusal: retryCritic.refusal ?? true,
+        timingsMs: {
+          ...retryResult.timingsMs,
+          total: Date.now() - startedAt,
+        },
+      }
+    }
+
+    return finalizeLlmDiagnostics(
+      finalize(retryResult, retryCritic.reason),
+      inputRetry.evaluation
+    )
+  }
+
   const firstRetrieval = await runOpenAiFileSearchQuestion({
     client: input.client,
     model: input.model,
     vectorStoreId: input.vectorStoreId,
-    question: input.question,
+    question: effectiveQuestion,
     maxResults: input.maxResults,
     maxOutputTokens: input.maxOutputTokens,
     instructionProfile: input.instructionProfile,
@@ -659,6 +1475,12 @@ export async function runOpenAiFileSearchValidatedQuestion(
       'Use the file_search tool and keep any direct answer minimal; Qualy will validate and rewrite from retrieved evidence separately.',
     citationSourcesByFilename: input.citationSourcesByFilename,
     filters: sourceGroupFilter(plan),
+  })
+  recordResearchAttempt({
+    stage: 'initial_retrieval',
+    query: effectiveQuestion,
+    sourceGroups: plan.sourceGroups,
+    citationCount: firstRetrieval.citations.length,
   })
   const retrievalAttempts = [firstRetrieval]
   let retrieval = firstRetrieval
@@ -693,27 +1515,27 @@ export async function runOpenAiFileSearchValidatedQuestion(
     if (tableFact) {
       retrieval = retrievalWithCombinedUsage(retrieval, retrievalAttempts)
       const retrievalMs = Date.now() - retrievalStartedAt
-      return directValidatedResult({
+      return finalizeWithCritic(directValidatedResult({
         startedAt,
         retrieval,
         retrievalMs,
-        question: input.question,
+        question: effectiveQuestion,
         plan,
         retryCount: retrievalAttempts.length - 1,
         answer: tableFact.answer,
         citations: [tableFact.citation],
-      })
+      }))
     }
   }
 
   let approvedSourceFact = resolveApprovedSourceFact({
-    question: input.question,
+    question: effectiveQuestion,
     plan,
     citations: retrievalAttempts.flatMap((attempt) => attempt.citations),
   })
   const factRetryQuery = approvedSourceFact
     ? undefined
-    : approvedSourceRetryQuery(input.question, plan)
+    : approvedSourceRetryQuery(effectiveQuestion, plan)
   if (factRetryQuery) {
     const retry = await runOpenAiFileSearchQuestion({
       client: input.client,
@@ -731,7 +1553,7 @@ export async function runOpenAiFileSearchValidatedQuestion(
     retrievalAttempts.push(retry)
     retrieval = retry
     approvedSourceFact = resolveApprovedSourceFact({
-      question: input.question,
+      question: effectiveQuestion,
       plan,
       citations: retrievalAttempts.flatMap((attempt) => attempt.citations),
     })
@@ -742,69 +1564,69 @@ export async function runOpenAiFileSearchValidatedQuestion(
   }
   const retrievalMs = Date.now() - retrievalStartedAt
   if (approvedSourceFact) {
-    return directValidatedResult({
+    return finalizeWithCritic(directValidatedResult({
       startedAt,
       retrieval,
       retrievalMs,
-      question: input.question,
+      question: effectiveQuestion,
       plan,
       retryCount: retrievalAttempts.length - 1,
       answer: approvedSourceFact.answer,
       citations: approvedSourceFact.citations,
-    })
+    }))
   }
 
   if (plan.intent === 'document_router') {
     const citations = documentRouterCitations(
-      input.question,
+      effectiveQuestion,
       dedupeCitationsByTitle([
         ...retrieval.citations,
         ...catalogCitations(input.citationSourcesByFilename),
       ])
     )
     if (citations.length > 0) {
-      return directValidatedResult({
+      return finalizeWithCritic(directValidatedResult({
         startedAt,
         retrieval,
         retrievalMs,
-        question: input.question,
+        question: effectiveQuestion,
         plan,
         retryCount: retrievalAttempts.length - 1,
-        answer: documentRouterAnswer(input.question, citations),
+        answer: documentRouterAnswer(effectiveQuestion, citations),
         citations,
-      })
+      }))
     }
   }
 
   const chunks = citationsToChunks(retrieval.citations)
   if (chunks.length === 0) {
-    return refusalResult({
+    return finalizeWithCritic(refusalResult({
       startedAt,
       retrieval,
       retrievalMs,
       plan,
       retryCount: retrievalAttempts.length - 1,
-    })
+    }))
   }
 
   const evidencePack = buildRagEvidencePack({
-    userMessage: input.question,
+    userMessage: effectiveQuestion,
     chunks,
   })
   if (evidencePack.items.length === 0) {
-    return refusalResult({
+    return finalizeWithCritic(refusalResult({
       startedAt,
       retrieval,
       retrievalMs,
       plan,
       retryCount: retrievalAttempts.length - 1,
-    })
+    }))
   }
 
   const generationStartedAt = Date.now()
   const generated = await generateGroundedRagAnswer({
-    userMessage: input.question,
-    responseLanguage: resolveMvpResponseLanguage(input.question),
+    userMessage: effectiveQuestion,
+    responseLanguage: resolveMvpResponseLanguage(effectiveQuestion),
     chunks,
     evidencePack,
     model: input.answerModel,
@@ -824,33 +1646,34 @@ export async function runOpenAiFileSearchValidatedQuestion(
   if (!generated.usedGeneration || !generated.answer.trim()) {
     const rawAnswer = cleanAnswer(retrieval.answer)
     if (rawAnswerLooksLikeRefusal(rawAnswer)) {
-      return refusalResult({
+      return finalizeWithCritic(refusalResult({
         startedAt,
         retrieval,
         retrievalMs,
         generationMs,
         plan,
         retryCount: retrievalAttempts.length - 1,
-      })
+        usage: combinedUsage(retrieval.usage, generated.usage),
+      }))
     }
     if (
       !retrieval.refusal &&
       isRawAnswerSupported({
-        question: input.question,
+        question: effectiveQuestion,
         answer: rawAnswer,
         citations: retrieval.citations,
       })
     ) {
       const citations = supportingCitationsForAnswer(rawAnswer, retrieval.citations)
       const followup = buildValidatedFollowup({
-        question: input.question,
+        question: effectiveQuestion,
         answer: rawAnswer,
         plan,
         citations,
         refusal: false,
       })
       const answer = followup ? `${rawAnswer}\n\n${followup}` : rawAnswer
-      return {
+      return finalizeWithCritic({
         provider: 'openai_file_search_validated',
         answer: appendSourceUrls(answer, citations),
         citations,
@@ -867,21 +1690,23 @@ export async function runOpenAiFileSearchValidatedQuestion(
           retryCount: retrievalAttempts.length - 1,
           followup: followup || undefined,
         },
-      }
+      })
     }
-    return refusalResult({
+    return finalizeWithCritic(refusalResult({
       startedAt,
       retrieval,
       retrievalMs,
       generationMs,
       plan,
       retryCount: retrievalAttempts.length - 1,
-    })
+      citations: strictLlmEvaluatorEnabled ? retrieval.citations : undefined,
+      usage: combinedUsage(retrieval.usage, generated.usage),
+    }))
   }
 
   const citations = selectedCitations(retrieval.citations, generated.sourceChunks)
   const followup = buildValidatedFollowup({
-    question: input.question,
+    question: effectiveQuestion,
     answer: generated.answer,
     plan,
     citations,
@@ -891,7 +1716,7 @@ export async function runOpenAiFileSearchValidatedQuestion(
   const answer = appendSourceUrls(groundedAnswer, citations)
   const usage = combinedUsage(retrieval.usage, generated.usage)
 
-  return {
+  return finalizeWithCritic({
     provider: 'openai_file_search_validated',
     answer,
     citations,
@@ -908,5 +1733,5 @@ export async function runOpenAiFileSearchValidatedQuestion(
       retryCount: retrievalAttempts.length - 1,
       followup: followup || undefined,
     },
-  }
+  })
 }

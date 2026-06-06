@@ -1,3 +1,5 @@
+import { buildPriceClarificationQuestion, shouldAskPriceClarification } from '@/lib/knowledge-base/rag-clarification'
+
 export type BrochureQueryIntent =
   | 'brochure_table_fact'
   | 'brochure_scholarship'
@@ -10,6 +12,7 @@ export type BrochureQueryIntent =
   | 'general_approved_corpus'
 
 export type BrochureGuardrailReason = 'guarantee' | 'future_information'
+export type BrochureClarificationReason = 'missing_price_subject' | 'missing_admissions_profile'
 
 export type BrochureTableField =
   | 'price'
@@ -29,6 +32,10 @@ export type BrochureQueryPlan = {
   sourceGroups: string[]
   retryQuery: string
   guardrailReason?: BrochureGuardrailReason
+  clarification?: {
+    reason: BrochureClarificationReason
+    question: string
+  }
 }
 
 const TURKISH_CHAR_MAP: Record<string, string> = {
@@ -169,12 +176,28 @@ const PROGRAM_GROUPS: Array<{ program: string; aliases: string[]; sourceGroup: s
   },
 ]
 
+const ALL_PROGRAM_FEE_SOURCE_GROUPS = Array.from(
+  new Set(PROGRAM_GROUPS.map((group) => group.sourceGroup))
+)
+
 const FIELD_PATTERNS: Array<{
   field: BrochureTableField
   label: string
   patterns: RegExp[]
 }> = [
-  { field: 'price', label: '2025 Fiyat', patterns: [/\bfiyat/, /\bucret/] },
+  {
+    field: 'price',
+    label: '2025 Fiyat',
+    patterns: [
+      /\bfiyat/,
+      /\bucret/,
+      /\bkac\s+para\b/,
+      /\bkaca\b/,
+      /\bkac\s*tl\b/,
+      /\bne\s+kadar\s+tutar\b/,
+      /\bmaliyet/,
+    ],
+  },
   {
     field: 'quota',
     label: '2025 Kontenjanı',
@@ -219,12 +242,12 @@ function normalize(value: string) {
     .trim()
 }
 
-function detectRequestedFields(question: string) {
+function detectRequestedFields(question: string): BrochureTableField[] {
   const normalized = normalize(question)
   if (/\bsatir/.test(normalized) && /(?:acikla|ozetle|temkinli)/.test(normalized)) {
     return FULL_ROW_FIELDS
   }
-  return FIELD_PATTERNS.flatMap(({ field, patterns }) => {
+  const requestedFields = FIELD_PATTERNS.flatMap(({ field, patterns }) => {
     const positions = patterns
       .map((pattern) => normalized.search(pattern))
       .filter((position) => position >= 0)
@@ -232,6 +255,14 @@ function detectRequestedFields(question: string) {
   })
     .sort((a, b) => a.position - b.position)
     .map(({ field }) => field)
+  if (
+    requestedFields.length === 0 &&
+    /(?:% ?50|\byuzde ?50\b|\bindirimli\s+program\b)/.test(normalized) &&
+    /(?:var mi|varmi|mevcut mu|bulunuyor mu)/.test(normalized)
+  ) {
+    return ['price' satisfies BrochureTableField]
+  }
+  return requestedFields
 }
 
 function detectPrograms(question: string) {
@@ -271,7 +302,10 @@ function isCampusQuestion(question: string) {
 }
 
 function isContactQuestion(question: string) {
-  return /(?:telefon|iletişim|iletisim|e-?posta|email|ulaşım|ulasim|konaklama|yurt)/i.test(question)
+  const normalized = normalize(question)
+  return /(?:telefon|iletisim|e-?posta|email|ulasim|konaklama|(?:^|\s)yurt(?:lar|lari|larin|u|un|larda|lardan)?(?:\s|$))/i.test(
+    normalized
+  )
 }
 
 function isDocumentRouterQuestion(question: string) {
@@ -326,16 +360,37 @@ function detectGuardrailReason(question: string): BrochureGuardrailReason | unde
   return undefined
 }
 
+function admissionChanceClarification(question: string, programs: string[]): BrochureQueryPlan['clarification'] {
+  const normalized = normalize(question)
+  const asksAdmissionChance =
+    /(?:puan|siralama|siralamam|puanim|bu siralamayla|bu puanla).{0,80}(?:kazan|yerles|girer miyim|gelir mi)/.test(
+      normalized
+    )
+  const hasConcreteScoreOrRank = /\b\d{2,}(?:[.,]\d+)*\b/.test(normalized)
+  if (!asksAdmissionChance || (programs.length > 0 && hasConcreteScoreOrRank)) return undefined
+
+  return {
+    reason: 'missing_admissions_profile',
+    question:
+      'Hangi program için değerlendirme yapmak istiyorsunuz? Puanınızı veya başarı sıralamanızı da yazarsanız broşürdeki taban puan ve başarı sırası bilgileriyle karşılaştırabilirim.',
+  }
+}
+
 function buildRetryQuery(input: {
   question: string
   programs: string[]
   variants: string[]
   requestedFields: BrochureTableField[]
 }) {
-  if (input.programs.length === 0 || input.requestedFields.length === 0) return input.question
+  if (input.requestedFields.length === 0) return input.question
   const fieldLabels = input.requestedFields.map(
     (field) => FIELD_PATTERNS.find((candidate) => candidate.field === field)?.label ?? field
   )
+  if (input.programs.length === 0) {
+    return [...fieldLabels, 'tüm programlar', 'doğrulanmış tanıtım broşürü tablo satırı']
+      .filter(Boolean)
+      .join(' | ')
+  }
   return [
     ...input.programs,
     ...input.variants,
@@ -352,12 +407,28 @@ export function planBrochureQuery(question: string): BrochureQueryPlan {
   const programs = programMatches.map((match) => match.program)
   const variants = detectVariants(question)
   const guardrailReason = detectGuardrailReason(question)
+  const clarification = admissionChanceClarification(question, programs) ?? (requestedFields.includes('price')
+    && programs.length === 0
+    && shouldAskPriceClarification(question)
+    ? {
+        reason: 'missing_price_subject' as const,
+        question: buildPriceClarificationQuestion('tr', 'education'),
+      }
+    : undefined)
 
   let intent: BrochureQueryIntent = 'general_approved_corpus'
   let sourceGroups: string[] = []
+  const broadTableQuestion =
+    programs.length === 0 &&
+    requestedFields.some((field) => field === 'base_score' || field === 'success_rank')
 
   if (guardrailReason) {
     intent = 'unsupported_guardrail'
+  } else if (clarification) {
+    intent = 'general_approved_corpus'
+  } else if (broadTableQuestion) {
+    intent = 'brochure_table_fact'
+    sourceGroups = ALL_PROGRAM_FEE_SOURCE_GROUPS
   } else if (requestedFields.length > 0 && programMatches.length > 0) {
     intent = 'brochure_table_fact'
     sourceGroups = Array.from(new Set(programMatches.map((match) => match.sourceGroup)))
@@ -398,6 +469,7 @@ export function planBrochureQuery(question: string): BrochureQueryPlan {
     requestedFields,
     sourceGroups,
     guardrailReason,
+    clarification,
     retryQuery:
       intent === 'website_admissions'
         ? WEBSITE_ADMISSIONS_RETRY_QUERY

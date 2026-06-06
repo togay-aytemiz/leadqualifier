@@ -20,6 +20,7 @@ import {
 import { resolveMvpResponseLanguage, type MvpResponseLanguage } from '@/lib/ai/language'
 import { applyLiveAssistantResponseGuards } from '@/lib/ai/response-guards'
 import { withAiTimeout } from '@/lib/ai/deadline'
+import { buildClarificationGateResult } from '@/lib/knowledge-base/rag-clarification'
 import {
     buildConversationContinuityGuidance,
     type ConversationHistoryTurn,
@@ -106,6 +107,22 @@ function renderStrictFallback(
     const languageDefault = language === 'tr'
         ? DEFAULT_STRICT_FALLBACK_TEXT
         : DEFAULT_STRICT_FALLBACK_TEXT_EN
+    const clarification = buildClarificationGateResult({
+        message: userMessage,
+        language
+    })
+    if (clarification) {
+        return applyLiveAssistantResponseGuards({
+            response: clarification.question,
+            userMessage,
+            responseLanguage: language,
+            recentAssistantMessages: [],
+            blockedReaskFields: intakeAnalysis?.blockedReaskFields ?? [],
+            suppressIntakeQuestions: intakeAnalysis?.suppressIntakeQuestions ?? false,
+            noProgressLoopBreak: intakeAnalysis?.noProgressStreak ?? false
+        })
+    }
+
     const fallbackText = text?.trim() || languageDefault
     const fallbackTopics = topics.length > 0
         ? formatTopicList(topics)
