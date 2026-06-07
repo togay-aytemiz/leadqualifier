@@ -1285,6 +1285,420 @@ Outcome:
 - The LLM repair loop is now bounded by deterministic safety: speculative repair language such as `genellikle ücretli olabilir` is not accepted when supporting evidence is missing.
 - This smoke does not change the full 508-question distribution yet; it is a targeted quality signal for the service/transport failure class before a larger post-v2 rerun.
 
+### Current-7 Broad Rerun After Retry + Blackboard
+
+Run ID: `2026-06-06T14-46-39-844Z`
+
+Artifact: `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-06T14-46-39-844Z.json`
+
+Scope: all `173` answers that were in the current `7/10` band after the merged strict retests.
+
+Automated rerun result before manual post-audit patching:
+
+| Result score | Count |
+|---:|---:|
+| 6 | 1 |
+| 7 | 161 |
+| 8 | 8 |
+| 9 | 3 |
+
+Usage:
+
+| Metric | Value |
+|---|---:|
+| Estimated credits | `315.10` |
+| Average credits / question | `1.82` |
+| Input tokens | `771,743` |
+| Output tokens | `40,084` |
+| Total tokens | `811,827` |
+| File Search tool calls | `95` |
+
+Routing and evaluator signal:
+
+| Signal | Count |
+|---|---:|
+| No strict LLM evaluator action | 100 |
+| Strict LLM pass | 27 |
+| Strict LLM repair | 27 |
+| Strict LLM refuse | 19 |
+| Evidence retry not needed | 162 |
+| Evidence retry passed | 4 |
+| Evidence retry critic-rejected | 4 |
+| Evidence retry no-supported-answer | 3 |
+
+Top strict verdicts:
+
+| Verdict | Count |
+|---|---:|
+| `supported` | 38 |
+| `contextual_no_info` | 37 |
+| `catalog_facility_resource_scope_guard` | 13 |
+| `catalog_campus_life_scope_guard` | 12 |
+| `catalog_clinical_program_clarification` | 12 |
+| `catalog_clinical_program_scope_guard` | 12 |
+| `catalog_housing_scope_guard` | 10 |
+| `catalog_registration_scope_guard` | 10 |
+| `catalog_professional_authority_scope_guard` | 7 |
+| `unsupported_institutional_claim` | 7 |
+
+Manual audit of the non-7 results found five useful post-audit fixes:
+
+| ID | Question | Automated score | Post-audit score | Decision |
+|---:|---|---:|---:|---|
+| 157 | En kolay iş bulan bölüm hangisi? | 9 | 7 | Career comparison now routes to `catalog_professional_authority_scope_guard`; no invented "easiest job" program. |
+| 188 | Hastaneye hangi sınıfta geçiliyor? | 6 | 7 | Broad hospital-start timing now asks a clarification question: "Hangi bölüm veya program..." |
+| 423 | özel hastane vaka az olmaz mı | 9 | 8 | Private-hospital case-volume concern now routes to `catalog_hospital_scope_guard`; no unsupported "sufficient case variety" claim. |
+| 479 | Ücreti kriptoyla ödeyebilir miyim? | 8 | 7 | Crypto payment now stays a direct payment-method boundary unless evidence explicitly supports the claim. |
+| 497 | TYT matematik çalıştırır mısın? | 9 | 8 | Off-topic tutoring request now exits before retrieval and offers only in-scope university topics. |
+
+Post-audit targeted artifact: `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-06T15-04-35-725Z.json`
+
+Projected effective distribution after the deterministic post-audit fixes:
+
+| Score /10 | Count |
+|---:|---:|
+| 6 | 0 |
+| 7 | 164 |
+| 8 | 9 |
+| 9 | 0 |
+
+Interpretation:
+
+- The retry + blackboard layer improved observability and caught several evidence gaps, but the larger quality lift came from making the critic more Codex-like: second-pass validation of LLM repairs, off-topic direct guards, career/outcome scope guards, and clinical/hospital comparison boundaries.
+- The new broad result is intentionally conservative. Most current-7 questions remain `7` because the answer is safe and meeting-room usable, but not strongly grounded enough for `8-9`.
+- The post-audit patch removes the last observed `5-6` residue in this current-7 slice and prevents the most concerning `9` over-promotions from LLM repair variance.
+
+### Supported-7 Direct Fact Promotion Smoke
+
+Run ID: `2026-06-07T10-46-58-927Z`
+
+Artifacts:
+
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T10-46-58-927Z.json`
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T10-46-58-927Z.md`
+
+Scope: `14` targeted questions from the remaining 7-lift buckets: institution/campus location, affiliated hospital terminology, agreement dormitory facts, library/study-area/student-community facts, and double-major policy facts.
+
+| Metric | Result |
+|---|---:|
+| Retested questions | `14` |
+| Improved vs original table score | `12/14` |
+| Average before | `4.36/10` |
+| Average after | `8.00/10` |
+| Result score 8 | `14` |
+| LLM/File Search calls needed | `0` |
+
+Promoted direct-fact classes:
+
+| New strict verdict | Target examples | Result |
+|---|---|---:|
+| `catalog_institution_location_fact` | `Üniversiteniz Ankara’da mı?`, `baglıca nerde` | 8 |
+| `catalog_affiliated_hospital_definition_fact` | `Afiliye hastane ne demek?` | 8 |
+| `catalog_housing_agreement_fact` | `Üniversitenin anlaşmalı yurdu var mı?` | 8 |
+| `catalog_campus_life_fact` | `Kütüphane var mı?`, `Ders çalışma alanları var mı?`, `Sağlık kulüpleri var mı?` | 8 |
+| `catalog_double_major_fact` | `Hangi programlar arasında çift anadal var?`, pair-specific ÇAP questions, second diploma, Tıp boundary | 8 |
+
+Projected effect on the previous current-7 broad slice:
+
+| Score /10 | Previous projected count | After this targeted direct-fact pass |
+|---:|---:|---:|
+| 6 | 0 | 0 |
+| 7 | 164 | 152 |
+| 8 | 9 | 21 |
+| 9 | 0 | 0 |
+
+Interpretation:
+
+- This pass intentionally raised only facts that are directly supported and reusable as a global pattern: `location`, `terminology definition`, `agreement list`, `campus-life fact`, and `policy-pair fact`.
+- The answers are zero-token deterministic catalog answers, so they improve speed and cost while reducing LLM variance.
+- The Tıp ÇAP case now refuses the unsupported scope precisely: the brochure lists ön lisans ÇAP programs, but Tıp Fakültesi is not in that list.
+
+### Actionable No-Info Boundary Smoke
+
+Run IDs:
+
+- `2026-06-07T16-13-08-678Z`
+- `2026-06-07T16-19-36-077Z`
+- `2026-06-07T16-22-50-019Z`
+
+Artifacts:
+
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T16-13-08-678Z.json`
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T16-13-08-678Z.md`
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T16-19-36-077Z.json`
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T16-19-36-077Z.md`
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T16-22-50-019Z.json`
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T16-22-50-019Z.md`
+
+Scope: `83` targeted questions from remaining low/mid-score and current-7 lift buckets where the system should avoid bare "document has no clear information" copy and instead return a category-specific, decision-useful boundary.
+
+| Metric | Result |
+|---|---:|
+| Retested questions | `83` |
+| Improved vs original table score | `65/83` |
+| Average before | `5.72/10` |
+| Average after | `7.89/10` |
+| Result score 6 | `2` |
+| Result score 7 | `11` |
+| Result score 8 | `64` |
+| Result score 9 | `6` |
+
+Follow-up mini-smokes:
+
+| Scope | Result |
+|---|---:|
+| Leftover clinical/professional/registration/facet subset | `7/8` improved, average `5.25 -> 7.875`, `7` questions at `8`, `1` at `7` |
+| `#220 Hastaneye toplu taşıma ile gidiliyor mu?` after hospital-transport scope guard | `5 -> 8` |
+
+What changed:
+
+- Bare no-information replies are now repaired into actionable boundaries for finance/payment, scholarship, campus/service, clinical/staj/lab, registration/process, credential/outcome, and contact-style prompts.
+- The scorer promotes only actionable safe boundaries to `8`; bare no-info remains weaker.
+- Hospital transport/proximity prompts now route to `catalog_hospital_scope_guard` instead of passing adjacent campus/transport evidence as if it proved hospital access.
+- This is a global pattern rather than a YİÜ-only shortcut: the boundary states what is known, what is missing, and which official facet must be verified before a decision.
+
+### Current-7 Full Rerun After Actionable Boundaries
+
+Run IDs:
+
+- Main current-7 run: `2026-06-07T17-55-28-333Z`
+- Final patch-smoke for over/under-promoted edge cases: `2026-06-07T18-07-14-626Z`
+
+Artifacts:
+
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T17-55-28-333Z.json`
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T17-55-28-333Z.md`
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T18-07-14-626Z.json`
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T18-07-14-626Z.md`
+
+Scope: all `108` questions that were still in the current `7/10` band after the direct-fact and actionable no-info targeted passes.
+
+Current-baseline result:
+
+| Result score | Count | Share |
+|---:|---:|---:|
+| 7 | 50 | 46.3% |
+| 8 | 58 | 53.7% |
+| 9 | 0 | 0.0% |
+
+Full 508-question effective distribution after this rerun:
+
+| Score /10 | Count |
+|---:|---:|
+| 1 | 0 |
+| 2 | 0 |
+| 3 | 0 |
+| 4 | 0 |
+| 5 | 0 |
+| 6 | 0 |
+| 7 | 50 |
+| 8 | 398 |
+| 9 | 60 |
+| 10 | 0 |
+
+Usage for the main 108-question run:
+
+| Metric | Value |
+|---|---:|
+| Estimated credits | `145.10` |
+| Average credits / question | `1.34` |
+| Input tokens | `351,496` |
+| Output tokens | `19,639` |
+| Total tokens | `371,135` |
+| File Search tool calls | `0` |
+
+Routing signal:
+
+| Signal | Count |
+|---|---:|
+| No strict LLM evaluator action | 83 |
+| Strict LLM pass | 12 |
+| Strict LLM repair | 7 |
+| Strict LLM refuse | 6 |
+| Evidence retry needed | 0 |
+
+Remaining `50` score-7 answers by category:
+
+| Category | Count |
+|---|---:|
+| Clinical or internship | 12 |
+| General / boundary | 11 |
+| Catalog or policy | 10 |
+| Finance / burs / payment | 6 |
+| Campus life / housing / facilities | 6 |
+| Admissions | 4 |
+| Credential or outcome | 1 |
+
+Top remaining score-7 verdicts:
+
+| Verdict | Count | Interpretation |
+|---|---:|---|
+| `supported` | 18 | Answers are grounded but still shallow, broad, or not complete enough for `8-9`. |
+| `catalog_clinical_program_clarification` | 13 | Correct clarification, but unresolved until the user names the program. |
+| `catalog_candidate_event_scope_guard` | 6 | Safe event/tanıtım/lab-visit boundary; needs approved current event facts to go higher. |
+| `contextual_no_info` | 5 | Still safe but not actionable enough; good next target for template expansion. |
+| `catalog_reputation_scope_guard` | 3 | Correct subjective/reputation boundary. |
+| `catalog_housing_link_fact` | 2 | Has official yurt page link but not enough detail for `8-9`. |
+
+Edge-case patch-smoke:
+
+| ID | Question | Before patch-smoke | After patch-smoke | Decision |
+|---:|---|---:|---:|---|
+| 389 | WhatsApp danışma hattı var mı? | 9 | 8 | Prevents adjacent WhatsApp group evidence from proving an unsupported advisory line. |
+| 503 | ChatGPT misin? | 6 | 8 | Bot identity questions now answer directly as Qualy AI instead of returning document no-info. |
+
+Interpretation:
+
+- The actionable no-info boundary layer produced a large real lift: current `7` count fell from `108` to `50`.
+- The new full-table distribution is now `50` x `7`, `398` x `8`, and `60` x `9`; there are still `0` questions below `7`.
+- The remaining `7`s are no longer mostly generic no-info. The biggest remaining buckets are supported-but-shallow answers and correct clarifications that need either better structured facts or a richer clarification UX.
+
+### Finance / Burs / Ücret Direct-Fact Pass
+
+Run ID:
+
+- `2026-06-07T18-41-13-542Z`
+
+Artifacts:
+
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T18-41-13-542Z.json`
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T18-41-13-542Z.md`
+
+Scope: the current-7 finance/burs/ücret edge cases plus `Staj ücretli mi?`, which is a clinical clarification despite matching the finance keyword.
+
+| Metric | Result |
+|---|---:|
+| Retested questions | `6` |
+| Improved vs original table score | `6/6` |
+| Current-7 answers moved to 8 | `5/6` |
+| Average before | `3.33/10` |
+| Average after | `7.83/10` |
+| Result score 7 | `1` |
+| Result score 8 | `5` |
+
+Direct verdicts added:
+
+| New strict verdict | Target examples | Result |
+|---|---|---:|
+| `catalog_scholarship_fact` | `Burslu öğrenciler ücret ödüyor mu?`, `İlk 1000’e girene burs var mı?` | 8 |
+| `catalog_scholarship_scope_guard` | `Tercih bursu tüm bölümlerde geçerli mi?`, `Tercih bursu ücretli programlarda mı geçerli?` | 8 |
+| `catalog_program_fee_fact` | `ilkyardım ücret` | 8 |
+
+Effective full-table distribution after this pass:
+
+| Score /10 | Previous count | New effective count |
+|---:|---:|---:|
+| 7 | 50 | 45 |
+| 8 | 398 | 403 |
+| 9 | 60 | 60 |
+
+Interpretation:
+
+- The burs resolver now separates `Burslu` quota rows from preference/academic discount bursaries, avoiding the previous answer that incorrectly mixed quota scholarship with partial-discount burs rules.
+- Preference-scholarship scope questions now give the supported rates (`%10`, `%7`, `%5`) but refuse unsupported scope claims such as "all programs" or "paid programs" unless the source explicitly says so.
+- `İlk ve Acil Yardım` shorthand fee questions now answer from the strict fee catalog with the paid and `%50` prices, instead of phrasing `Burslu` as a missing price field.
+- `Staj ücretli mi?` remained `7` in this finance-only pass because it needed clinical/staj policy handling; the later clinical/staj/lab pass below moves it to `8`.
+
+### Clinical / Staj / Lab Direct-Fact Pass
+
+Run ID:
+
+- `2026-06-07T20-27-42-713Z`
+
+Artifacts:
+
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T20-27-42-713Z.json`
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T20-27-42-713Z.md`
+
+Scope: the remaining current-7 clinical/staj/lab-like questions, including broad staj policy, Tıp clinical timing/location, Ergoterapi staj/lab facts, broad active-practice boundaries, affiliated-hospital shorthand, and lab-visit candidate-event boundaries.
+
+| Metric | Result |
+|---|---:|
+| Retested questions | `18` |
+| Current-7 answers moved to 8 | `18/18` |
+| Average before | `4.56/10` |
+| Average after | `8.00/10` |
+| Result score 8 | `18` |
+
+Direct verdicts added or expanded:
+
+| Strict verdict | Target examples | Result |
+|---|---|---:|
+| `catalog_clinical_training_fact` | `Hastaneye hangi sınıfta geçiliyor?`, `Sağlık bölümü öğrencileri uygulama eğitimini nerede yapıyor?` | 8 |
+| `catalog_internship_policy_fact` | `Staj kaç gün sürüyor?`, `Staj ücretli mi?`, `Staj yeri garantisi veriyor musunuz?`, `Mezuniyet için zorunlu uygulama var mı?` | 8 |
+| `catalog_ergotherapy_training_fact` | `Hangi bölümlerde yaz stajı var?`, `Yaz stajı zorunlu mu?` | 8 |
+| `catalog_clinical_practice_scope_guard` | `Öğrenciler sadece gözlem mi yapıyor?`, `Stajda hasta bakımı yapıyor muyuz?` | 8 |
+| `catalog_hospital_scope_guard` | `afiliye nerde` | 8 |
+| `catalog_candidate_event_scope_guard` | `Laboratuvarları gezebilir miyiz?`, `Tanıtım gününde laboratuvarları görebilir miyim?` | 8 |
+
+Effective full-table distribution after this pass:
+
+| Score /10 | Previous count | New effective count |
+|---:|---:|---:|
+| 7 | 45 | 27 |
+| 8 | 403 | 421 |
+| 9 | 60 | 60 |
+
+Interpretation:
+
+- Broad staj questions now use the Uygulamalı Eğitimler Yönergesi instead of asking only a bare clarification: duration is tied to the `20 iş günü` minimum and `5-10 AKTS` range, payment references `3308` and Tıp intörnlük references `2547 ek 29`.
+- Tıp clinical progression now answers Dönem IV/V clinical staj and Dönem VI intörnlük directly, while other health programs still require program-specific confirmation.
+- Ergoterapi now has a structured supported fact for 2nd/3rd-year summer staj, 4th-year clinical practice, and listed lab areas. The answer avoids claiming the same staj scope for all departments.
+- Broad active-practice questions now refuse one-size-fits-all claims about "only observation" or active patient care, but give the exact facet that must be verified.
+- Lab-visit/tanıtım-day questions now return an actionable event boundary instead of a bare no-info answer.
+
+### Finance / Payment Policy + Admissions / Tercih Decision Catalog Pass
+
+Run ID:
+
+- `2026-06-07T20-45-20-343Z`
+
+Artifacts:
+
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T20-45-20-343Z.json`
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-07T20-45-20-343Z.md`
+
+Scope: a broader finance/payment/admissions target set covering 2025 program fees, shorthand fee questions, payment-policy edge cases, sensitive payment boundaries, broad taban-puan / başarı-sırası prompts, point-type listings, and personalized tercih/placement-decision prompts.
+
+| Metric | Result |
+|---|---:|
+| Retested questions | `56` |
+| Improved vs original table score | `26/56` |
+| Average before | `6.32/10` |
+| Average after | `8.05/10` |
+| Result score 8 | `53` |
+| Result score 9 | `3` |
+| Result below 8 | `0` |
+
+Direct verdicts added or expanded:
+
+| Strict verdict | Target examples | Result |
+|---|---|---:|
+| `catalog_program_fee_fact` | `2025 ücretleri nedir?`, `Türkçe Tıp ücreti ne kadar?`, `dkt kaç tl`, `grafik tasarım kaç para` | 8 |
+| `catalog_payment_policy_scope_guard` | `Ücretler peşin mi ödeniyor?`, `Ücretlere KDV dahil mi?`, `Bana IBAN gönderebilir misin?`, `Web sitesindeki ücretle broşürdeki ücret farklıysa hangisi geçerli?` | 8 |
+| `unsafe_sensitive_data` | `Kredi kartı bilgilerimi buraya yazsam ödeme yapabilir miyim?`, `Kredi kartımı yazsam ödeme alır mısın?` | 9 |
+| `catalog_admissions_metric_scope_guard` | `Taban puanlar nedir?`, `Başarı sıralamaları nedir?` | 8 |
+| `catalog_admissions_decision_guard` | `Puanım şu, kazanır mıyım?`, `Bu sıralamayla kesin girer miyim?`, `Geçen yılki sıralamayla bu yıl yerleşebilir miyim?`, `Bana tercih listesi hazırlar mısın?` | 8 |
+| `catalog_admissions_point_type_fact` | `TYT puanıyla sağlık alanında hangi programları tercih edebilirim?`, `SAY puan türüyle hangi bölümler var?`, `EA puan türüyle bölümünüz var mı?`, `say bölümleri` | 8 |
+
+Current-7 impact from the previously documented effective band:
+
+| ID | Question | New verdict | New score |
+|---:|---|---|---:|
+| 142 | Taban puanlar nedir? | `catalog_admissions_metric_scope_guard` | 8 |
+| 143 | Başarı sıralamaları nedir? | `catalog_admissions_metric_scope_guard` | 8 |
+| 146 | Puanım şu, kazanır mıyım? | `catalog_admissions_decision_guard` | 8 |
+| 148 | Geçen yılki sıralamayla bu yıl yerleşebilir miyim? | `catalog_admissions_decision_guard` | 8 |
+| 455 | say bölümleri | `catalog_admissions_point_type_fact` | 8 |
+
+Interpretation:
+
+- Broad program-fee questions no longer drift into unrelated fee pages such as yaz okulu, yatay geçiş, kimlik kartı, or payment calendar details. The catalog gives a compact 2025 fee overview and asks for the program for an exact row.
+- Payment policy questions now refuse unsupported KDV, taksit, peşin/online payment, IBAN, source-conflict, and 2026 fee claims with an actionable official-channel boundary.
+- Card-number/card-data entry remains a safety answer before retrieval, while ordinary `kredi kartına taksit` questions stay in payment-policy scope instead of being misclassified as sensitive-card-data.
+- Admissions decision prompts now avoid both extremes: they do not say "dokümanda yok" and they do not promise placement. They explain how taban puan, başarı sırası, kontenjan, puan türü, and burs/indirim row can be compared, but no kesin kazanma / yerleşme guarantee is given.
+- Point-type questions now answer from structured admissions facts instead of relying on broad retrieval.
+
 ### Recommended Next 7->8/9 Work
 
 1. **Facet-aware critic and answer contract**
@@ -1293,8 +1707,8 @@ Outcome:
 2. **Housing and campus-life fact catalog**
    Add approved facts for yurt options, yurt application, food/cafeteria, Wi-Fi, study areas, clubs, events, campus services, and transport if the customer can approve sources. This can move many `campus_life:safe_no_info` answers from `7` to `8-9`.
 
-3. **Clinical/staj/lab structured facts**
-   Add program-specific facts for clinical placement, application labs, device/simulation availability, staj timing, staj responsibility, and hospital practice scope. This is the largest high-risk area after fees/program lists.
+3. **Deeper clinical/staj/lab facts**
+   The first clinical/staj/lab catalog now covers the broad high-risk prompts. The next lift would be program-by-program approved facts for Hemşirelik, Ebelik, Anestezi, İlk ve Acil Yardım, Tıbbi Laboratuvar, and Tıbbi Görüntüleme practice/lab/staj details if the customer approves those sources.
 
 4. **Policy/outcome boundary catalog**
    Add deterministic guards or facts for ÇAP/DGS/yatay geçiş, akreditasyon, YÖK recognition/denklik, KPSS/atama, and job-guarantee questions. These reduce `supported / pass` cases where the LLM currently accepts adjacent evidence too generously.

@@ -59,7 +59,7 @@ const ACADEMIC_ENTITY_PATTERNS = [
 ]
 
 const FACILITY_RESOURCE_PATTERN =
-  /(?:laboratuvar(?:i|lari)?|lab(?:oratuvar)?|mikroskop|kadavra|maket|simulasyon|beceri|cihaz|rontgen|tomografi|\bmr\b|dogumhane|yogun bakim|ameliyathane|ogrenci dinlenme alani)/u
+  /(?:laboratuvar(?:i|lari)?|\blab(?:oratuvar)?\b|mikroskop|kadavra|maket|simulasyon|beceri|cihaz|rontgen|tomografi|\bmr\b|dogumhane|yogun bakim|ameliyathane|ogrenci dinlenme alani)/u
 
 const CLINICAL_PRACTICE_PATTERN =
   /(?:staj|klinik|hastane|hasta basi|hasta bakimi|uygulama|vaka|nobet|ambulans|ameliyat izle|laboratuvara gir|cihaz kullan)/u
@@ -67,7 +67,8 @@ const CLINICAL_PRACTICE_PATTERN =
 const TRANSPORT_PATTERN =
   /(?:servis|ulasim|guzergah|metro|otobus|dolmus|toplu tasima|nasil gid|kampuse yakin|mesafe)/u
 
-const PAYMENT_METHOD_PATTERN = /(?:kripto|iban|kredi kart|online ode|taksit|pesin|odeme kanali|odeme yontemi)/u
+const PAYMENT_METHOD_PATTERN =
+  /(?:kripto|iban|kredi kart|online ode|taksit|pesin|odeme kanali|odeme yontemi)/u
 
 const PAYMENT_POLICY_PATTERN = /(?:kdv|ucret|fiyat|iade|hazirlik.*ucret|ucret.*art|kesin mi)/u
 
@@ -76,7 +77,8 @@ const SCHOLARSHIP_POLICY_PATTERN =
 
 const CREDENTIAL_PATTERN = /(?:diploma|denklik|yok|akredit|mavi diploma|kpss|atanabilir|taniniyor)/u
 
-const REGISTRATION_PATTERN = /(?:kayit|belge|e devlet|e-devlet|randevu|basvuru|tarih|saat|dgs|cap|cift anadal|yatay gecis|devamsizlik|hazirlik)/u
+const REGISTRATION_PATTERN =
+  /(?:kayit|belge|e devlet|e-devlet|randevu|basvuru|tarih|saat|dgs|cap|cift anadal|yatay gecis|devamsizlik|hazirlik)/u
 
 const HOUSING_PATTERN = /(?:yurt|konaklama|kyk|apart|kiralik ev)/u
 
@@ -84,7 +86,7 @@ const CAMPUS_LIFE_PATTERN =
   /(?:wifi|wi fi|kafe|kantin|yemek|yemekhane|spor salonu|kutuphane|ders calisma|kulup|etkinlik|guvenlik|revir|otopark|kampus yasam|vejetaryen)/u
 
 const PROFESSIONAL_AUTHORITY_PATTERN =
-  /(?:eczaci olur|eczane ac|gozlukcu ac|optik ac|ambulans kullan|doktor der|hacker olur|is garantisi|direkt hastaneye|dogrudan is bul|en zengin)/u
+  /(?:eczaci olur|eczane ac|gozlukcu ac|optik ac|ambulans kullan|doktor der|hacker olur|is garantisi|direkt hastaneye|dogrudan is bul|is bul|is imkani|is olanagi|en kolay is|en kolay bolum|en zor bolum|en cok maas|maas|en zengin)/u
 
 const REPUTATION_PATTERN = /(?:rakip|kotu yorum|eksileri|en kotu|kiyas|olumsuz yorum|dezavantaj)/u
 
@@ -176,7 +178,8 @@ function textHasFacetTerms(
   if (facet === 'campus_life') return CAMPUS_LIFE_PATTERN.test(normalized)
   if (facet === 'professional_authority') return PROFESSIONAL_AUTHORITY_PATTERN.test(normalized)
   if (facet === 'reputation') return REPUTATION_PATTERN.test(normalized)
-  if (facet === 'program_listing') return understanding.entities.length > 0 || /(?:program|bolum|fakulte|liste)/.test(normalized)
+  if (facet === 'program_listing')
+    return understanding.entities.length > 0 || /(?:program|bolum|fakulte|liste)/.test(normalized)
   if (facet === 'program_existence') {
     return understanding.entities.some((entity) =>
       normalized.includes(normalizeStrictQuestionSearch(entity.canonicalName))
@@ -184,8 +187,10 @@ function textHasFacetTerms(
   }
   if (facet === 'fee_amount') return /(?:ucret|fiyat|tl|\d)/.test(normalized)
   if (facet === 'quota') return /(?:kontenjan|\d)/.test(normalized)
-  if (facet === 'location') return /(?:kampus|yerleske|adres|ankara|baglica|balgat|baglum|100 yil)/.test(normalized)
-  if (facet === 'safety') return /(?:yazmayin|paylasmayin|yardimci olamam|resmi kanal|guvenli)/.test(normalized)
+  if (facet === 'location')
+    return /(?:kampus|yerleske|adres|ankara|baglica|balgat|baglum|100 yil)/.test(normalized)
+  if (facet === 'safety')
+    return /(?:yazmayin|paylasmayin|yardimci olamam|resmi kanal|guvenli)/.test(normalized)
   return true
 }
 

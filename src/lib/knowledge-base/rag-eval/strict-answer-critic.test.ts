@@ -77,7 +77,8 @@ describe('evaluateStrictAnswer', () => {
         {
           providerSourceId: 'brochure-07-campus-program-map.md',
           title: 'YİÜ Tanıtım Broşürü - Program ve Yerleşke Eşleşmeleri',
-          quote: '### Tıp Fakültesi\nProgramlar:\n- Tıp Fakültesi (Türkçe)\n- Tıp Fakültesi (İngilizce)',
+          quote:
+            '### Tıp Fakültesi\nProgramlar:\n- Tıp Fakültesi (Türkçe)\n- Tıp Fakültesi (İngilizce)',
         },
       ],
     })
@@ -96,12 +97,59 @@ describe('evaluateStrictAnswer', () => {
 
     expect(verdict).toMatchObject({
       action: 'repair',
-      reason: 'contextual_no_info',
+      reason: 'actionable_no_info',
       refusal: true,
     })
     expect(verdict.repairedAnswer).toContain('Öğrenci işleri telefon numarası')
     expect(verdict.repairedAnswer).toContain('onaylı kaynaklarda net bilgi bulunmamaktadır')
     expect(verdict.repairedAnswer).toContain('resmi iletişim kanallarını')
+    expect(verdict.repairedAnswer).toContain('hangi birim')
+  })
+
+  it('adds decision criteria to clinical, housing, registration, and credential no-info boundaries', () => {
+    const clinical = critic(
+      'Ebelik öğrencileri uygulamaya ne zaman başlıyor?',
+      'Yüklenen belgelerde bu konuda net bir bilgi bulunmamaktadır.'
+    )
+    expect(clinical).toMatchObject({
+      action: 'repair',
+      reason: 'actionable_no_info',
+    })
+    expect(clinical.repairedAnswer).toContain('ilgili programın akademik birimi')
+    expect(clinical.repairedAnswer).toContain('hangi sınıf/dönem')
+
+    const housing = critic(
+      'Yurt başvurusu nasıl yapılıyor?',
+      'Yüklenen belgelerde bu konuda net bir bilgi bulunmamaktadır.'
+    )
+    expect(housing).toMatchObject({
+      action: 'repair',
+      reason: 'actionable_no_info',
+    })
+    expect(housing.repairedAnswer).toContain('yurt/konaklama sayfası')
+    expect(housing.repairedAnswer).toContain('başvuru takvimi')
+
+    const registration = critic(
+      'Kesin kayıt için hangi belgeler gerekiyor?',
+      'Yüklenen belgelerde bu konuda net bir bilgi bulunmamaktadır.'
+    )
+    expect(registration).toMatchObject({
+      action: 'repair',
+      reason: 'actionable_no_info',
+    })
+    expect(registration.repairedAnswer).toContain('resmi kayıt duyuruları')
+    expect(registration.repairedAnswer).toContain('aday türü')
+
+    const credential = critic(
+      'Akreditasyon olmazsa diplomam geçersiz mi olur?',
+      'Yüklenen belgelerde bu konuda net bir bilgi bulunmamaktadır.'
+    )
+    expect(credential).toMatchObject({
+      action: 'repair',
+      reason: 'actionable_no_info',
+    })
+    expect(credential.repairedAnswer).toContain('diplomanın geçersiz olduğu anlamına gelmez')
+    expect(credential.repairedAnswer).toContain('YÖK')
   })
 
   it('repairs unsupported operational claims into contextual boundaries instead of passing shallow answers', () => {
@@ -223,11 +271,13 @@ describe('evaluateStrictAnswer', () => {
 
     expect(verdict).toMatchObject({
       action: 'repair',
-      reason: 'contextual_no_info',
+      reason: 'actionable_no_info',
       refusal: true,
     })
     expect(verdict.repairedAnswer).toContain('Bursum kesilir mi')
-    expect(verdict.repairedAnswer?.toLocaleLowerCase('tr-TR')).toContain('burs ve indirim koşulları')
+    expect(verdict.repairedAnswer?.toLocaleLowerCase('tr-TR')).toContain(
+      'burs ve indirim koşulları'
+    )
     expect(verdict.repairedAnswer).toContain('resmi burs')
   })
 
@@ -239,11 +289,35 @@ describe('evaluateStrictAnswer', () => {
 
     expect(verdict).toMatchObject({
       action: 'repair',
-      reason: 'contextual_no_info',
+      reason: 'actionable_no_info',
       refusal: true,
     })
     expect(verdict.repairedAnswer).toContain('Kripto para ile ödeme')
     expect(verdict.repairedAnswer).toContain('resmi ödeme')
     expect(verdict.repairedAnswer?.toLocaleLowerCase('tr-TR')).not.toContain('kart')
+  })
+
+  it('repairs speculative payment-method additions even when the answer starts with a no-info boundary', () => {
+    const verdict = evaluateStrictAnswer({
+      question: 'Ücreti kriptoyla ödeyebilir miyim?',
+      understanding: understandStrictQuestion('Ücreti kriptoyla ödeyebilir miyim?'),
+      answer:
+        'Yüksek İhtisas Üniversitesi’nin eğitim ücretleriyle ilgili dökümanlarda kripto para ile ödeme seçeneği hakkında bilgi bulunmamaktadır. Ödeme genellikle kredi kartı, banka kartı veya bankalar aracılığıyla yapılmaktadır, ancak kriptoyla ödeme imkanı belirtilmemiştir.',
+      citations: [
+        {
+          providerSourceId: 'fees',
+          title: 'Ücret Bilgilendirme',
+          quote: '2025-2026 eğitim öğretim yılı program ücretleri tabloda listelenmiştir.',
+        },
+      ],
+    })
+
+    expect(verdict).toMatchObject({
+      action: 'repair',
+      reason: 'unsupported_institutional_claim',
+      refusal: true,
+    })
+    expect(verdict.repairedAnswer).toContain('Kripto para ile ödeme')
+    expect(verdict.repairedAnswer?.toLocaleLowerCase('tr-TR')).not.toContain('genellikle')
   })
 })

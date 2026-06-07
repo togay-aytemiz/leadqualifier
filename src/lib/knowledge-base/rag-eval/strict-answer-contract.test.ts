@@ -16,6 +16,14 @@ describe('strict answer contract', () => {
     ).toContain('program_existence')
   })
 
+  it('does not treat unrelated words containing lab as facility-resource questions', () => {
+    expect(
+      classifyStrictQuestionFacets(
+        understandStrictQuestion('Üniversitenizde sevgili bulabilir miyim?')
+      )
+    ).not.toContain('facility_resource')
+  })
+
   it('marks adjacent program evidence as a facet mismatch for facility availability', () => {
     const contract = buildStrictAnswerContract({
       question: 'Ebelik uygulama laboratuvarı var mı?',

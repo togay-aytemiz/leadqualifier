@@ -207,7 +207,10 @@ function normalize(value: string) {
 }
 
 function normalizeLoose(value: string) {
-  return normalize(value).replace(/[^\p{L}\p{N}%]+/gu, ' ').replace(/\s+/g, ' ').trim()
+  return normalize(value)
+    .replace(/[^\p{L}\p{N}%]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function phrasePattern(alias: string) {
@@ -244,7 +247,13 @@ function findEntities(search: string) {
 }
 
 function detectSafety(originalQuestion: string, search: string): StrictQuestionSafety {
-  if (/(?:kredi kart|kart bilg|cvv|cvc|kart numara)/.test(search)) return 'payment_card'
+  if (
+    /(?:kart bilg|cvv|cvc|kart numara)/.test(search) ||
+    /kredi kart.{0,50}(?:yaz|paylas|gonder|ver|bilgi|numara|odeme al|buraya)/.test(search) ||
+    /(?:yazsam|paylassam|versem).{0,50}kredi kart/.test(search)
+  ) {
+    return 'payment_card'
+  }
   if (/(?:osym sifre|e devlet sifre|sifremi|parolami|password|login)/.test(search)) {
     return 'credential_request'
   }
@@ -300,7 +309,11 @@ function detectIntents(search: string, safety: StrictQuestionSafety) {
     pushIntent(intents, 'scholarship')
   }
   if (safety !== 'none') pushIntent(intents, 'safety')
-  if (/(?:bugun hava|kahve tarifi|burcuma gore|fali|sevgilimden ayrildim)/.test(search)) {
+  if (
+    /(?:bugun hava|kahve tarifi|burcuma gore|fali|sevgilimden ayrildim|sevgili|tyt matematik|matematik calistir|ders calistir|soru coz|konu anlatim|test coz|chatgpt|gercek insan|ogrenci misin|sen kimsin|yapay zeka misin|ai misin|asistan misin)/.test(
+      search
+    )
+  ) {
     pushIntent(intents, 'off_topic')
   }
 

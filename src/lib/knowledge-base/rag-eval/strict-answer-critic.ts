@@ -1,10 +1,10 @@
-import {
-  findUnsupportedCatalogUnit,
-  resolveStrictCatalogAnswer,
-} from './strict-fact-catalog'
+import { findUnsupportedCatalogUnit, resolveStrictCatalogAnswer } from './strict-fact-catalog'
 import { buildStrictAnswerContract } from './strict-answer-contract'
 import { buildStrictClaimLedger, type StrictClaimLedger } from './strict-claim-ledger'
-import type { StrictQuestionSafety, StrictQuestionUnderstanding } from './strict-question-understanding'
+import type {
+  StrictQuestionSafety,
+  StrictQuestionUnderstanding,
+} from './strict-question-understanding'
 import { normalizeStrictQuestionSearch } from './strict-question-understanding'
 import type { RagProviderCitation } from './types'
 
@@ -19,6 +19,7 @@ export type StrictAnswerCriticReason =
   | 'unsupported_institutional_claim'
   | 'facet_mismatch'
   | 'insufficient_answer'
+  | 'actionable_no_info'
   | 'contextual_no_info'
 
 export type StrictAnswerCriticVerdict = {
@@ -56,7 +57,10 @@ const DIRECT_EVIDENCE_TOPIC_PATTERN =
   /(?:akredit|basvuru|başvuru|belge|burs|cift anadal|çift anadal|cihaz|devamsizlik|devamsızlık|dgs|diploma|e devlet|e-devlet|etkinlik|hazirlik|hazırlık|hastane|iban|kafe|kampus|kampüs|kantin|kayit|kayıt|klinik|konaklama|kontenjan|kredi kart|kutuphane|kütüphane|laboratuvar|mikroskop|odeme|ödeme|online|otopark|puan|siralama|sıralama|servis|spor salonu|staj|taksit|tarih|ucret|ücret|ulasim|ulaşım|uygulama|wifi|wi fi|yatay gecis|yatay geçiş|yemek|yemekhane|yerleske|yerleşke|yurt)/u
 
 const ASSERTIVE_INSTITUTIONAL_CLAIM_PATTERN =
-  /(?:\b(?:evet|var|vardir|vardır|bulunur|bulunuyor|bulunmaktadir|bulunmaktadır|mevcut|mevcuttur|saglanir|sağlanır|saglanmaktadir|sağlanmaktadır|verilir|verilmektedir|yapilir|yapılır|yapiliyor|yapılıyor|basvurulur|başvurulur|basvuru yapilir|başvuru yapılır|zorunlu|ucretli|ücretli|ucretsiz|ücretsiz|gecerlidir|geçerlidir|gecer|geçer|dahil|dahildir|kesilir|kesilmez|online|e-devlet|web sitesi|ayarlanir|ayarlanır|universite ayarlar|üniversite ayarlar)\b)/u
+  /(?:\b(?:evet|var|vardir|vardır|bulunur|bulunuyor|bulunmaktadir|bulunmaktadır|mevcut|mevcuttur|saglanir|sağlanır|saglanmaktadir|sağlanmaktadır|verilir|verilmektedir|yapilir|yapılır|yapiliyor|yapılıyor|yapilmaktadir|yapılmaktadır|basvurulur|başvurulur|basvuru yapilir|başvuru yapılır|zorunlu|ucretli|ücretli|ucretsiz|ücretsiz|gecerlidir|geçerlidir|gecer|geçer|dahil|dahildir|kesilir|kesilmez|online|e-devlet|web sitesi|ayarlanir|ayarlanır|universite ayarlar|üniversite ayarlar)\b)/u
+
+const SPECULATIVE_INSTITUTIONAL_LANGUAGE_PATTERN =
+  /(?:\b(?:genellikle|muhtemelen|tahminen|olabilir|olasi|olasilikla|belki|tipik olarak)\b)/u
 
 const DIRECT_EVIDENCE_CLAIM_TERMS: Array<{ pattern: RegExp; terms: string[] }> = [
   { pattern: /\bkdv\b/u, terms: ['kdv'] },
@@ -159,23 +163,27 @@ function contextualNoInfoAnswer(question: string, understanding: StrictQuestionU
   const topic = humanizeTopic(question)
 
   if (/(?:ogrenci isleri|telefon|whatsapp|iletisim|aday ogrenci birimi|kayit ofisi)/.test(search)) {
-    return `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Bu bilgi değişebileceği için üniversitenin resmi iletişim kanallarını veya ilgili birimini kontrol etmek en güvenli yoldur.`
+    return `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Bu bilgi değişebileceği için üniversitenin resmi iletişim kanallarını veya ilgili birimini kontrol etmek en güvenli yoldur. Özellikle hangi birim, telefon veya başvuru dönemi için bilgi istediğiniz netleşirse resmi kaynakta tekrar kontrol edilmelidir.`
   }
 
   if (/kripto/.test(search)) {
-    return `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Kripto para ile ödeme kabul edildiğine dair doğrulanmış bilgi yoktur; ödeme için yalnızca üniversitenin resmi ödeme ve kayıt kanalları kontrol edilmelidir.`
+    return `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Kripto para ile ödeme kabul edildiğine dair doğrulanmış bilgi yoktur; ödeme için yalnızca üniversitenin resmi ödeme ve kayıt kanalları kontrol edilmelidir. Geçerli ödeme yöntemi, kayıt dönemi ve resmi ödeme ekranında ayrıca doğrulanmalıdır.`
   }
 
   if (/(?:iban|odeme|taksit|kredi kart|online ode)/.test(search)) {
-    return `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Ödeme ve kayıt işlemleri için yalnızca üniversitenin resmi ödeme ve kayıt kanallarını kullanın; kart veya kişisel bilgilerinizi bu sohbet içinde paylaşmayın.`
+    return `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Ödeme ve kayıt işlemleri için yalnızca üniversitenin resmi ödeme ve kayıt kanallarını kullanın; kart veya kişisel bilgilerinizi bu sohbet içinde paylaşmayın. Geçerli yöntem, taksit/IBAN bilgisi ve ödeme takvimi resmi kayıt ekranı veya kayıt birimi tarafından doğrulanmalıdır.`
   }
 
-  if (/(?:burs|indirim|tercih burs|basari burs|kardes indirimi|sporcu burs|sosyal destek)/.test(search)) {
-    return `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Burs ve indirim koşulları dönemsel değişebileceği için üniversitenin resmi burs/kayıt duyuruları veya ilgili birimi kontrol edilmelidir.`
+  if (
+    /(?:burs|indirim|tercih burs|basari burs|kardes indirimi|sporcu burs|sosyal destek)/.test(
+      search
+    )
+  ) {
+    return `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Burs ve indirim koşulları dönemsel değişebileceği için üniversitenin resmi burs/kayıt duyuruları veya ilgili birimi kontrol edilmelidir. Karar için burs türü, yerleşme sırası, program türü ve ilgili akademik yıl birlikte doğrulanmalıdır.`
   }
 
   if (/(?:ucret|fiyat|kac para|kac tl|kdv|pesin)/.test(search)) {
-    return `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Ücret ve ödeme koşulları dönemsel değişebileceği için üniversitenin resmi ücret/kayıt duyuruları veya ilgili birimi kontrol edilmelidir.`
+    return `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Ücret ve ödeme koşulları dönemsel değişebileceği için üniversitenin resmi ücret/kayıt duyuruları veya ilgili birimi kontrol edilmelidir. Karar için akademik yıl, program, burs/indirim durumu ve KDV/ödeme koşulu aynı resmi kaynakta birlikte doğrulanmalıdır.`
   }
 
   if (/(?:rakip|kotu yorum|eksileri|en kotu|kiyas)/.test(search)) {
@@ -189,20 +197,49 @@ function contextualNoInfoAnswer(question: string, understanding: StrictQuestionU
     return `${topic} üniversitenin onaylı aday öğrenci dokümanlarında yer alan bir başlık değildir. Yüksek İhtisas Üniversitesi'nin programları, ücretleri, bursları, kontenjanları, kampüsleri veya kayıt süreciyle ilgili sorularınızı yanıtlayabilirim.`
   }
 
-  if (/(?:servis|ulasim|kampus|yerleske|yemek|kantin|kafe|wifi|wi fi|otopark|kutuphane|laboratuvar|mikroskop|kadavra|maket)/.test(search)) {
-    return `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Bu tür kampüs, ulaşım ve imkan bilgileri değişebileceği için üniversitenin güncel resmi duyuruları veya ilgili birimi kontrol edilmelidir.`
+  if (
+    /(?:servis|ulasim|kampus|yerleske|yemek|kantin|kafe|wifi|wi fi|otopark|kutuphane|laboratuvar|mikroskop|kadavra|maket)/.test(
+      search
+    )
+  ) {
+    return `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Bu tür kampüs, ulaşım ve imkan bilgileri değişebileceği için üniversitenin güncel resmi duyuruları veya ilgili birimi kontrol edilmelidir. Karar için ilgili yerleşke, dönem ve hizmetin güncel saat/kapasite/başvuru koşulu birlikte doğrulanmalıdır.`
   }
 
-  if (/(?:staj|uygulama|hastane|afiliye|klinik|hasta basi|vaka|servis|ameliyathane|dogumhane|yogun bakim)/.test(search)) {
-    return `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Klinik uygulama ve staj ayrıntıları bölüm ve dönem bazında değişebileceği için ilgili programın resmi duyuruları veya akademik birimi kontrol edilmelidir.`
+  if (
+    /(?:staj|uygulama|hastane|afiliye|klinik|hasta basi|muayene|vaka|servis|ameliyathane|dogumhane|yogun bakim)/.test(
+      search
+    )
+  ) {
+    return `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Klinik uygulama ve staj ayrıntıları bölüm ve dönem bazında değişebileceği için ilgili programın akademik birimi veya resmi duyuruları kontrol edilmelidir. Karar için hangi sınıf/dönem, hangi program ve uygulamanın hastane, laboratuvar ya da saha uygulaması olup olmadığı birlikte doğrulanmalıdır.`
+  }
+
+  if (/(?:kayit|belge|e devlet|e-devlet|randevu|basvuru|tarih|saat)/.test(search)) {
+    return `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Kayıt ve başvuru ayrıntıları dönemsel değişebileceği için üniversitenin resmi kayıt duyuruları veya kayıt birimi kontrol edilmelidir. Karar için aday türü, kayıt dönemi, istenen belge ve başvuru kanalı birlikte doğrulanmalıdır.`
+  }
+
+  if (/(?:akredit|diploma|denklik|yok|yurtdisi|kpss|atan|is bul|is garantisi)/.test(search)) {
+    return `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Akreditasyon, denklik, atama veya mesleki sonuçlar ülke, kurum ve ilgili mevzuata bağlıdır; akreditasyon bulunmaması tek başına diplomanın geçersiz olduğu anlamına gelmez. Karar için YÖK, ilgili meslek otoritesi ve güncel program duyuruları birlikte kontrol edilmelidir.`
   }
 
   return `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. ${GENERIC_CONTEXTUAL_NO_INFO_FOLLOWUP}`
 }
 
+function actionableNoInfoReason(answer: string) {
+  const normalized = normalizeStrictQuestionSearch(answer)
+  return /(?:karar icin|birlikte dogrulanmalidir|resmi kayit duyurulari|resmi odeme|resmi ucret|resmi burs|resmi iletisim|akademik birimi|ilgili birimi|yok|meslek otoritesi)/.test(
+    normalized
+  )
+    ? 'actionable_no_info'
+    : 'contextual_no_info'
+}
+
 function answerLooksPositive(answer: string) {
   const normalized = normalizeStrictQuestionSearch(answer)
-  if (/(?:yoktur|yok|bulunmamaktadir|listelenmemektedir|yer almamaktadir|belirtilmemistir)/.test(normalized)) {
+  if (
+    /(?:yoktur|yok|bulunmamaktadir|listelenmemektedir|yer almamaktadir|belirtilmemistir)/.test(
+      normalized
+    )
+  ) {
     return false
   }
   return /(?:^|\s)(?:evet|var|vardir|bulunmaktadir|mevcuttur|listelenmektedir)(?:\s|[.!?]|$)/.test(
@@ -244,10 +281,14 @@ function supportedByCitation(question: string, answer: string, citations: RagPro
 
   const questionTerms = normalizedQuestion
     .split(/\s+/)
-    .filter((term) => term.length >= 4 && !['fakulteniz', 'bolumunuz', 'programiniz'].includes(term))
+    .filter(
+      (term) => term.length >= 4 && !['fakulteniz', 'bolumunuz', 'programiniz'].includes(term)
+    )
   const answerTerms = normalizedAnswer
     .split(/\s+/)
-    .filter((term) => term.length >= 4 && !['vardir', 'bulunmaktadir', 'listelenmektedir'].includes(term))
+    .filter(
+      (term) => term.length >= 4 && !['vardir', 'bulunmaktadir', 'listelenmektedir'].includes(term)
+    )
   const importantTerms = Array.from(new Set([...questionTerms, ...answerTerms])).slice(0, 8)
   if (importantTerms.length === 0) return true
 
@@ -255,9 +296,11 @@ function supportedByCitation(question: string, answer: string, citations: RagPro
 }
 
 function tokenizeForDirectEvidence(value: string) {
-  return normalizeStrictQuestionSearch(value)
-    .match(/[\p{L}\p{N}%]+/gu)
-    ?.filter((term) => term.length >= 4 && !DIRECT_EVIDENCE_STOPWORDS.has(term)) ?? []
+  return (
+    normalizeStrictQuestionSearch(value)
+      .match(/[\p{L}\p{N}%]+/gu)
+      ?.filter((term) => term.length >= 4 && !DIRECT_EVIDENCE_STOPWORDS.has(term)) ?? []
+  )
 }
 
 function termLooksSupported(term: string, support: string) {
@@ -290,6 +333,10 @@ function answerAssertsInstitutionalClaim(answer: string) {
     return false
   }
   return ASSERTIVE_INSTITUTIONAL_CLAIM_PATTERN.test(normalized)
+}
+
+function answerHasSpeculativeInstitutionalLanguage(answer: string) {
+  return SPECULATIVE_INSTITUTIONAL_LANGUAGE_PATTERN.test(normalizeStrictQuestionSearch(answer))
 }
 
 function questionRequiresDirectEvidence(understanding: StrictQuestionUnderstanding) {
@@ -327,7 +374,8 @@ export function evaluateStrictAnswer(input: {
 }): StrictAnswerCriticVerdict {
   if (
     input.understanding.safety !== 'none' &&
-    (answerLooksUnsafeForSensitiveData(input.answer) || input.understanding.intents.includes('safety'))
+    (answerLooksUnsafeForSensitiveData(input.answer) ||
+      input.understanding.intents.includes('safety'))
   ) {
     return {
       action: 'repair',
@@ -343,7 +391,10 @@ export function evaluateStrictAnswer(input: {
     understanding: input.understanding,
   })
   if (catalogAnswer) {
-    if (catalogAnswer.reason === 'catalog_unsupported_existence' && answerLooksPositive(input.answer)) {
+    if (
+      catalogAnswer.reason === 'catalog_unsupported_existence' &&
+      answerLooksPositive(input.answer)
+    ) {
       return {
         action: 'repair',
         reason: 'catalog_contradiction',
@@ -356,7 +407,7 @@ export function evaluateStrictAnswer(input: {
     if (answerLooksLikeNoInfo(input.answer)) {
       return {
         action: 'repair',
-        reason: 'missed_catalog_fact',
+        reason: catalogAnswer.refusal ? 'actionable_no_info' : 'missed_catalog_fact',
         repairedAnswer: catalogAnswer.answer,
         repairedCitations: catalogAnswer.citations,
         refusal: catalogAnswer.refusal,
@@ -395,12 +446,27 @@ export function evaluateStrictAnswer(input: {
     }
   }
 
-  const claimLedger = input.claimLedger ?? buildStrictClaimLedger({
-    question: input.question,
-    understanding: input.understanding,
-    answer: input.answer,
-    citations: input.citations,
-  })
+  const claimLedger =
+    input.claimLedger ??
+    buildStrictClaimLedger({
+      question: input.question,
+      understanding: input.understanding,
+      answer: input.answer,
+      citations: input.citations,
+    })
+
+  if (
+    questionRequiresDirectEvidence(input.understanding) &&
+    answerHasSpeculativeInstitutionalLanguage(input.answer)
+  ) {
+    return {
+      action: 'repair',
+      reason: 'unsupported_institutional_claim',
+      repairedAnswer: contextualNoInfoAnswer(input.question, input.understanding),
+      repairedCitations: [],
+      refusal: true,
+    }
+  }
 
   if (
     questionRequiresDirectEvidence(input.understanding) &&
@@ -449,10 +515,11 @@ export function evaluateStrictAnswer(input: {
   }
 
   if (answerLooksLikeNoInfo(input.answer)) {
+    const repairedAnswer = contextualNoInfoAnswer(input.question, input.understanding)
     return {
       action: 'repair',
-      reason: 'contextual_no_info',
-      repairedAnswer: contextualNoInfoAnswer(input.question, input.understanding),
+      reason: actionableNoInfoReason(repairedAnswer),
+      repairedAnswer,
       repairedCitations: [],
       refusal: true,
     }

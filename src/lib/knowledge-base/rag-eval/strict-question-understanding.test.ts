@@ -100,8 +100,17 @@ describe('understandStrictQuestion', () => {
     })
   })
 
+  it('keeps card installment questions in payment policy instead of sensitive card-data safety', () => {
+    expect(understandStrictQuestion('Kredi kartına taksit oluyor mu?')).toMatchObject({
+      safety: 'none',
+      intents: ['payment'],
+    })
+  })
+
   it('keeps discount and tuition variants instead of collapsing them to plain existence', () => {
-    expect(understandStrictQuestion('Tıp Fakültesinde %50 indirimli program var mı?')).toMatchObject({
+    expect(
+      understandStrictQuestion('Tıp Fakültesinde %50 indirimli program var mı?')
+    ).toMatchObject({
       normalizedQuestion: 'Tıp Fakültesi %50 indirimli program var mı?',
       intents: ['existence', 'scholarship'],
       entities: [
@@ -116,6 +125,26 @@ describe('understandStrictQuestion', () => {
     expect(understandStrictQuestion('Kayıtta pazarlık yapılıyor mu?')).toMatchObject({
       safety: 'fraud_or_bypass',
       intents: ['payment', 'safety'],
+    })
+  })
+
+  it('routes social relationship questions as off-topic instead of ordinary campus resources', () => {
+    expect(understandStrictQuestion('Üniversitenizde sevgili bulabilir miyim?')).toMatchObject({
+      intents: ['off_topic'],
+      safety: 'none',
+    })
+  })
+
+  it('routes tutoring requests as off-topic while preserving ordinary TYT preference questions', () => {
+    expect(understandStrictQuestion('TYT matematik çalıştırır mısın?')).toMatchObject({
+      intents: ['off_topic'],
+      safety: 'none',
+    })
+
+    expect(
+      understandStrictQuestion('TYT puanıyla sağlık alanında hangi programları tercih edebilirim?')
+    ).not.toMatchObject({
+      intents: ['off_topic'],
     })
   })
 })
