@@ -948,7 +948,7 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
     expect(result.diagnostics?.retryCount).toBe(1)
   })
 
-  it('runs an evidence-seeking retry when the first answer satisfies the wrong facet', async () => {
+  it('answers supported transport-scope catalog boundaries before retrieval', async () => {
     const create = vi
       .fn()
       .mockResolvedValueOnce({
@@ -1040,28 +1040,18 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
       },
     })
 
-    expect(create).toHaveBeenCalledTimes(2)
-    expect(create.mock.calls[1]?.[0]).toEqual(
-      expect.objectContaining({
-        input: expect.stringContaining('servis'),
-      })
-    )
-    expect(createCompletion).toHaveBeenCalledTimes(2)
-    expect(result.refusal).toBe(false)
-    expect(result.answer).toContain('kampüse ulaşım servisi bulunmaktadır')
-    expect(result.answer).not.toContain('kampüs Ankara')
-    expect(result.diagnostics?.retryCount).toBe(1)
-    expect(result.diagnostics?.evidenceRetry).toMatchObject({
-      attempted: true,
-      outcome: 'passed',
-      reason: 'missing_facet_evidence',
+    expect(create).not.toHaveBeenCalled()
+    expect(createCompletion).not.toHaveBeenCalled()
+    expect(result.refusal).toBe(true)
+    expect(result.answer).toContain('servis hakkında onaylı kaynaklarda net bilgi bulunmamaktadır')
+    expect(result.answer).toContain('resmi ulaşım duyurusu')
+    expect(result.answer).not.toContain('kampüse ulaşım servisi bulunmaktadır')
+    expect(result.diagnostics).toMatchObject({
+      strictVerdict: 'catalog_campus_transport_scope_guard',
+      researchPlan: expect.objectContaining({
+        route: 'catalog_direct',
+      }),
     })
-    expect(result.diagnostics?.researchBlackboard?.attempts).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ stage: 'initial_retrieval', citationCount: 1 }),
-        expect.objectContaining({ stage: 'evidence_retry', citationCount: 1 }),
-      ])
-    )
   })
 
   it('retries website bilgi paketi retrieval when the first general evidence misses program names', async () => {
@@ -1326,6 +1316,10 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
       qualityMode: 'strict',
       normalizedQuestion: 'Dil ve Konuşma Terapisi ücreti ne kadar?',
       strictVerdict: 'catalog_program_fee_fact',
+      strictQuality: {
+        suggestedScore: 9,
+        tier: 'grounded_direct_fact',
+      },
       researchPlan: {
         route: 'catalog_direct',
         tools: ['strict_fact_catalog'],
@@ -1352,6 +1346,10 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
     expect(result.diagnostics).toMatchObject({
       qualityMode: 'strict',
       strictVerdict: 'catalog_unsupported_existence',
+      strictQuality: {
+        suggestedScore: 8,
+        tier: 'safe_actionable_boundary',
+      },
     })
   })
 
@@ -1373,6 +1371,10 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
     expect(result.diagnostics).toMatchObject({
       qualityMode: 'strict',
       strictVerdict: 'unsafe_sensitive_data',
+      strictQuality: {
+        suggestedScore: 9,
+        tier: 'grounded_direct_fact',
+      },
     })
   })
 
@@ -1504,18 +1506,18 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
       strictEvaluatorCreateCompletion,
     })
 
-    expect(create).toHaveBeenCalledOnce()
+    expect(create).not.toHaveBeenCalled()
     expect(createCompletion).not.toHaveBeenCalled()
     expect(strictEvaluatorCreateCompletion).not.toHaveBeenCalled()
     expect(result.refusal).toBe(true)
-    expect(result.answer).toContain('Servis ücretli mi')
+    expect(result.answer).toContain('servis ücreti')
     expect(result.answer).toContain('net bilgi bulunmamaktadır')
     expect(result.answer).toContain('Karar için')
     expect(result.answer).not.toContain('genellikle')
     expect(result.answer).not.toContain('olabilir')
     expect(result.diagnostics).toMatchObject({
       qualityMode: 'strict',
-      strictVerdict: 'actionable_no_info',
+      strictVerdict: 'catalog_campus_transport_scope_guard',
     })
   })
 

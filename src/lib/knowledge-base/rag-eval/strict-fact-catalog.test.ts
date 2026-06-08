@@ -59,6 +59,143 @@ describe('resolveStrictCatalogAnswer', () => {
     expect(shmyo?.answer).toContain('Anestezi')
     expect(shmyo?.answer).toContain('Tele-Sağlık Teknikerliği')
     expect(shmyo?.answer).toContain('Tıbbi Veri İşleme Teknikerliği')
+
+    const schools = catalogAnswer('Üniversitenizde hangi meslek yüksekokulları var?')
+    expect(schools).toMatchObject({
+      refusal: false,
+      reason: 'catalog_faculty_listing',
+    })
+    expect(schools?.answer).toContain('Meslek Yüksekokulu')
+    expect(schools?.answer).toContain('Sağlık Hizmetleri Meslek Yüksekokulu')
+  })
+
+  it('answers institution type and founding foundation from the catalog', () => {
+    const type = catalogAnswer('Üniversiteniz devlet mi vakıf üniversitesi mi?')
+    expect(type).toMatchObject({
+      refusal: false,
+      reason: 'catalog_institution_fact',
+    })
+    expect(type?.answer).toContain('vakıf üniversitesidir')
+    expect(type?.answer).toContain('devlet üniversitesi değildir')
+
+    const foundation = catalogAnswer('Üniversitenin kurucu vakfı kimdir?')
+    expect(foundation).toMatchObject({
+      refusal: false,
+      reason: 'catalog_institution_fact',
+    })
+    expect(foundation?.answer).toContain('Türkiye Yüksek İhtisas Hastanesi Vakfı')
+  })
+
+  it('answers generic MYO campus location from campus-program mappings', () => {
+    const answer = catalogAnswer('myo nerde')
+
+    expect(answer).toMatchObject({
+      refusal: false,
+      reason: 'catalog_campus_program_listing',
+    })
+    expect(answer?.answer).toContain('Meslek Yüksekokulu')
+    expect(answer?.answer).toContain('Balgat Yerleşkesi')
+    expect(answer?.answer).toContain('Sağlık Hizmetleri Meslek Yüksekokulu')
+    expect(answer?.answer).toContain('Bağlum Yerleşkesi')
+  })
+
+  it('answers broad department-campus mapping from campus-program facts', () => {
+    const answer = catalogAnswer('Hangi bölüm hangi kampüste?')
+
+    expect(answer).toMatchObject({
+      refusal: false,
+      reason: 'catalog_campus_program_listing',
+    })
+    expect(answer?.answer).toContain('100. Yıl Yerleşkesi')
+    expect(answer?.answer).toContain('Tıp Fakültesi')
+    expect(answer?.answer).toContain('Bağlıca Yerleşkesi')
+    expect(answer?.answer).toContain('Sağlık Bilimleri Fakültesi')
+    expect(answer?.answer).toContain('Balgat Yerleşkesi')
+    expect(answer?.answer).toContain('Bağlum Yerleşkesi')
+  })
+
+  it('uses decision-safe boundaries for personal preference and transfer/process questions', () => {
+    const preference = catalogAnswer('Hastanede çalışmak istiyorum, hangi programı seçmeliyim?')
+    expect(preference).toMatchObject({
+      refusal: true,
+      reason: 'catalog_admissions_decision_guard',
+    })
+    expect(preference?.answer.toLocaleLowerCase('tr-TR')).toContain(
+      'sizin yerinize tercih kararı'
+    )
+    expect(preference?.answer).toContain('çalışmak istediğiniz ortam')
+    expect(preference?.answer).toContain('kesin yerleşme garantisi')
+
+    const transfer = catalogAnswer('Yatay geçiş kabul ediyor musunuz?')
+    expect(transfer).toMatchObject({
+      refusal: true,
+      reason: 'catalog_admissions_decision_guard',
+    })
+    expect(transfer?.answer.toLocaleLowerCase('tr-TR')).toContain('yatay geçiş')
+    expect(transfer?.answer).toContain('başvuru takvimi')
+
+    const prep = catalogAnswer('Hazırlığı geçemezsem ne olur?')
+    expect(prep).toMatchObject({
+      refusal: true,
+      reason: 'catalog_academic_process_scope_guard',
+    })
+    expect(prep?.answer).toContain('hazırlık')
+    expect(prep?.answer).toContain('resmi akademik süreç')
+  })
+
+  it('uses meeting-room-safe boundaries for subjective reputation and low-effort prompts', () => {
+    const instructors = catalogAnswer('Hocalar zor mu?')
+    expect(instructors).toMatchObject({
+      refusal: true,
+      reason: 'catalog_reputation_scope_guard',
+    })
+    expect(instructors?.answer).toContain('öznel')
+    expect(instructors?.answer).toContain('doğrulanmış bilgi')
+
+    const lowEffort = catalogAnswer('En az ders çalışarak hangi bölüm okunur?')
+    expect(lowEffort).toMatchObject({
+      refusal: true,
+      reason: 'catalog_academic_process_scope_guard',
+    })
+    expect(lowEffort?.answer).toContain('en az ders çalışarak')
+    expect(lowEffort?.answer).toContain('uygun değildir')
+
+    const absence = catalogAnswer('Devamsızlıktan kalmak kolay mı?')
+    expect(absence).toMatchObject({
+      refusal: true,
+      reason: 'catalog_academic_process_scope_guard',
+    })
+    expect(absence?.answer.toLocaleLowerCase('tr-TR')).toContain('devamsızlık')
+    expect(absence?.answer).toContain('resmi ders devam')
+  })
+
+  it('routes adjacent housing and local-life questions to actionable campus boundaries', () => {
+    const outOfCity = catalogAnswer('Şehir dışından gelen öğrenciler nerede kalıyor?')
+    expect(outOfCity).toMatchObject({
+      refusal: true,
+      reason: 'catalog_housing_scope_guard',
+    })
+    expect(outOfCity?.answer).toContain('konaklama')
+    expect(outOfCity?.answer).toContain('yerleştirme desteği')
+
+    const rent = catalogAnswer('Ankara’da kiralar ne kadar?')
+    expect(rent).toMatchObject({
+      refusal: true,
+      reason: 'catalog_campus_life_scope_guard',
+    })
+    expect(rent?.answer).toContain('Ankara kira')
+    expect(rent?.answer).toContain('üniversitenin onaylı aday öğrenci kaynaklarında')
+  })
+
+  it('guards Turkish-inflected facility resource questions such as mikroskobu', () => {
+    const answer = catalogAnswer('Öğrenciler mikroskobu bireysel mi kullanıyor grup halinde mi?')
+
+    expect(answer).toMatchObject({
+      refusal: true,
+      reason: 'catalog_facility_resource_scope_guard',
+    })
+    expect(answer?.answer).toContain('mikroskop')
+    expect(answer?.answer).toContain('güncel kullanım koşulu')
   })
 
   it('lists lisans and ön lisans programs separately from the catalog', () => {
@@ -522,6 +659,15 @@ describe('resolveStrictCatalogAnswer', () => {
   })
 
   it('guards program-specific summer internship questions instead of answering only program existence', () => {
+    const medicine = catalogAnswer('Tıp Fakültesinde yaz stajı var mı?')
+    expect(medicine).toMatchObject({
+      refusal: false,
+      reason: 'catalog_clinical_training_fact',
+    })
+    expect(medicine?.answer).toContain('Dönem IV')
+    expect(medicine?.answer).toContain('Dönem VI')
+    expect(medicine?.answer).toContain('ayrı bir yaz stajı')
+
     const nursing = catalogAnswer('Hemşirelikte yaz stajı var mı?')
     expect(nursing).toMatchObject({
       refusal: true,
@@ -772,6 +918,45 @@ describe('resolveStrictCatalogAnswer', () => {
     expect(answer?.answer).toContain('denklik')
   })
 
+  it('guards accreditation and credential-recognition claims without invalidating the diploma', () => {
+    const accreditation = catalogAnswer('Tıp Fakülteniz akredite mi?')
+    expect(accreditation).toMatchObject({
+      refusal: true,
+      reason: 'catalog_accreditation_scope_guard',
+    })
+    expect(accreditation?.answer).toContain('Tıp Fakültesi')
+    expect(accreditation?.answer).toContain('akreditasyon')
+    expect(accreditation?.answer).toContain('net bilgi bulunmamaktadır')
+    expect(accreditation?.answer).not.toMatch(/^Evet/i)
+
+    const invalidDiploma = catalogAnswer('Akreditasyon olmazsa diplomam geçersiz mi olur?')
+    expect(invalidDiploma).toMatchObject({
+      refusal: false,
+      reason: 'catalog_accreditation_scope_guard',
+    })
+    expect(invalidDiploma?.answer).toContain('diploma geçerliliğiyle aynı şey değildir')
+    expect(invalidDiploma?.answer).toContain('YÖK')
+
+    const recognition = catalogAnswer('Üniversite YÖK tarafından tanınıyor mu?')
+    expect(recognition).toMatchObject({
+      refusal: false,
+      reason: 'catalog_recognition_scope_guard',
+    })
+    expect(recognition?.answer).toContain('2013')
+    expect(recognition?.answer).toContain('vakıf üniversitesi')
+    expect(recognition?.answer).toContain('YÖK')
+    expect(recognition?.answer).toContain('resmi')
+
+    const equivalency = catalogAnswer('Mezun olunca denklik almam gerekir mi?')
+    expect(equivalency).toMatchObject({
+      refusal: true,
+      reason: 'catalog_credential_scope_guard',
+    })
+    expect(equivalency?.answer).toContain('Denklik gerekip gerekmediği')
+    expect(equivalency?.answer).toContain('ülke')
+    expect(equivalency?.answer).toContain('meslek otoritesine')
+  })
+
   it('guards campus-life facilities that are not proven by the current demo catalog', () => {
     const wifi = catalogAnswer('Kampüste Wi-Fi var mı?')
 
@@ -808,6 +993,85 @@ describe('resolveStrictCatalogAnswer', () => {
       reason: 'catalog_campus_life_fact',
     })
     expect(healthClubs?.answer).toContain('öğrenci toplulukları')
+  })
+
+  it('answers campus transport and placement facts while guarding unsupported service claims', () => {
+    const transport = catalogAnswer('kampüse nasıl gidiliyo')
+    expect(transport).toMatchObject({
+      refusal: false,
+      reason: 'catalog_campus_transport_fact',
+    })
+    expect(transport?.answer).toContain('100. Yıl Yerleşkesi')
+    expect(transport?.answer).toContain('Bağlıca Yerleşkesi')
+    expect(transport?.answer).toContain('Balgat Yerleşkesi')
+    expect(transport?.answer).toContain('Bağlum Yerleşkesi')
+    expect(transport?.answer).toContain('Ulaşım bilgileri')
+
+    const service = catalogAnswer('Servis saatleri nedir?')
+    expect(service).toMatchObject({
+      refusal: true,
+      reason: 'catalog_campus_transport_scope_guard',
+    })
+    expect(service?.answer).toContain('servis saatleri')
+    expect(service?.answer).toContain('net bilgi bulunmamaktadır')
+    expect(service?.answer).not.toMatch(/^Evet/i)
+
+    const balgat = catalogAnswer('balgat hangi bölümler')
+    expect(balgat).toMatchObject({
+      refusal: false,
+      reason: 'catalog_campus_program_listing',
+    })
+    expect(balgat?.answer).toContain('Spor Bilimleri Fakültesi')
+    expect(balgat?.answer).toContain('Meslek Yüksekokulu')
+    expect(balgat?.answer).toContain('Sağlık Hizmetleri Meslek Yüksekokulu')
+  })
+
+  it('guards dining and housing-specific claims with official next-step boundaries', () => {
+    const dining = catalogAnswer('Yemek fiyatları ne kadar?')
+    expect(dining).toMatchObject({
+      refusal: true,
+      reason: 'catalog_campus_life_scope_guard',
+    })
+    expect(dining?.answer).toContain('yemek fiyatları')
+    expect(dining?.answer).toContain('net bilgi bulunmamaktadır')
+    expect(dining?.answer).toContain('ilgili yerleşke')
+
+    const housing = catalogAnswer('Yurt var mı?')
+    expect(housing).toMatchObject({
+      refusal: false,
+      reason: 'catalog_housing_link_fact',
+    })
+    expect(housing?.answer).toContain('Konaklama bilgileri')
+    expect(housing?.answer).toContain('başvuru')
+    expect(housing?.answer).toContain('ücret')
+  })
+
+  it('answers official contact next steps without inventing direct unit numbers', () => {
+    const studentAffairs = catalogAnswer('Öğrenci işleri telefon numarası nedir?')
+    expect(studentAffairs).toMatchObject({
+      refusal: true,
+      reason: 'catalog_contact_scope_guard',
+    })
+    expect(studentAffairs?.answer).toContain('Öğrenci İşleri')
+    expect(studentAffairs?.answer).toContain('doğrudan telefon numarası')
+    expect(studentAffairs?.answer).toContain('Genel telefon')
+    expect(studentAffairs?.answer).not.toContain('WhatsApp gruplarına')
+
+    const candidateUnit = catalogAnswer('Aday öğrenci birimine nasıl ulaşırım?')
+    expect(candidateUnit).toMatchObject({
+      refusal: true,
+      reason: 'catalog_contact_scope_guard',
+    })
+    expect(candidateUnit?.answer).toContain('aday öğrenci birimi')
+    expect(candidateUnit?.answer).toContain('resmi iletişim')
+
+    const proxyRegistration = catalogAnswer('Benim yerime kayıt yapar mısın?')
+    expect(proxyRegistration).toMatchObject({
+      refusal: true,
+      reason: 'catalog_registration_scope_guard',
+    })
+    expect(proxyRegistration?.answer).toContain('sizin yerinize kayıt')
+    expect(proxyRegistration?.answer).toContain('resmi kayıt')
   })
 
   it('answers double-major facts from the structured policy catalog', () => {
@@ -857,6 +1121,46 @@ describe('resolveStrictCatalogAnswer', () => {
     })
     expect(answer?.answer).toContain('Mavi diploma')
     expect(answer?.answer).toContain('net bilgi bulunmamaktadır')
+    expect(answer?.answer).not.toMatch(/^Evet/i)
+  })
+
+  it('answers program duration questions from the structured academic catalog', () => {
+    const medicine = catalogAnswer('Tıp Fakültesi kaç yıllık?')
+    expect(medicine).toMatchObject({
+      refusal: false,
+      reason: 'catalog_program_duration_fact',
+    })
+    expect(medicine?.answer).toContain('Tıp Fakültesi')
+    expect(medicine?.answer).toContain('6 yıllık')
+
+    const anesthesia = catalogAnswer('anestezi kaç yıl')
+    expect(anesthesia).toMatchObject({
+      refusal: false,
+      reason: 'catalog_program_duration_fact',
+    })
+    expect(anesthesia?.answer).toContain('Anestezi')
+    expect(anesthesia?.answer).toContain('2 yıllık')
+
+    const nursing = catalogAnswer('Hemşirelik kaç yıl sürüyor?')
+    expect(nursing).toMatchObject({
+      refusal: false,
+      reason: 'catalog_program_duration_fact',
+    })
+    expect(nursing?.answer).toContain('Hemşirelik')
+    expect(nursing?.answer).toContain('4 yıllık')
+  })
+
+  it('answers Eczane Hizmetleri title questions without turning the graduate into an eczacı', () => {
+    const answer = catalogAnswer('Eczane Hizmetleri okuyan eczacı olur mu?')
+
+    expect(answer).toMatchObject({
+      refusal: false,
+      reason: 'catalog_program_professional_title_fact',
+    })
+    expect(answer?.answer).toContain('Hayır')
+    expect(answer?.answer).toContain('Eczane Hizmetleri')
+    expect(answer?.answer).toContain('ön lisans')
+    expect(answer?.answer).toContain('eczacı unvanı')
     expect(answer?.answer).not.toMatch(/^Evet/i)
   })
 })

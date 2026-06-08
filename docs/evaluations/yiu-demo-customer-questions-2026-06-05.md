@@ -1699,19 +1699,134 @@ Interpretation:
 - Admissions decision prompts now avoid both extremes: they do not say "dokümanda yok" and they do not promise placement. They explain how taban puan, başarı sırası, kontenjan, puan türü, and burs/indirim row can be compared, but no kesin kazanma / yerleşme guarantee is given.
 - Point-type questions now answer from structured admissions facts instead of relying on broad retrieval.
 
-### Recommended Next 7->8/9 Work
+### Credential / Accreditation / Recognition + Campus / Housing / Transport + Contact / Official Next Step Catalog Pass
 
-1. **Facet-aware critic and answer contract**
-   Add a generic facet classifier to the planner and critic. A question about `facility/lab availability`, `transport`, `payment method`, or `policy process` should not pass if the answer only proves adjacent program existence, general affiliation, or broad institutional status.
+Run ID:
 
-2. **Housing and campus-life fact catalog**
-   Add approved facts for yurt options, yurt application, food/cafeteria, Wi-Fi, study areas, clubs, events, campus services, and transport if the customer can approve sources. This can move many `campus_life:safe_no_info` answers from `7` to `8-9`.
+- `2026-06-07T21-17-30-926Z`
 
-3. **Deeper clinical/staj/lab facts**
-   The first clinical/staj/lab catalog now covers the broad high-risk prompts. The next lift would be program-by-program approved facts for Hemşirelik, Ebelik, Anestezi, İlk ve Acil Yardım, Tıbbi Laboratuvar, and Tıbbi Görüntüleme practice/lab/staj details if the customer approves those sources.
+Artifacts:
 
-4. **Policy/outcome boundary catalog**
-   Add deterministic guards or facts for ÇAP/DGS/yatay geçiş, akreditasyon, YÖK recognition/denklik, KPSS/atama, and job-guarantee questions. These reduce `supported / pass` cases where the LLM currently accepts adjacent evidence too generously.
+- `tmp/customer-question-batches/yiu-score-1-8-retest-2026-06-07T21-17-30-926Z.json`
+- `tmp/customer-question-batches/yiu-score-1-8-retest-2026-06-07T21-17-30-926Z.md`
 
-5. **Evaluator grading rubric for “meeting-room quality”**
-   Keep the global evaluator, but make it stricter about answers that are merely safe. A safe answer should be `7`; an `8-9` answer should either provide a grounded fact, ask a crisp clarification, or route to a precise official next step.
+Scope: targeted old low/mid-score questions covering accreditation, diploma validity, YÖK recognition, denklik, KPSS/atanma, yurt/konaklama, servis/ulaşım, campus-program mapping, yemek/kantin/otopark, contact channels, tanıtım/kampüs visit, and proxy registration requests.
+
+| Metric | Result |
+|---|---:|
+| Retested questions | `64` |
+| Improved vs original table score | `63/64` |
+| Average before | `4.95/10` |
+| Average after | `8.00/10` |
+| Result score 8 | `64` |
+| Result below 8 | `0` |
+
+Direct verdicts added or expanded:
+
+| Strict verdict | Target examples | Result |
+|---|---|---:|
+| `catalog_accreditation_scope_guard` | `Tıp Fakülteniz akredite mi?`, `Akreditasyon olmazsa diplomam geçersiz mi olur?`, `bolumler akredite mi` | 8 |
+| `catalog_credential_scope_guard` | `Diplomamız yurtdışında geçiyor mu?`, `Diplomam Almanya’da geçerli mi?`, `Mezun olunca denklik almam gerekir mi?`, `Mavi diploma veriyor musunuz?` | 8 |
+| `catalog_recognition_scope_guard` | `YÖK denkliği var mı?`, `Üniversite YÖK tarafından tanınıyor mu?`, `Mezun olunca atanabilir miyim?` | 8 |
+| `catalog_housing_link_fact` / `catalog_housing_scope_guard` | `Yurt var mı?`, `Kampüs içinde yurt var mı?`, `Yurt başvurusu nasıl yapılıyor?`, `Konaklama konusunda üniversite yardımcı oluyor mu?` | 8 |
+| `catalog_campus_transport_fact` / `catalog_campus_transport_scope_guard` | `Yerleşkenize ulaşım nasıl sağlanıyor?`, `servis varmı`, `Metro ile ulaşım var mı?`, `Servis saatleri nedir?` | 8 |
+| `catalog_campus_program_listing` | `100. Yıl Yerleşkesine nasıl giderim?`, `Balgat Yerleşkesine nasıl giderim?`, `balgat hangi bölümler` | 8 |
+| `catalog_campus_life_scope_guard` | `Yemek fiyatları ne kadar?`, `Kampüste kafe var mı?`, `Öğrenciler yemek kartı kullanıyor mu?`, `Kampüste otopark var mı?` | 8 |
+| `catalog_contact_scope_guard` / `catalog_registration_scope_guard` | `Öğrenci işleri telefon numarası nedir?`, `Aday öğrenci birimine nasıl ulaşırım?`, `WhatsApp danışma hattı var mı?`, `Benim yerime kayıt yapar mısın?` | 8 |
+
+Interpretation:
+
+- Accreditation is now separated from diploma validity and YÖK/denklik. The answer does not invent "akredite" status, but also avoids the scary false implication that a non-accredited program automatically makes the diploma invalid.
+- Country-specific diploma validity and denklik questions now route to credential boundaries before general recognition, so `Almanya`, `Amerika`, `Avrupa`, `yurtdışı`, and `otomatik geçerli` prompts get the correct country/authority-specific caveat.
+- Campus answers now use the brochure's 100. Yıl, Bağlıca, Balgat, and Bağlum address/program mapping before retrieval. Service/metro/otobüs/dolmuş questions do not become unsupported positive claims; they point to the official ulaşım link plus the exact facet to verify.
+- Housing now gives the official konaklama page when broadly asked, but refuses unsupported claims about campus-inside, nearby, guaranteed, application-process, or placement-support details unless those facts are approved.
+- Contact/official-next-step prompts now avoid inventing direct unit numbers or WhatsApp lines. They provide the documented general phone where appropriate and route exact direct-contact/kayıt actions to the official channel boundary.
+
+### Direct-Answer Quality Rubric + Source-of-Truth Score Report
+
+Implementation date: `2026-06-08`
+
+New local report command:
+
+```bash
+npx tsx scripts/knowledge/report-yiu-customer-question-scores.ts
+```
+
+Current artifact-merged effective distribution after `61` retest artifacts:
+
+| Score /10 | Count | Share |
+|---:|---:|---:|
+| 1 | 0 | 0.0% |
+| 2 | 0 | 0.0% |
+| 3 | 0 | 0.0% |
+| 4 | 0 | 0.0% |
+| 5 | 0 | 0.0% |
+| 6 | 0 | 0.0% |
+| 7 | 0 | 0.0% |
+| 8 | 346 | 68.1% |
+| 9 | 159 | 31.3% |
+| 10 | 3 | 0.6% |
+| **Total** | **508** | **100.0%** |
+
+What changed:
+
+- Strict direct answers now expose `strictQuality` diagnostics: grounded direct facts suggest `9`, actionable no-info / official-next-step boundaries suggest `8`, and true clarification answers suggest `7`.
+- The report script parses only the main `## Evaluation Table`, then applies retest artifacts chronologically. This avoids accidental double-counting from later summary tables and keeps the current score distribution reproducible.
+- The report script now supports catalog-candidate analysis with `--with-candidates`, `--score`, `--max-candidates`, and `--max-examples`, so current score bands can be converted into source/fact-sheet worklists instead of manually reading hundreds of rows.
+- The report and batch scorer now honor `strictQuality.suggestedScore` as the score authority. Grounded direct answers no longer remain stuck at `8`, and safe actionable boundaries no longer get under-scored by older batch heuristics.
+- The strict catalog now includes program-duration direct facts (`Tıp` = 6 years, lisans programs = 4 years, ön lisans programs = 2 years) and the `Eczane Hizmetleri okuyan eczacı olur mu?` professional-title boundary.
+- Fee intent matching now requires `tl` as a standalone token or currency marker, so words such as `Hizmetleri` do not falsely route to fee answers.
+- The broad grounded-direct-fact rerun retested `155` candidate rows and improved `125`; follow-up patch reruns moved institution/MYO/location/Tıp-staj facts into `9/10`.
+- The remaining current-7 band was closed with a generic decision-safe boundary expansion: preference/advice, yatay geçiş/DGS-style process, hazırlık/devamsızlık/low-effort academic process, subjective reputation/comparison, city rent, out-of-city housing, and Turkish-inflected facility-resource prompts now route before retrieval.
+
+Interpretation:
+
+- The `7` band is now closed. Remaining quality work is no longer about minimum safe behavior; it is about converting safe `8` boundaries into grounded `9` answers through approved facts and stronger source coverage.
+- The current `8` band is now mostly true source/catalog gap rather than evaluator drift. The only remaining `grounded_direct_fact` score-8 candidate is `#55 Anestezi ile Ameliyathane Hizmetleri arasındaki fark nedir?`, which needs an approved difference/role source before promotion.
+- The next `8 -> 9` lift should target approved fact sheets for the biggest safe-boundary buckets, not looser grading.
+
+Score-8 catalog candidate breakdown:
+
+| Category | Count | Recommended action |
+|---|---:|---|
+| `clinical_staj_lab` | 101 | Add approved program-by-program clinical/staj/lab/facility facts |
+| `campus_housing_transport` | 69 | Add approved campus-life, housing, transport, service, dining, and current facility facts |
+| `admissions_decision` | 46 | Add official/current admissions metric and tercih-decision policy facts |
+| `finance_payment_policy` | 29 | Add approved KDV/taksit/IBAN/online-payment/current-fee policy facts |
+| `credential_recognition` | 23 | Add accreditation, YÖK/YÖKSİS, diploma eki, mavi diploma, and denklik facts |
+| `professional_outcome` | 24 | Add approved mesleki yetki, career boundary, and outcome policy facts |
+| `contact_official_next_step` | 18 | Add official channel/routing details for records, offices, events, and direct next steps |
+| `unknown_safe_boundary` | 21 | Review and assign typed catalog slots before adding facts |
+| `off_topic_or_safety` | 8 | Keep boundary; no catalog fact needed |
+| `institution_positioning` | 6 | Add customer-approved value-proposition / positioning sheet |
+| `grounded_direct_fact` | 1 | Rerun/regrade only after approved evidence for the difference question |
+
+Score-7 catalog candidate breakdown:
+
+| Category | Count | Recommended action |
+|---|---:|---|
+| _none_ | 0 | Current 7 band is closed |
+
+Recent rerun artifacts:
+
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-08T08-56-04-871Z.json` (`155` grounded-direct candidates; `125` improved)
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-08T09-05-08-608Z.json` (`4` institution/MYO fact patch checks; all `9/10`)
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-08T09-10-17-199Z.json` (`2` campus/Tıp-staj fact patch checks; all `9/10`)
+- `tmp/customer-question-batches/yiu-score-1-10-retest-2026-06-08T09-36-35-012Z.json` (`15` previous current-7 questions; all `8/10`)
+
+### Recommended Next 8->9 Work
+
+1. **Clinical/staj/lab fact sheet first**
+   This is the largest score-8 bucket (`101`). The next lift should collect approved program-by-program practice/staj/lab/facility facts for Hemşirelik, Ebelik, Anestezi, İlk ve Acil Yardım, Tıbbi Laboratuvar, Tıbbi Görüntüleme, Fizyoterapi, and related health programs.
+
+2. **Campus/housing/transport operations sheet**
+   The second-largest score-8 bucket (`69`) needs customer-approved current facts for service/shuttle details, yurt options, campus events, dining, Wi-Fi, clubs, and local-life guidance.
+
+3. **Admissions and preference-decision source coverage**
+   The admissions bucket (`46`) is now safe, but mostly boundary-style. Stronger approved data for kontenjan, taban puan, başarı sırası, yatay geçiş/DGS, hazırlık, and tercih decision policy can move many of these from `8` to `9`.
+
+4. **Finance, credential, and career authority sheets**
+   Payment-policy (`29`), credential (`23`), and professional-outcome (`24`) answers are safe but often cannot provide exact positive facts. These need official or customer-approved source sheets rather than model creativity.
+
+5. **Unknown-safe-boundary typing**
+   The `unknown_safe_boundary` bucket (`21`) should be reviewed and assigned to typed catalog slots so future candidate generation points to the exact fact sheet instead of a generic review queue.

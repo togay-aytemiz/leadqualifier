@@ -13,6 +13,8 @@ export type StrictCatalogAnswerReason =
   | 'catalog_faculty_listing'
   | 'catalog_degree_level_listing'
   | 'catalog_program_distinction_fact'
+  | 'catalog_program_duration_fact'
+  | 'catalog_program_professional_title_fact'
   | 'catalog_program_fee_fact'
   | 'catalog_payment_policy_scope_guard'
   | 'catalog_admissions_metric_scope_guard'
@@ -20,6 +22,9 @@ export type StrictCatalogAnswerReason =
   | 'catalog_admissions_point_type_fact'
   | 'catalog_institution_fact'
   | 'catalog_institution_location_fact'
+  | 'catalog_campus_program_listing'
+  | 'catalog_campus_transport_fact'
+  | 'catalog_campus_transport_scope_guard'
   | 'catalog_scholarship_fact'
   | 'catalog_scholarship_scope_guard'
   | 'catalog_hospital_scope_guard'
@@ -38,8 +43,11 @@ export type StrictCatalogAnswerReason =
   | 'catalog_housing_agreement_fact'
   | 'catalog_housing_scope_guard'
   | 'catalog_double_major_fact'
+  | 'catalog_accreditation_scope_guard'
+  | 'catalog_recognition_scope_guard'
   | 'catalog_credential_scope_guard'
   | 'catalog_registration_scope_guard'
+  | 'catalog_academic_process_scope_guard'
   | 'catalog_professional_authority_scope_guard'
   | 'catalog_candidate_event_scope_guard'
   | 'catalog_reputation_scope_guard'
@@ -78,7 +86,22 @@ const INSTITUTION_LOCATION_CITATION: RagProviderCitation = {
   providerSourceId: 'strict-catalog:campus-locations',
   title: 'YİÜ Tanıtım Broşürü - Yerleşke Konumları',
   quote:
-    'YİÜ kaynaklarında Bağlıca, Balgat ve Bağlum yerleşkeleri Ankara adresleriyle listelenir.',
+    'YİÜ kaynaklarında 100. Yıl, Bağlıca, Balgat ve Bağlum yerleşkeleri Ankara adresleriyle listelenir.',
+}
+
+const CAMPUS_PROGRAM_CITATION: RagProviderCitation = {
+  providerSourceId: 'strict-catalog:campus-programs',
+  title: 'YİÜ Tanıtım Broşürü - Fakülte, Program ve Yerleşke Eşleşmeleri',
+  quote:
+    'Broşürde Tıp Fakültesi 100. Yıl, Sağlık Bilimleri Fakültesi Bağlıca, Spor Bilimleri Fakültesi/Meslek Yüksekokulu/Sağlık Hizmetleri MYO programları Balgat ve Bağlum yerleşkeleriyle eşleştirilir.',
+}
+
+const CAMPUS_TRANSPORT_CITATION: RagProviderCitation = {
+  providerSourceId: 'strict-catalog:campus-transport',
+  title: 'YİÜ Tanıtım Broşürü - Yerleşke, İletişim ve Ulaşım Bilgileri',
+  url: 'https://yuksekihtisasuniversitesi.edu.tr/duyuru/universitemizde-yeni-duzenleme-kapsaminda-yapilan-yerleske-konumlari-guncellendi',
+  quote:
+    'Broşürde yerleşke adresleri, genel telefon, Bağlum telefonu ve ulaşım bilgileri için resmi bağlantı yer alır; servis saat/güzergah/ücret ayrıntıları ayrıca doğrulanmalıdır.',
 }
 
 const HOSPITAL_SCOPE_CITATION: RagProviderCitation = {
@@ -134,7 +157,7 @@ const CAMPUS_LIFE_SCOPE_CITATION: RagProviderCitation = {
   providerSourceId: 'strict-catalog:campus-life-scope',
   title: 'YİÜ Kampüs Yaşamı ve Güncel İmkan Bilgileri Kapsamı',
   quote:
-    'Kampüs yaşamı, Wi-Fi, kafe/kantin, spor salonu, vejetaryen yemek, güvenlik, otopark, servis saatleri/güzergahları ve kampüs çevresi konaklama gibi güncel imkan bilgileri onaylı aday öğrenci kaynaklarında net doğrulanmadan var cevabı olarak verilmemelidir.',
+    'Kampüs yaşamı, Wi-Fi, kafe/kantin, yemekhane, yemek fiyatları, spor salonu, vejetaryen yemek, güvenlik, otopark ve kampüs çevresi konaklama gibi güncel imkan bilgileri onaylı aday öğrenci kaynaklarında net doğrulanmadan var cevabı olarak verilmemelidir.',
 }
 
 const CAMPUS_LIFE_FACT_CITATION: RagProviderCitation = {
@@ -149,6 +172,13 @@ const REGISTRATION_SCOPE_CITATION: RagProviderCitation = {
   title: 'YİÜ Aday Öğrenci Kayıt Süreci Kapsamı',
   quote:
     'Aday öğrenci kesin kayıt, online kayıt, randevu, belge ve tarih bilgileri dönem ve başvuru türüne göre değişebilir; onaylı aday öğrenci kaynağında net doğrulanmadan kesin süreç cevabı verilmemelidir.',
+}
+
+const ACADEMIC_PROCESS_SCOPE_CITATION: RagProviderCitation = {
+  providerSourceId: 'strict-catalog:academic-process-scope',
+  title: 'YİÜ Akademik Süreç, Devam ve Hazırlık Kapsamı',
+  quote:
+    'Devam zorunluluğu, devamsızlıktan kalma, hazırlık başarı/tekrar koşulu, uzaktan eğitim ve ders yükü gibi akademik süreç ayrıntıları resmi yönerge ve program duyurularıyla doğrulanmalıdır.',
 }
 
 const PROFESSIONAL_AUTHORITY_SCOPE_CITATION: RagProviderCitation = {
@@ -183,7 +213,7 @@ const CONTACT_SCOPE_CITATION: RagProviderCitation = {
   providerSourceId: 'strict-catalog:contact-channel-scope',
   title: 'YİÜ Resmi İletişim Kanalı Kapsamı',
   quote:
-    'WhatsApp danışma hattı veya aday öğrenci WhatsApp hattı gibi özel iletişim kanalı iddiaları onaylı kaynaklarda net doğrulanmadan var cevabı olarak verilmemelidir.',
+    'Broşürde genel telefon ve Bağlum telefonu yer alır; WhatsApp danışma hattı, aday öğrenci birimi veya Öğrenci İşleri doğrudan telefon numarası gibi özel kanal iddiaları net doğrulanmadan var cevabı olarak verilmemelidir.',
 }
 
 const HOUSING_CITATION: RagProviderCitation = {
@@ -209,6 +239,20 @@ const CREDENTIAL_SCOPE_CITATION: RagProviderCitation = {
     'Yurtdışında diploma geçerliliği ve mesleki denklik otomatik garanti olarak verilmemelidir; ülke, kurum ve meslek otoritesi kurallarına bağlıdır.',
 }
 
+const ACCREDITATION_SCOPE_CITATION: RagProviderCitation = {
+  providerSourceId: 'strict-catalog:accreditation-scope',
+  title: 'Akreditasyon, Diploma Geçerliliği ve Program Tanınma Kapsamı',
+  quote:
+    'Akreditasyon program bazlı kalite değerlendirmesidir; diploma geçerliliği, YÖK tanınması ve mesleki denklik ayrı resmi otorite süreçleridir.',
+}
+
+const RECOGNITION_SCOPE_CITATION: RagProviderCitation = {
+  providerSourceId: 'strict-catalog:institution-recognition-scope',
+  title: 'YİÜ Kurumsal Tanıtım ve Resmi Tanınma Kapsamı',
+  quote:
+    'Yüksek İhtisas Üniversitesi 2013 yılında Ankara’da kurulan bir vakıf üniversitesi olarak tanıtılır; YÖK/YÖKSİS, program onayı ve mesleki tanınma iddiaları resmi otorite kaydıyla doğrulanmalıdır.',
+}
+
 const DOUBLE_MAJOR_CITATION: RagProviderCitation = {
   providerSourceId: 'strict-catalog:double-major',
   title: 'YİÜ Tanıtım Broşürü - Burslar ve Çift Anadal',
@@ -228,6 +272,20 @@ const PROGRAM_FEE_CITATION: RagProviderCitation = {
   title: 'YİÜ Tanıtım Broşürü - 2025 Program Ücretleri',
   quote:
     'Broşür program ücret tablolarında ücretli, burslu ve %50 indirimli satırlar program bazında listelenir; burslu satırlarda fiyat alanı "-" olarak gösterilir.',
+}
+
+const PROGRAM_DURATION_CITATION: RagProviderCitation = {
+  providerSourceId: 'strict-catalog:program-durations',
+  title: 'YİÜ Tanıtım Broşürü - Program Süreleri',
+  quote:
+    'Broşürde Tıp Fakültesi 6 yıllık, lisans programları 4 yıllık ve ön lisans programları 2 yıllık programlar olarak aday öğrenci program listelerinde yer alır.',
+}
+
+const PROGRAM_PROFESSIONAL_TITLE_CITATION: RagProviderCitation = {
+  providerSourceId: 'strict-catalog:program-professional-title',
+  title: 'YİÜ Program Düzeyi ve Mesleki Unvan Kapsamı',
+  quote:
+    'Eczane Hizmetleri katalogda ön lisans programı olarak listelenir; program mezuniyeti fakülte düzeyi eczacılık unvanı veya mesleki yetki iddiası olarak yorumlanmamalıdır.',
 }
 
 const PAYMENT_POLICY_SCOPE_CITATION: RagProviderCitation = {
@@ -360,6 +418,11 @@ const UNSUPPORTED_UNITS: AcademicCatalogUnit[] = [
 
 const CAMPUS_LOCATIONS = [
   {
+    key: '100 yil',
+    name: '100. Yıl Yerleşkesi',
+    address: 'İşçi Blokları Mahallesi 1505. Sokak No:18/A Çankaya/Ankara',
+  },
+  {
     key: 'baglica',
     name: 'Bağlıca Yerleşkesi',
     address: 'Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca/Ankara',
@@ -373,6 +436,83 @@ const CAMPUS_LOCATIONS = [
     key: 'baglum',
     name: 'Bağlum Yerleşkesi',
     address: 'Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören/Ankara',
+  },
+]
+
+const CAMPUS_PROGRAM_GROUPS = [
+  {
+    keys: ['100 yil', 'tip'],
+    name: '100. Yıl Yerleşkesi',
+    address: 'İşçi Blokları Mahallesi 1505. Sokak No:18/A Çankaya/Ankara',
+    groups: [
+      {
+        unit: 'Tıp Fakültesi',
+        programs: ['Tıp Fakültesi (Türkçe)', 'Tıp Fakültesi (İngilizce)'],
+      },
+    ],
+  },
+  {
+    keys: ['baglica', 'saglik bilimleri'],
+    name: 'Bağlıca Yerleşkesi',
+    address: 'Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca/Ankara',
+    groups: [
+      {
+        unit: 'Sağlık Bilimleri Fakültesi',
+        programs: [
+          'Ergoterapi',
+          'Ebelik',
+          'Hemşirelik',
+          'Beslenme ve Diyetetik',
+          'Fizyoterapi ve Rehabilitasyon',
+          'Dil ve Konuşma Terapisi',
+          'Sağlık Yönetimi',
+        ],
+      },
+    ],
+  },
+  {
+    keys: ['balgat'],
+    name: 'Balgat Yerleşkesi',
+    address: 'Oğuzlar Mahallesi 1375 Sokak No:8 Balgat/Ankara',
+    groups: [
+      {
+        unit: 'Spor Bilimleri Fakültesi',
+        programs: ['Antrenörlük Eğitimi'],
+      },
+      {
+        unit: 'Meslek Yüksekokulu',
+        programs: ['Eczane Hizmetleri', 'Bilgisayar Programcılığı', 'Grafik Tasarım', 'Elektrik'],
+      },
+      {
+        unit: 'Sağlık Hizmetleri Meslek Yüksekokulu',
+        programs: [
+          'Elektronörofizyoloji',
+          'Biyomedikal Cihaz Teknolojisi',
+          'Fizyoterapi',
+          'Tıbbi Veri İşleme Teknikerliği',
+          'Tıbbi Laboratuvar Teknikleri',
+        ],
+      },
+    ],
+  },
+  {
+    keys: ['baglum'],
+    name: 'Bağlum Yerleşkesi',
+    address: 'Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören/Ankara',
+    groups: [
+      {
+        unit: 'Sağlık Hizmetleri Meslek Yüksekokulu',
+        programs: [
+          'Anestezi',
+          'Ameliyathane Hizmetleri',
+          'İlk ve Acil Yardım',
+          'Tıbbi Tanıtım ve Pazarlama',
+          'Optisyenlik',
+          'Tıbbi Dokümantasyon ve Sekreterlik',
+          'Tele-Sağlık Teknikerliği',
+        ],
+      },
+    ],
   },
 ]
 
@@ -544,6 +684,165 @@ const PROGRAM_FEE_FACTS = [
   },
 ]
 
+const PROGRAM_DURATION_FACTS = [
+  {
+    name: 'Tıp Fakültesi',
+    aliases: ['tip', 'tip fakultesi', 'turkce tip', 'ingilizce tip'],
+    duration: '6 yıllık',
+    level: 'tıp programı',
+  },
+  {
+    name: 'Beslenme ve Diyetetik',
+    aliases: ['beslenme', 'beslenme ve diyetetik'],
+    duration: '4 yıllık',
+    level: 'lisans programı',
+  },
+  {
+    name: 'Dil ve Konuşma Terapisi',
+    aliases: ['dkt', 'dil konusma terapisi', 'dil ve konusma terapisi'],
+    duration: '4 yıllık',
+    level: 'lisans programı',
+  },
+  {
+    name: 'Fizyoterapi ve Rehabilitasyon',
+    aliases: ['ftr', 'fizyoterapi ve rehabilitasyon'],
+    duration: '4 yıllık',
+    level: 'lisans programı',
+  },
+  {
+    name: 'Hemşirelik',
+    aliases: ['hemsirelik'],
+    duration: '4 yıllık',
+    level: 'lisans programı',
+  },
+  {
+    name: 'Sağlık Yönetimi',
+    aliases: ['saglik yonetimi'],
+    duration: '4 yıllık',
+    level: 'lisans programı',
+  },
+  {
+    name: 'Ergoterapi',
+    aliases: ['ergoterapi'],
+    duration: '4 yıllık',
+    level: 'lisans programı',
+  },
+  {
+    name: 'Ebelik',
+    aliases: ['ebelik'],
+    duration: '4 yıllık',
+    level: 'lisans programı',
+  },
+  {
+    name: 'Antrenörlük Eğitimi',
+    aliases: ['antrenorluk egitimi', 'antrenorluk'],
+    duration: '4 yıllık',
+    level: 'lisans programı',
+  },
+  {
+    name: 'Ameliyathane Hizmetleri',
+    aliases: ['ameliyathane hizmetleri'],
+    duration: '2 yıllık',
+    level: 'ön lisans programı',
+  },
+  {
+    name: 'Anestezi',
+    aliases: ['anestezi'],
+    duration: '2 yıllık',
+    level: 'ön lisans programı',
+  },
+  {
+    name: 'Biyomedikal Cihaz Teknolojisi',
+    aliases: ['biyomedikal cihaz teknolojisi'],
+    duration: '2 yıllık',
+    level: 'ön lisans programı',
+  },
+  {
+    name: 'Elektronörofizyoloji',
+    aliases: ['elektronorofizyoloji'],
+    duration: '2 yıllık',
+    level: 'ön lisans programı',
+  },
+  {
+    name: 'Optisyenlik',
+    aliases: ['optisyenlik'],
+    duration: '2 yıllık',
+    level: 'ön lisans programı',
+  },
+  {
+    name: 'Tıbbi Dokümantasyon ve Sekreterlik',
+    aliases: ['tibbi dokumantasyon', 'tibbi dokumantasyon ve sekreterlik'],
+    duration: '2 yıllık',
+    level: 'ön lisans programı',
+  },
+  {
+    name: 'Tıbbi Laboratuvar Teknikleri',
+    aliases: ['tibbi laboratuvar', 'tibbi laboratuvar teknikleri'],
+    duration: '2 yıllık',
+    level: 'ön lisans programı',
+  },
+  {
+    name: 'Tıbbi Görüntüleme Teknikleri',
+    aliases: ['tibbi goruntuleme', 'tibbi goruntuleme teknikleri'],
+    duration: '2 yıllık',
+    level: 'ön lisans programı',
+  },
+  {
+    name: 'Tıbbi Tanıtım ve Pazarlama',
+    aliases: ['tibbi tanitim', 'tibbi tanitim ve pazarlama'],
+    duration: '2 yıllık',
+    level: 'ön lisans programı',
+  },
+  {
+    name: 'Fizyoterapi',
+    aliases: ['fizyoterapi on lisans', 'fizyoterapi'],
+    duration: '2 yıllık',
+    level: 'ön lisans programı',
+  },
+  {
+    name: 'İlk ve Acil Yardım',
+    aliases: ['ilk ve acil yardim', 'ilk yardim', 'ilkyardim', 'ilkyardım'],
+    duration: '2 yıllık',
+    level: 'ön lisans programı',
+  },
+  {
+    name: 'Tele-Sağlık Teknikerliği',
+    aliases: ['tele saglik', 'tele saglik teknikerligi'],
+    duration: '2 yıllık',
+    level: 'ön lisans programı',
+  },
+  {
+    name: 'Tıbbi Veri İşleme Teknikerliği',
+    aliases: ['tibbi veri isleme', 'tibbi veri isleme teknikerligi'],
+    duration: '2 yıllık',
+    level: 'ön lisans programı',
+  },
+  {
+    name: 'Bilgisayar Programcılığı',
+    aliases: ['bilgisayar programciligi'],
+    duration: '2 yıllık',
+    level: 'ön lisans programı',
+  },
+  {
+    name: 'Eczane Hizmetleri',
+    aliases: ['eczane hizmetleri'],
+    duration: '2 yıllık',
+    level: 'ön lisans programı',
+  },
+  {
+    name: 'Elektrik',
+    aliases: ['elektrik'],
+    duration: '2 yıllık',
+    level: 'ön lisans programı',
+  },
+  {
+    name: 'Grafik Tasarım',
+    aliases: ['grafik tasarim', 'grafik tasarimi'],
+    duration: '2 yıllık',
+    level: 'ön lisans programı',
+  },
+]
+
 const ADMISSIONS_POINT_TYPE_PROGRAMS = {
   SAY: [
     'Tıp Fakültesi',
@@ -622,6 +921,10 @@ function renderFaculties() {
   return `Onaylı tanıtım broşüründe listelenen fakülteler: ${FACULTIES.map((unit) => unit.name).join(', ')}.`
 }
 
+function renderSchools() {
+  return `Onaylı tanıtım broşüründe listelenen meslek yüksekokulları: ${SCHOOLS.map((unit) => unit.name).join(', ')}.`
+}
+
 function renderDegreeLevelPrograms() {
   const undergraduatePrograms = FACULTIES.flatMap((unit) => unit.programs ?? [])
   const associatePrograms = SCHOOLS.flatMap((unit) => unit.programs ?? [])
@@ -644,7 +947,59 @@ function resolveProgramDistinctionFact(search: string): StrictCatalogAnswer | nu
   }
 }
 
+function resolveProgramDurationFact(search: string): StrictCatalogAnswer | null {
+  const asksDuration = /(?:kac yil|kac yillik|egitim suresi|ne kadar sur)/.test(search)
+  if (!asksDuration) return null
+
+  const program = PROGRAM_DURATION_FACTS.find((fact) => includesAlias(search, fact.aliases))
+  if (!program) return null
+
+  return {
+    answer: `${program.name} ${program.duration} bir ${program.level} olarak listelenir. Hazırlık sınıfı, özel uygulama veya güncel program koşulu varsa ilgili akademik yılın resmi duyurusuyla ayrıca doğrulanmalıdır.`,
+    citations: [PROGRAM_DURATION_CITATION],
+    refusal: false,
+    reason: 'catalog_program_duration_fact',
+  }
+}
+
+function resolveProgramProfessionalTitleFact(search: string): StrictCatalogAnswer | null {
+  const asksEczaneServicesTitle =
+    /eczane hizmetleri/.test(search) &&
+    /(?:eczaci olur|eczaci mi|eczaci olunur|eczaci yapar|eczacilik unvani|eczacı unvanı)/.test(
+      search
+    )
+  if (!asksEczaneServicesTitle) return null
+
+  return {
+    answer:
+      'Hayır. Eczane Hizmetleri onaylı katalogda Meslek Yüksekokulu altında listelenen 2 yıllık bir ön lisans programıdır. Bu programdan eczacı unvanı sonucu çıkarılmamalıdır; eczacı unvanı ve mesleki yetkiler için ilgili resmi mevzuat ve fakülte düzeyi eğitim koşulları ayrıca belirleyicidir.',
+    citations: [CATALOG_CITATION, PROGRAM_PROFESSIONAL_TITLE_CITATION],
+    refusal: false,
+    reason: 'catalog_program_professional_title_fact',
+  }
+}
+
 function resolveInstitutionFact(search: string): StrictCatalogAnswer | null {
+  if (/(?:devlet mi|vakif|vakıf)/.test(search) && /(?:universite|yuksek ihtisas)/.test(search)) {
+    return {
+      answer:
+        'Yüksek İhtisas Üniversitesi bir vakıf üniversitesidir; devlet üniversitesi değildir. Onaylı kaynaklarda Türkiye Yüksek İhtisas Hastanesi Vakfı tarafından 2013 yılında Ankara’da kurulduğu belirtilir.',
+      citations: [INSTITUTION_CITATION],
+      refusal: false,
+      reason: 'catalog_institution_fact',
+    }
+  }
+
+  if (/(?:kurucu vakif|kurucu vakf|vakfi kim|vakfı kim)/.test(search)) {
+    return {
+      answer:
+        'Yüksek İhtisas Üniversitesi’nin kurucu vakfı Türkiye Yüksek İhtisas Hastanesi Vakfı’dır.',
+      citations: [INSTITUTION_CITATION],
+      refusal: false,
+      reason: 'catalog_institution_fact',
+    }
+  }
+
   if (
     /(?:ne zaman|kac yilinda|kurulus yil|kuruldu)/.test(search) &&
     /(?:universite|yuksek ihtisas)/.test(search)
@@ -664,6 +1019,131 @@ function renderAllCampusLocations() {
   return `Evet, Yüksek İhtisas Üniversitesi Ankara’dadır. Onaylı kaynaklarda yerleşkeler Ankara adresleriyle listelenir: ${CAMPUS_LOCATIONS.map(
     (location) => `${location.name}: ${location.address}`
   ).join('; ')}.`
+}
+
+function findCampusProgramGroup(search: string) {
+  return CAMPUS_PROGRAM_GROUPS.find((campus) =>
+    campus.keys.some((key) => search.includes(normalizeStrictQuestionSearch(key)))
+  )
+}
+
+function renderCampusProgramGroups(campus: (typeof CAMPUS_PROGRAM_GROUPS)[number]) {
+  return campus.groups
+    .map((group) => `${group.unit}: ${group.programs.join(', ')}`)
+    .join('; ')
+}
+
+function renderAllCampusProgramGroups() {
+  return CAMPUS_PROGRAM_GROUPS.map(
+    (campus) => `${campus.name}: ${renderCampusProgramGroups(campus)}`
+  ).join('; ')
+}
+
+function resolveCampusProgramListingFact(search: string): StrictCatalogAnswer | null {
+  if (
+    /(?:hangi bolum hangi kampus|hangi bölüm hangi kampüs|hangi bolum hangi yerleske|hangi bölüm hangi yerleşke|bolumler hangi kampus|bölümler hangi kampüs|bolumler hangi yerleske|bölümler hangi yerleşke)/.test(
+      search
+    )
+  ) {
+    return {
+      answer: `Broşürdeki yerleşke-program eşleşmeleri: ${renderAllCampusProgramGroups()}.`,
+      citations: [CAMPUS_PROGRAM_CITATION],
+      refusal: false,
+      reason: 'catalog_campus_program_listing',
+    }
+  }
+
+  if (
+    /(?:myo|meslek yuksekokulu|meslek yüksekokulu)/.test(search) &&
+    /(?:nerede|nerde|kampus|kampüs|yerleske|yerleşke)/.test(search)
+  ) {
+    return {
+      answer:
+        'Broşürde Meslek Yüksekokulu Balgat Yerleşkesi ile eşleştirilir. Sağlık Hizmetleri Meslek Yüksekokulu programları ise Balgat ve Bağlum yerleşkelerinde listelenir: Balgat Yerleşkesi adresi Oğuzlar Mahallesi 1375 Sokak No:8 Balgat/Ankara; Bağlum Yerleşkesi adresi Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören/Ankara.',
+      citations: [CAMPUS_PROGRAM_CITATION],
+      refusal: false,
+      reason: 'catalog_campus_program_listing',
+    }
+  }
+
+  const campus = findCampusProgramGroup(search)
+  if (!campus) return null
+
+  const hasExplicitCampusKey = ['100 yil', 'baglica', 'balgat', 'baglum'].some((key) =>
+    search.includes(key)
+  )
+  const hasCampusIntent = /(?:kampus|kampüs|yerleske|yerleşke|yerleskesinde|yerleşkesinde)/.test(
+    search
+  )
+  const asksCampusProgramListing =
+    (hasExplicitCampusKey &&
+      /(?:hangi bolum|hangi program|hangi fakulte|bolumler|programlar|fakulteler)/.test(
+        search
+      )) ||
+    /(?:hangi|nerede|nerde).{0,30}(?:kampus|yerleske)/.test(search) ||
+    /(?:tip fakultesi|saglik bilimleri|shmyo|meslek yuksekokulu|spor bilimleri).{0,40}(?:kampus|yerleske|nerede|nerde)/.test(
+      search
+    ) ||
+    (hasCampusIntent && hasExplicitCampusKey)
+  if (!asksCampusProgramListing) return null
+
+  return {
+    answer: `${campus.name} için broşürdeki yerleşke eşleşmesi: ${renderCampusProgramGroups(
+      campus
+    )}. Adres: ${campus.address}.`,
+    citations: [CAMPUS_PROGRAM_CITATION],
+    refusal: false,
+    reason: 'catalog_campus_program_listing',
+  }
+}
+
+function campusTransportTopicLabel(search: string) {
+  if (/hastaneye.*servis|servis.*hastane/.test(search)) return 'hastaneye servis'
+  if (/kampusler arasi servis/.test(search)) return 'kampüsler arası servis'
+  if (/servis saat/.test(search)) return 'servis saatleri'
+  if (/servis guzergah/.test(search)) return 'servis güzergahları'
+  if (/servis ucret|servis.*ucretli/.test(search)) return 'servis ücreti'
+  if (/servis/.test(search)) return 'servis'
+  if (/metro/.test(search)) return 'metro ile ulaşım'
+  if (/otobus/.test(search)) return 'otobüs ile ulaşım'
+  if (/dolmus/.test(search)) return 'dolmuş ile ulaşım'
+  return 'ulaşım'
+}
+
+function resolveCampusTransportFact(search: string): StrictCatalogAnswer | null {
+  const asksServiceScope =
+    /(?:servis|metro|otobus|dolmus)/.test(search) &&
+    /(?:var mi|varmi|ucretli|saat|guzergah|nereden gec|nasil|hastaneye|kampuse|kampusler arasi|toplu tasima)/.test(
+      search
+    )
+  if (asksServiceScope) {
+    const topic = campusTransportTopicLabel(search)
+    return {
+      answer: `Broşürde yerleşke adresleri ve ulaşım bilgileri için resmi bağlantı yer alır; ancak ${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Karar için ilgili yerleşke, güncel hizmet saatleri, güzergah, ücret ve ulaşım modu üniversitenin resmi ulaşım duyurusu veya ilgili birimiyle birlikte doğrulanmalıdır. Genel telefon: 0 (312) 329 10 10; Bağlum telefon: 0 (312) 329 74 25.`,
+      citations: [CAMPUS_TRANSPORT_CITATION],
+      refusal: true,
+      reason: 'catalog_campus_transport_scope_guard',
+    }
+  }
+
+  const asksCampusTransport =
+    /(?:kampuse nasil|kampüse nasil|kampuse nasıl|kampüse nasıl|yerleskeye nasil|yerleşkeye nasıl|yerleskenize ulasim|yerleşkenize ulaşım|ulasim nasil|ulaşım nasıl|nasil gider|nasıl gider|nasil gidilir|nasıl gidilir)/.test(
+      search
+    ) ||
+    (/(?:ulasim|ulaşım)/.test(search) && /(?:yerleske|yerleşke|kampus|kampüs)/.test(search))
+  if (!asksCampusTransport) return null
+
+  const campus = findCampusProgramGroup(search)
+  const addressText = campus
+    ? `${campus.name}: ${campus.address}`
+    : CAMPUS_PROGRAM_GROUPS.map((location) => `${location.name}: ${location.address}`).join('; ')
+
+  return {
+    answer: `Broşürdeki yerleşke adresleri: ${addressText}. Ulaşım bilgileri için resmi bağlantı: https://yuksekihtisasuniversitesi.edu.tr/duyuru/universitemizde-yeni-duzenleme-kapsaminda-yapilan-yerleske-konumlari-guncellendi. Güncel rota, metro/otobüs/dolmuş seçeneği ve saat bilgisi değişebileceği için ilgili yerleşke ve güncel ulaşım modu birlikte doğrulanmalıdır. Genel telefon: 0 (312) 329 10 10; Bağlum telefon: 0 (312) 329 74 25.`,
+    citations: [CAMPUS_TRANSPORT_CITATION],
+    refusal: false,
+    reason: 'catalog_campus_transport_fact',
+  }
 }
 
 function resolveInstitutionLocationFact(search: string): StrictCatalogAnswer | null {
@@ -808,6 +1288,16 @@ function resolveClinicalProgramScopeGuard(
     )
   if (!asksSpecificSummerInternship && !asksSpecificClinicalPractice) return null
 
+  if (asksSpecificSummerInternship && /(?:tip|tıp|tip fakultesi|tıp fakültesi)/.test(search)) {
+    return {
+      answer:
+        'Onaylı kaynaklarda Tıp Fakültesi için klinik eğitim Dönem IV ve Dönem V’te stajlarla başlar; Dönem VI ise intörn hekimlik dönemidir. Bu kaynaklardan Tıp Fakültesi için ayrıca ayrı bir yaz stajı olduğu sonucu çıkarılmamalıdır.',
+      citations: [CLINICAL_TRAINING_CITATION],
+      refusal: false,
+      reason: 'catalog_clinical_training_fact',
+    }
+  }
+
   const program = findSupportedUnit(understanding)
   if (!program || program.kind !== 'program') return null
 
@@ -828,7 +1318,7 @@ function resolveFacilityResourceScopeFact(
 ): StrictCatalogAnswer | null {
   const search = understanding.normalizedSearch
   const asksFacilityResource =
-    /(?:rontgen|mr|tomografi|cihaz|mikroskop|ambulans simulasyon|simulasyon laboratuvari|beceri laboratuvari|uygulama alani|dogumhane|yogun bakim|ameliyathane|cocuk hastaliklari servisi|dahili ve cerrahi|hasta basi egitim|ogrenci dinlenme alani|laboratuvarlari gez|laboratuvarlari gorebilir)/.test(
+    /(?:rontgen|mr|tomografi|cihaz|mikroskop|mikroskob|ambulans simulasyon|simulasyon laboratuvari|beceri laboratuvari|uygulama alani|dogumhane|yogun bakim|ameliyathane|cocuk hastaliklari servisi|dahili ve cerrahi|hasta basi egitim|ogrenci dinlenme alani|laboratuvarlari gez|laboratuvarlari gorebilir)/.test(
       search
     ) &&
     /(?:var mi|varmi|kac tane|kac adet|dusuyor mu|nerede|gorebilir miyim|gezebilir miyiz|kullan|egitimi)/.test(
@@ -854,6 +1344,10 @@ function resolveFacilityResourceScopeFact(
 
 function campusLifeTopicLabel(search: string) {
   if (/(?:wifi|wi fi)/.test(search)) return 'Wi-Fi'
+  if (/yemek fiyat|yemek ucret|yemek.*para|yemek.*tl/.test(search)) return 'yemek fiyatları'
+  if (/yemek kart/.test(search)) return 'yemek kartı'
+  if (/yemekhane/.test(search)) return 'yemekhane'
+  if (/yemek/.test(search)) return 'yemek hizmeti'
   if (/kafe/.test(search)) return 'kafe'
   if (/kantin/.test(search)) return 'kantin'
   if (/spor salonu/.test(search)) return 'spor salonu'
@@ -868,19 +1362,20 @@ function campusLifeTopicLabel(search: string) {
   if (/(?:kampusler.*yakin|birbirine yakin)/.test(search)) return 'kampüslerin birbirine yakınlığı'
   if (/apart/.test(search)) return 'kampüs çevresindeki apartlar'
   if (/kiralik ev/.test(search)) return 'kampüs çevresindeki kiralık evler'
+  if (/(?:ankara.*kira|kira|kiralar)/.test(search)) return 'Ankara kira ve konaklama maliyeti'
   return 'kampüs yaşamı ve imkanları'
 }
 
 function resolveCampusLifeScopeFact(search: string): StrictCatalogAnswer | null {
   const asksCampusLifeScope =
-    /(?:wifi|wi fi|kafe|kantin|spor salonu|vejetaryen|revir|otopark|kampus guvenli|kampus guvenligi|servis saat|servis guzergah|kampus yasam|kampus merkezi|kampusler.*yakin|birbirine yakin|apart|kiralik ev)/.test(
+    /(?:wifi|wi fi|yemek|yemekhane|kafe|kantin|spor salonu|vejetaryen|revir|otopark|kampus guvenli|kampus guvenligi|kampus yasam|kampus merkezi|kampusler.*yakin|birbirine yakin|apart|kiralik ev|ankara.*kira|kira|kiralar)/.test(
       search
     )
   if (!asksCampusLifeScope) return null
 
   const topic = campusLifeTopicLabel(search)
   return {
-    answer: `${topic} hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Bu tür kampüs yaşamı ve güncel imkan bilgileri değişebileceği için üniversitenin güncel resmi duyuruları veya ilgili birimi kontrol edilmelidir. Karar için ilgili yerleşke, dönem, hizmet saatleri/kapasitesi ve varsa başvuru koşulu birlikte doğrulanmalıdır.`,
+    answer: `${topic} hakkında üniversitenin onaylı aday öğrenci kaynaklarında net bilgi bulunmamaktadır. Bu tür kampüs yaşamı, şehir yaşamı ve güncel imkan bilgileri değişebileceği için üniversitenin güncel resmi duyuruları veya ilgili birimi kontrol edilmelidir. Karar için ilgili yerleşke, dönem, hizmet saatleri/kapasitesi, konaklama türü ve varsa başvuru koşulu birlikte doğrulanmalıdır.`,
     citations: [CAMPUS_LIFE_SCOPE_CITATION],
     refusal: true,
     reason: 'catalog_campus_life_scope_guard',
@@ -1092,7 +1587,9 @@ function resolveClinicalPracticeScopeGuard(search: string): StrictCatalogAnswer 
 }
 
 function hasHousingTerm(search: string) {
-  return /(?:^|\s)(?:yurt|yurdu|yurtlar|yurtlari|yurtlarda|konaklama)(?:\s|$)/.test(search)
+  return /(?:^|\s)(?:yurt|yurdu|yurtlar|yurtlari|yurtlarda|konaklama)(?:\s|$)|(?:sehir disindan gelen|nerede kaliyor|nerede kalıyor|nerde kaliyor|nerde kalıyor|kalacak yer)/.test(
+    search
+  )
 }
 
 function resolveHousingFact(search: string): StrictCatalogAnswer | null {
@@ -1126,7 +1623,7 @@ function resolveHousingFact(search: string): StrictCatalogAnswer | null {
   if (/^(?:yurt|yurtlar)\s+var mi\??$/.test(search)) {
     return {
       answer:
-        'Üniversite kaynaklarında yurtlar/konaklama için resmi bilgilendirme sayfası bağlantısı bulunmaktadır. Güncel yurt seçenekleri ve ayrıntılar için bu resmi sayfa kontrol edilmelidir.',
+        'Üniversite kaynaklarında Konaklama bilgileri için resmi yurtlar/konaklama sayfası bağlantısı bulunmaktadır: https://yuksekihtisasuniversitesi.edu.tr/sayfa/yurtlar/yurtlar/yurtlar. Güncel yurt seçenekleri, başvuru süreci, ücret, kontenjan, kampüse yakınlık ve varsa protokol/indirim bilgileri bu resmi sayfadan veya ilgili birimden doğrulanmalıdır.',
       citations: [HOUSING_CITATION],
       refusal: false,
       reason: 'catalog_housing_link_fact',
@@ -1282,7 +1779,7 @@ function resolveScholarshipFact(search: string): StrictCatalogAnswer | null {
 }
 
 function resolveProgramFeeFact(search: string): StrictCatalogAnswer | null {
-  const asksPrice = /(?:ucret|kac para|kac tl|fiyat|tl)/.test(search)
+  const asksPrice = /(?:ucret|kac para|kac tl|fiyat|(?:^|\s)tl(?:\s|$)|₺)/.test(search)
   if (!asksPrice) return null
 
   const asksBroadProgramFees =
@@ -1425,6 +1922,34 @@ function resolveAdmissionsPointTypeFact(search: string): StrictCatalogAnswer | n
 }
 
 function resolveAdmissionsDecisionGuard(search: string): StrictCatalogAnswer | null {
+  const asksPreferenceAdvice =
+    /(?:hangi bolum.*secmeliyim|hangi bölüm.*seçmeliyim|hangi program.*secmeliyim|hangi program.*seçmeliyim|hangi bolumu yaz|hangi bölümü yaz|hangi program.*uygun|hangi bolum.*uygun|hangi bölüm.*uygun|tip gelmezse|tıp gelmezse|hemsirelik mi|hemşirelik mi|anestezi mi|tibbi laboratuvar mi|tıbbi laboratuvar mı|saglik yonetimi mi|sağlık yönetimi mi|hastanede calismak|hastanede çalışmak|laboratuvarda calismak|laboratuvarda çalışmak|insanlarla birebir|spor gecmisim|spor geçmişim|bilgisayara ilgim)/.test(
+      search
+    )
+  if (asksPreferenceAdvice) {
+    return {
+      answer:
+        'Sizin yerinize tercih kararı veremem veya tek bir “en doğru bölüm” seçemem. Sağlıklı bir tercih için puan türünüz/başarı sıralamanız, hedef program, burs/indirim beklentisi, çalışmak istediğiniz ortam, mesleki ilgi alanınız ve programın kontenjan/geçmiş yıl verileri birlikte değerlendirilmelidir. Broşürde program, puan türü, kontenjan, taban puan ve başarı sırası gibi karşılaştırma girdileri yer alır; ancak kesin yerleşme garantisi verilemez.',
+      citations: [ADMISSIONS_METRIC_CITATION, ADMISSIONS_DECISION_SCOPE_CITATION, CATALOG_CITATION],
+      refusal: true,
+      reason: 'catalog_admissions_decision_guard',
+    }
+  }
+
+  const asksTransferOrDgs =
+    /(?:yatay gecis|yatay geçiş|kurum ici yatay|kurum içi yatay|dgs|on lisanstan lisansa|ön lisanstan lisansa)/.test(
+      search
+    )
+  if (asksTransferOrDgs) {
+    return {
+      answer:
+        'Yatay geçiş, kurum içi geçiş veya DGS gibi başvuru süreçleri için onaylı kaynaklarda bu botun kesin kabul/uygunluk cevabı verebileceği net bilgi bulunmamaktadır. Bu süreçler program, kontenjan, sınıf/dönem, not ortalaması, başvuru takvimi ve resmi yönerge koşullarına bağlıdır. Karar için hedef program, başvuru türü, güncel kontenjan ve resmi başvuru duyurusu birlikte doğrulanmalıdır.',
+      citations: [ADMISSIONS_DECISION_SCOPE_CITATION, REGISTRATION_SCOPE_CITATION],
+      refusal: true,
+      reason: 'catalog_admissions_decision_guard',
+    }
+  }
+
   const asksPersonalPlacement =
     /(?:kazanir miyim|kazanır mıyım|kesin kazan|kesin gir|yerlesebilir miyim|yerleşebilir miyim|bu siralamayla|bu sıralamayla|gecen yilki siralamayla|geçen yılki sıralamayla|puanim su|puanım şu|siralamam su|sıralamam şu|hangi bolumleri yazmaliyim|hangi bölümleri yazmalıyım|tercih listesi|tercihlerimi|kesin kazanacagim|kesin kazanacağım)/.test(
       search
@@ -1460,6 +1985,89 @@ function resolveAdmissionsDecisionGuard(search: string): StrictCatalogAnswer | n
   }
 }
 
+function resolveAccreditationScopeFact(search: string): StrictCatalogAnswer | null {
+  const asksAccreditationDefinition =
+    /(?:akreditasyon|akredite)/.test(search) && /(?:ne demek|nedir|anlami|ne anlama)/.test(search)
+  if (asksAccreditationDefinition) {
+    return {
+      answer:
+        'Akreditasyon, bir programın veya kurumun belirli kalite standartlarına göre bağımsız/ yetkili bir yapı tarafından değerlendirilmesi anlamına gelir. Diploma geçerliliğiyle aynı şey değildir; diploma geçerliliği, program onayı, YÖK tanınması ve mesleki denklik ayrı resmi süreçlerdir.',
+      citations: [ACCREDITATION_SCOPE_CITATION],
+      refusal: false,
+      reason: 'catalog_accreditation_scope_guard',
+    }
+  }
+
+  const asksInvalidity =
+    /(?:akreditasyon olmazsa|akredite olmayan|akredite degilse|akredite değilse)/.test(search) &&
+    /(?:diploma|gecersiz|geçersiz|okunmaz|okunur mu)/.test(search)
+  if (asksInvalidity) {
+    return {
+      answer:
+        'Akreditasyon diploma geçerliliğiyle aynı şey değildir. Akreditasyon program bazlı kalite değerlendirmesidir; diplomanın geçerliliği, YÖK tanınması, program onayı, mezuniyet koşulları ve varsa mesleki denklik/yetki süreçleri ayrı resmi otorite kurallarıyla değerlendirilir. Bu yüzden “akreditasyon yoksa diploma geçersizdir” şeklinde kesin bir sonuç çıkarılmamalıdır.',
+      citations: [ACCREDITATION_SCOPE_CITATION],
+      refusal: false,
+      reason: 'catalog_accreditation_scope_guard',
+    }
+  }
+
+  const asksAccreditation = /(?:akreditasyon|akredite)/.test(search)
+  if (!asksAccreditation) return null
+
+  const unit =
+    PROGRAM_FEE_FACTS.find((program) => includesAlias(search, program.aliases)) ??
+    (/(?:tip|tıp)/.test(search) ? { name: 'Tıp Fakültesi' } : null) ??
+    (/(?:hemsirelik|hemşirelik)/.test(search) ? { name: 'Hemşirelik' } : null) ??
+    (/(?:saglik bilimleri|sağlık bilimleri)/.test(search)
+      ? { name: 'Sağlık Bilimleri Fakültesi bölümleri' }
+      : null) ??
+    (/(?:on lisans|ön lisans|myo|meslek yuksekokulu)/.test(search)
+      ? { name: 'ön lisans programları' }
+      : null)
+  const topic = unit?.name ?? 'Bölümlerin/programların akreditasyon durumu'
+
+  return {
+    answer: `${topic} için akreditasyon durumu hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Akreditasyon program bazında değerlendirilir ve diploma geçerliliği, YÖK tanınması veya mesleki denklikle aynı şey değildir; karar için ilgili program, akreditasyon kuruluşu, geçerlilik tarihi ve resmi YÖK/YÖKAK/akreditasyon kaydı birlikte doğrulanmalıdır.`,
+    citations: [ACCREDITATION_SCOPE_CITATION],
+    refusal: true,
+    reason: 'catalog_accreditation_scope_guard',
+  }
+}
+
+function resolveRecognitionScopeFact(search: string): StrictCatalogAnswer | null {
+  const asksInstitutionRecognition =
+    /(?:yok|yök|yoksis|yöksis).{0,50}(?:tanin|tanın|denklik|denk|onay)/.test(search) ||
+    /(?:universite|üniversite).{0,60}(?:yok|yök).{0,60}(?:tanin|tanın|onay)/.test(search)
+  const asksDomesticCredential =
+    /(?:diploma|diplomaniz|diplomanız|mezun olunca diplomam).{0,80}(?:devlet universitesi|devlet üniversitesi|ayni gecerlilik|aynı geçerlilik|gecerli mi|geçerli mi|yok denk|yök denk)/.test(
+      search
+    ) ||
+    /(?:yok denkligi|yök denkliği|yok denkliği|yök denkligi)/.test(search)
+  const asksPublicExamOutcome =
+    /(?:kpss|atanabilir|atanma|atanir miyim|atanır mıyım)/.test(search)
+  if (!asksInstitutionRecognition && !asksDomesticCredential && !asksPublicExamOutcome) {
+    return null
+  }
+
+  if (asksPublicExamOutcome) {
+    return {
+      answer:
+        'Mezuniyet sonrası KPSS’ye girme veya atanma hakkı program mezuniyet unvanı, ÖSYM/KPSS başvuru koşulları, ilgili kamu kadrosu ve mevzuata bağlıdır. Onaylı aday öğrenci kaynaklarında belirli bir programa “mezun olunca atanır” garantisi veren net bilgi bulunmamaktadır; karar için program, mezuniyet unvanı, KPSS kılavuzu ve ilgili kadro şartı birlikte doğrulanmalıdır.',
+      citations: [RECOGNITION_SCOPE_CITATION],
+      refusal: true,
+      reason: 'catalog_recognition_scope_guard',
+    }
+  }
+
+  return {
+    answer:
+      'Yüksek İhtisas Üniversitesi, onaylı tanıtım kaynaklarında Türkiye Yüksek İhtisas Hastanesi Vakfı tarafından 2013 yılında Ankara’da kurulmuş bir vakıf üniversitesi olarak yer alır. Ancak YÖK/YÖKSİS kaydı, program onayı, devlet üniversitesi diplomasıyla aynı geçerlilik yorumu veya özel bir denklik sonucu için resmi YÖK ve ilgili otorite kaydı esas alınmalıdır. Bu bot resmi denklik/tanınma belgesi yerine geçmez; karar için kurum, program, mezuniyet belgesi ve yetkili otorite kaydı birlikte doğrulanmalıdır.',
+    citations: [INSTITUTION_CITATION, RECOGNITION_SCOPE_CITATION],
+    refusal: false,
+    reason: 'catalog_recognition_scope_guard',
+  }
+}
+
 function resolveCredentialScopeFact(search: string): StrictCatalogAnswer | null {
   if (/mavi diploma/.test(search)) {
     return {
@@ -1474,7 +2082,19 @@ function resolveCredentialScopeFact(search: string): StrictCatalogAnswer | null 
   const asksInternationalCredential =
     /(?:diploma|denklik)/.test(search) &&
     /(?:yurtdisi|amerika|almanya|avrupa|otomatik|gecerli)/.test(search)
-  if (!asksInternationalCredential) return null
+  const asksEquivalencyRequirement =
+    /denklik/.test(search) && /(?:gerekir|gerekli|lazim|almam|almak|mezun olunca)/.test(search)
+  if (!asksInternationalCredential && !asksEquivalencyRequirement) return null
+
+  if (asksEquivalencyRequirement && !asksInternationalCredential) {
+    return {
+      answer:
+        'Denklik gerekip gerekmediği hedef ülke, kurum, meslek alanı ve ilgili meslek otoritesine bağlıdır. Onaylı belgelerde YİÜ diploması için mezun olunca otomatik veya her durumda denklik alınması gerektiğine dair net bilgi bulunmamaktadır. Karar için hangi ülke/kurum, hangi program ve hangi mesleki yetki sürecinin söz konusu olduğu resmi otoriteyle doğrulanmalıdır.',
+      citations: [CREDENTIAL_SCOPE_CITATION],
+      refusal: true,
+      reason: 'catalog_credential_scope_guard',
+    }
+  }
 
   return {
     answer:
@@ -1486,6 +2106,16 @@ function resolveCredentialScopeFact(search: string): StrictCatalogAnswer | null 
 }
 
 function resolveRegistrationScopeFact(search: string): StrictCatalogAnswer | null {
+  if (/(?:benim yerime|yerime).{0,30}(?:kayit|kayıt)|(?:kayit|kayıt).{0,30}(?:benim yerime|yerime)/.test(search)) {
+    return {
+      answer:
+        'sizin yerinize kayıt yapamam veya resmi başvuru işlemi gerçekleştiremem. Kayıt işlemleri yalnızca üniversitenin güncel resmi kayıt kanalları, e-Devlet/ÖSYM süreçleri ve yetkili kayıt birimleri üzerinden yürütülmelidir. Karar için aday türü, kayıt dönemi, gerekli belgeler, kimlik doğrulama ve resmi kayıt kanalı birlikte doğrulanmalıdır.',
+      citations: [REGISTRATION_SCOPE_CITATION],
+      refusal: true,
+      reason: 'catalog_registration_scope_guard',
+    }
+  }
+
   const asksRegistrationScope =
     /(?:kayit|kayıt)/.test(search) &&
     /(?:nasil|online|kesin kayit|e devlet|kampuse gel|tarih|saat|randevu|eksik belge|hangi belge|belgeler|baskasinin yerine|resit olmayan|vazgecersem|ucret iadesi|kayit ofisi)/.test(
@@ -1500,6 +2130,54 @@ function resolveRegistrationScopeFact(search: string): StrictCatalogAnswer | nul
     refusal: true,
     reason: 'catalog_registration_scope_guard',
   }
+}
+
+function resolveAcademicProcessScopeFact(search: string): StrictCatalogAnswer | null {
+  const asksPrepOutcome =
+    /(?:hazirligi gecemezsem|hazırlığı geçemezsem|hazirlik.*gecemez|hazırlık.*geçemez|hazirlik.*kal|hazırlık.*kal)/.test(
+      search
+    )
+  if (asksPrepOutcome) {
+    return {
+      answer:
+        'Hazırlığı geçemezsem ne olur sorusu için onaylı aday öğrenci kaynaklarında net ve güncel resmi süreç bilgisi bulunmamaktadır. Hazırlık başarı/tekrar koşulu, muafiyet, program dili ve kayıt statüsü resmi akademik süreç ve ilgili hazırlık yönergesine bağlıdır. Karar için program, hazırlık zorunluluğu, sınav/muafiyet durumu ve güncel akademik yönerge birlikte doğrulanmalıdır.',
+      citations: [ACADEMIC_PROCESS_SCOPE_CITATION],
+      refusal: true,
+      reason: 'catalog_academic_process_scope_guard',
+    }
+  }
+
+  if (/(?:devamsizlik|devamsızlık|devamsizliktan kal|devamsızlıktan kal|devam zorunlu|devam zorunlulugu|devam zorunluluğu)/.test(search)) {
+    return {
+      answer:
+        'Devamsızlık ve derse devam zorunluluğu hakkında onaylı aday öğrenci kaynaklarında bu botun kesin oran/kural verebileceği net bilgi bulunmamaktadır. Devamsızlıktan kalma koşulu ders, program, uygulama/staj türü ve resmi ders devam yönergesine bağlıdır. Karar için ilgili ders/program, dönem, teorik-uygulamalı ders ayrımı ve resmi ders devam kuralı birlikte doğrulanmalıdır.',
+      citations: [ACADEMIC_PROCESS_SCOPE_CITATION],
+      refusal: true,
+      reason: 'catalog_academic_process_scope_guard',
+    }
+  }
+
+  if (/(?:en az ders calisarak|en az ders çalışarak|az calisarak|az çalışarak|kolay bolum|kolay bölüm|en kolay bolum|en kolay bölüm)/.test(search)) {
+    return {
+      answer:
+        'Bölümleri “en az ders çalışarak okunur” gibi bir ölçüte göre önermek uygun değildir. Ders yükü ve zorluk öğrencinin hazırlığına, ilgi alanına, programın müfredatına, uygulama/staj yüküne ve akademik beklentilere göre değişir. Tercih için programın ders planı, puan türü, mesleki hedef, çalışma alışkanlığı ve mezuniyet koşulları birlikte değerlendirilmelidir.',
+      citations: [ACADEMIC_PROCESS_SCOPE_CITATION, ADMISSIONS_DECISION_SCOPE_CITATION],
+      refusal: true,
+      reason: 'catalog_academic_process_scope_guard',
+    }
+  }
+
+  if (/(?:sadece online|uzaktan egitim|uzaktan eğitim|online okuyabilir)/.test(search)) {
+    return {
+      answer:
+        'Sadece online okuma veya uzaktan eğitim imkanı hakkında onaylı aday öğrenci kaynaklarında net bilgi bulunmamaktadır. Bu durum program, ders türü, dönem ve resmi eğitim-öğretim duyurusuna bağlıdır. Karar için hedef program, derslerin yürütülme biçimi, varsa uygulama/staj yükümlülüğü ve güncel resmi duyuru birlikte doğrulanmalıdır.',
+      citations: [ACADEMIC_PROCESS_SCOPE_CITATION],
+      refusal: true,
+      reason: 'catalog_academic_process_scope_guard',
+    }
+  }
+
+  return null
 }
 
 function resolveProfessionalAuthorityScopeFact(search: string): StrictCatalogAnswer | null {
@@ -1522,13 +2200,41 @@ function resolveContactScopeFact(search: string): StrictCatalogAnswer | null {
   const asksUnsupportedMessagingLine =
     /(?:whatsapp|danisma hatti|danisma hatt|aday.*hatti|iletisim hatti)/.test(search) &&
     /(?:var mi|varmi|mevcut mu|telefon|numara|hatti|hatt|danisma|iletisim)/.test(search)
+  const asksStudentAffairsPhone =
+    /(?:ogrenci isleri|öğrenci işleri|student affairs)/.test(search) &&
+    /(?:telefon|numara|iletisim|ulaş|ulas)/.test(search)
+  const asksCandidateOffice =
+    /(?:aday ogrenci|aday öğrenci|aday birim|aday.*birim)/.test(search) &&
+    /(?:nasil ulas|nasıl ulaş|ulasirim|ulaşırım|iletisim|telefon|numara|birim)/.test(search)
 
-  if (!asksUnsupportedMessagingLine) return null
+  if (!asksUnsupportedMessagingLine && !asksStudentAffairsPhone && !asksCandidateOffice) {
+    return null
+  }
+
+  if (asksStudentAffairsPhone) {
+    return {
+      answer:
+        'Öğrenci İşleri doğrudan telefon numarası hakkında onaylı aday öğrenci kaynaklarında net bilgi bulunmamaktadır. Broşürde resmi genel iletişim olarak Genel telefon: 0 (312) 329 10 10 ve Bağlum telefon: 0 (312) 329 74 25 yer alır. Öğrenci İşleri için güncel resmi iletişim sayfası, ilgili birim ve başvuru/kayıt dönemi birlikte doğrulanmalıdır.',
+      citations: [CONTACT_SCOPE_CITATION, CAMPUS_TRANSPORT_CITATION],
+      refusal: true,
+      reason: 'catalog_contact_scope_guard',
+    }
+  }
+
+  if (asksCandidateOffice) {
+    return {
+      answer:
+        'aday öğrenci birimi için doğrudan özel iletişim kanalı hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. resmi iletişim için üniversitenin güncel iletişim sayfası ve broşürde yer alan genel telefon kullanılmalı; aday türü, başvuru/kayıt dönemi ve ilgili birim birlikte doğrulanmalıdır. Genel telefon: 0 (312) 329 10 10.',
+      citations: [CONTACT_SCOPE_CITATION, CAMPUS_TRANSPORT_CITATION],
+      refusal: true,
+      reason: 'catalog_contact_scope_guard',
+    }
+  }
 
   return {
     answer:
-      'WhatsApp danışma hattı, aday öğrenci WhatsApp hattı veya özel iletişim hattı hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Karar için üniversitenin resmi iletişim sayfası, ilgili birim ve güncel başvuru dönemi birlikte doğrulanmalıdır.',
-    citations: [CONTACT_SCOPE_CITATION],
+      'WhatsApp danışma hattı, aday öğrenci WhatsApp hattı veya özel iletişim hattı hakkında onaylı kaynaklarda net bilgi bulunmamaktadır. Karar için üniversitenin resmi iletişim sayfası, ilgili birim ve güncel başvuru dönemi birlikte doğrulanmalıdır. Broşürde genel telefon olarak 0 (312) 329 10 10 yer alır.',
+    citations: [CONTACT_SCOPE_CITATION, CAMPUS_TRANSPORT_CITATION],
     refusal: true,
     reason: 'catalog_contact_scope_guard',
   }
@@ -1585,14 +2291,14 @@ function resolveCandidateEventScopeFact(search: string): StrictCatalogAnswer | n
 
 function resolveReputationScopeFact(search: string): StrictCatalogAnswer | null {
   const asksReputation =
-    /(?:universitenin eksileri|eksileri ne|kotu yorum|kotu yorumlari|en kotu bolum|rakip.*kiyas|kiyaslar misin|olumsuz yorum|dezavantajlari)/.test(
+    /(?:universitenin eksileri|eksileri ne|kotu yorum|kotu yorumlari|en kotu bolum|rakip.*kiyas|kiyaslar misin|olumsuz yorum|dezavantajlari|hocalar zor|hoca.*zor|yemekler guzel|yemekler güzel)/.test(
       search
     )
   if (!asksReputation) return null
 
   return {
     answer:
-      'Üniversitenin eksileri, kötü yorumlar veya rakiplerle kıyaslama gibi öznel değerlendirme başlıkları hakkında onaylı kaynaklarda doğrulanmış bilgi bulunmamaktadır. Yanıltıcı yorum aktarmak yerine program, ücret, burs, kontenjan, kampüs veya kayıt bilgileri gibi doğrulanabilir başlıklarda yardımcı olabilirim.',
+      'Üniversitenin eksileri, kötü yorumlar, hocaların zorluğu, yemeklerin beğenilip beğenilmediği veya rakiplerle kıyaslama gibi öznel değerlendirme başlıkları hakkında onaylı kaynaklarda doğrulanmış bilgi bulunmamaktadır. Yanıltıcı yorum aktarmak yerine program, ücret, burs, kontenjan, kampüs veya kayıt bilgileri gibi doğrulanabilir başlıklarda yardımcı olabilirim.',
     citations: [REPUTATION_SCOPE_CITATION],
     refusal: true,
     reason: 'catalog_reputation_scope_guard',
@@ -1612,8 +2318,18 @@ export function resolveStrictCatalogAnswer(input: {
   const asksListing = understanding.intents.includes('listing')
   const programDistinctionFact = resolveProgramDistinctionFact(understanding.normalizedSearch)
   if (programDistinctionFact) return programDistinctionFact
+  const programDurationFact = resolveProgramDurationFact(understanding.normalizedSearch)
+  if (programDurationFact) return programDurationFact
+  const programProfessionalTitleFact = resolveProgramProfessionalTitleFact(
+    understanding.normalizedSearch
+  )
+  if (programProfessionalTitleFact) return programProfessionalTitleFact
   const institutionFact = resolveInstitutionFact(understanding.normalizedSearch)
   if (institutionFact) return institutionFact
+  const campusTransportFact = resolveCampusTransportFact(understanding.normalizedSearch)
+  if (campusTransportFact) return campusTransportFact
+  const campusProgramListingFact = resolveCampusProgramListingFact(understanding.normalizedSearch)
+  if (campusProgramListingFact) return campusProgramListingFact
   const institutionLocationFact = resolveInstitutionLocationFact(understanding.normalizedSearch)
   if (institutionLocationFact) return institutionLocationFact
   const affiliatedHospitalDefinitionFact = resolveAffiliatedHospitalDefinitionFact(
@@ -1636,6 +2352,14 @@ export function resolveStrictCatalogAnswer(input: {
   if (admissionsMetricScopeFact) return admissionsMetricScopeFact
   const admissionsPointTypeFact = resolveAdmissionsPointTypeFact(understanding.normalizedSearch)
   if (admissionsPointTypeFact) return admissionsPointTypeFact
+  const academicProcessScopeFact = resolveAcademicProcessScopeFact(understanding.normalizedSearch)
+  if (academicProcessScopeFact) return academicProcessScopeFact
+  const accreditationScopeFact = resolveAccreditationScopeFact(understanding.normalizedSearch)
+  if (accreditationScopeFact) return accreditationScopeFact
+  const credentialScopeFact = resolveCredentialScopeFact(understanding.normalizedSearch)
+  if (credentialScopeFact) return credentialScopeFact
+  const recognitionScopeFact = resolveRecognitionScopeFact(understanding.normalizedSearch)
+  if (recognitionScopeFact) return recognitionScopeFact
   const offTopicScopeFact = resolveOffTopicScopeFact(input.question, understanding)
   if (offTopicScopeFact) return offTopicScopeFact
   const clinicalTrainingFact = resolveClinicalTrainingFact(understanding.normalizedSearch)
@@ -1659,8 +2383,6 @@ export function resolveStrictCatalogAnswer(input: {
   if (clinicalProgramScopeGuard) return clinicalProgramScopeGuard
   const housingFact = resolveHousingFact(understanding.normalizedSearch)
   if (housingFact) return housingFact
-  const credentialScopeFact = resolveCredentialScopeFact(understanding.normalizedSearch)
-  if (credentialScopeFact) return credentialScopeFact
   const professionalAuthorityScopeFact = resolveProfessionalAuthorityScopeFact(
     understanding.normalizedSearch
   )
@@ -1693,6 +2415,20 @@ export function resolveStrictCatalogAnswer(input: {
     }
   }
 
+  if (
+    !/(?:shmyo|saglik hizmetleri|sağlık hizmetleri)/.test(understanding.normalizedSearch) &&
+    /(?:hangi meslek yuksekokulu|hangi meslek yüksekokulu|meslek yuksekokullari|meslek yüksekokulları|myo)/.test(
+      understanding.normalizedSearch
+    )
+  ) {
+    return {
+      answer: renderSchools(),
+      citations: [CATALOG_CITATION],
+      refusal: false,
+      reason: 'catalog_faculty_listing',
+    }
+  }
+
   if (asksExistence && !asksClinicalInternshipTopic(understanding.normalizedSearch)) {
     const unsupported = findUnsupportedCatalogUnit(input.question)
     if (unsupported) {
@@ -1718,6 +2454,20 @@ export function resolveStrictCatalogAnswer(input: {
   }
 
   if (asksListing) {
+    if (
+      !/(?:shmyo|saglik hizmetleri|sağlık hizmetleri)/.test(understanding.normalizedSearch) &&
+      /(?:hangi meslek yuksekokulu|hangi meslek yüksekokulu|meslek yuksekokullari|meslek yüksekokulları|myo)/.test(
+        understanding.normalizedSearch
+      )
+    ) {
+      return {
+        answer: renderSchools(),
+        citations: [CATALOG_CITATION],
+        refusal: false,
+        reason: 'catalog_faculty_listing',
+      }
+    }
+
     if (/hangi fakulte|hangi fakulteler|fakulteler/.test(understanding.normalizedSearch)) {
       return {
         answer: renderFaculties(),

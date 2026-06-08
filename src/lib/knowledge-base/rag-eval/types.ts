@@ -64,6 +64,11 @@ export type RagProviderResult = {
     qualityMode?: 'validated' | 'strict'
     normalizedQuestion?: string
     strictVerdict?: string
+    strictQuality?: {
+      suggestedScore: 7 | 8 | 9
+      tier: string
+      reason: string
+    }
     strictLlmVerdict?: string
     strictLlmReason?: string
     strictLlmRetryQuery?: string

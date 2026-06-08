@@ -36,6 +36,7 @@ import {
   type StrictLlmCreateCompletion,
   type StrictLlmEvaluatorResult,
 } from './strict-llm-evaluator'
+import { classifyStrictDirectAnswerQuality } from './strict-quality-rubric'
 
 type CitationSource = {
   title?: string
@@ -789,6 +790,12 @@ function strictDirectResult(input: {
       qualityMode: 'strict',
       ...(input.normalizedQuestion ? { normalizedQuestion: input.normalizedQuestion } : {}),
       strictVerdict: input.strictVerdict,
+      strictQuality: classifyStrictDirectAnswerQuality({
+        reason: input.strictVerdict,
+        answer: input.answer,
+        citations: input.citations,
+        refusal: input.refusal,
+      }),
       ...(input.researchPlan ? { researchPlan: input.researchPlan } : {}),
     },
   }

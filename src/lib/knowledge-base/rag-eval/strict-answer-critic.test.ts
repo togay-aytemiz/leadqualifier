@@ -100,10 +100,12 @@ describe('evaluateStrictAnswer', () => {
       reason: 'actionable_no_info',
       refusal: true,
     })
-    expect(verdict.repairedAnswer).toContain('Öğrenci işleri telefon numarası')
-    expect(verdict.repairedAnswer).toContain('onaylı kaynaklarda net bilgi bulunmamaktadır')
-    expect(verdict.repairedAnswer).toContain('resmi iletişim kanallarını')
-    expect(verdict.repairedAnswer).toContain('hangi birim')
+    expect(verdict.repairedAnswer).toContain('Öğrenci İşleri doğrudan telefon numarası')
+    expect(verdict.repairedAnswer).toContain(
+      'onaylı aday öğrenci kaynaklarında net bilgi bulunmamaktadır'
+    )
+    expect(verdict.repairedAnswer).toContain('Genel telefon')
+    expect(verdict.repairedAnswer).toContain('ilgili birim')
   })
 
   it('adds decision criteria to clinical, housing, registration, and credential no-info boundaries', () => {
@@ -146,9 +148,9 @@ describe('evaluateStrictAnswer', () => {
     )
     expect(credential).toMatchObject({
       action: 'repair',
-      reason: 'actionable_no_info',
+      reason: 'missed_catalog_fact',
     })
-    expect(credential.repairedAnswer).toContain('diplomanın geçersiz olduğu anlamına gelmez')
+    expect(credential.repairedAnswer).toContain('diploma geçerliliğiyle aynı şey değildir')
     expect(credential.repairedAnswer).toContain('YÖK')
   })
 
