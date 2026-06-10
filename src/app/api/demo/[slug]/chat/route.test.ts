@@ -877,6 +877,150 @@ describe('demo chat API route', () => {
         }))
     })
 
+    it('passes recent ordered conversation history into OpenAI File Search recovery', async () => {
+        const createConversationChain = () => {
+            const chain = {
+                eq: vi.fn(),
+                maybeSingle: vi.fn(async () => ({
+                    data: { id: 'conversation-1' },
+                    error: null,
+                })),
+            }
+            chain.eq.mockReturnValue(chain)
+            return chain
+        }
+
+        const completedMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(async () => ({
+                data: [],
+                error: null,
+            })),
+        }
+        completedMessagesChain.eq.mockReturnValue(completedMessagesChain)
+
+        const inboundMessagesChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: {
+                    id: 'contact-message-2',
+                    content: 'olur et',
+                },
+                error: null,
+            })),
+        }
+        inboundMessagesChain.eq.mockReturnValue(inboundMessagesChain)
+
+        const historyMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(),
+            limit: vi.fn(async () => ({
+                data: [
+                    {
+                        content: 'olur et',
+                        sender_type: 'contact',
+                        metadata: { demo_chat_message_id: 'message-2' },
+                    },
+                    {
+                        content:
+                            'İsterseniz bu programlardan birinin eğitim süresi veya mezuniyet olanaklarını da kaynaklardan kontrol edebilirim.',
+                        sender_type: 'bot',
+                        metadata: { demo_chat_reply_to_message_id: 'message-1' },
+                    },
+                    {
+                        content: "tip'ta burslu program var mı",
+                        sender_type: 'contact',
+                        metadata: { demo_chat_message_id: 'message-1' },
+                    },
+                ],
+                error: null,
+            })),
+        }
+        historyMessagesChain.eq.mockReturnValue(historyMessagesChain)
+        historyMessagesChain.order.mockReturnValue(historyMessagesChain)
+
+        const duplicateReplyChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: null,
+                error: null,
+            })),
+        }
+        duplicateReplyChain.eq.mockReturnValue(duplicateReplyChain)
+
+        const botInsertChain = {
+            insert: vi.fn(async () => ({ error: null })),
+        }
+        const conversationUpdateChain = {
+            update: vi.fn(() => conversationUpdateChain),
+            eq: vi.fn(async () => ({ error: null })),
+        }
+        const conversations = [
+            createConversationChain(),
+            createConversationChain(),
+            createConversationChain(),
+        ]
+        const messagesTable = {
+            select: vi.fn((columns: string) => {
+                if (columns === 'content, sender_type, metadata') return historyMessagesChain
+                if (columns.includes('content, metadata')) return completedMessagesChain
+                if (columns.includes('id, content')) return inboundMessagesChain
+                if (columns === 'id') return duplicateReplyChain
+                return completedMessagesChain
+            }),
+            insert: botInsertChain.insert,
+        }
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                const chain = conversations.shift()
+                if (!chain) return { update: conversationUpdateChain.update }
+                return {
+                    select: vi.fn(() => chain),
+                    update: conversationUpdateChain.update,
+                }
+            }
+            if (table === 'messages') return messagesTable
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+        buildOpenAiFileSearchDemoReplyMock.mockResolvedValueOnce({
+            replyText: 'Tıp için hangi ayrıntıyı kontrol edeyim: eğitim süresi mi, mezuniyet olanakları mı?',
+            metadata: {
+                is_rag: true,
+                demo_chat_reply_source: 'openai_file_search_validated',
+                rag_provider: 'openai_file_search_validated',
+            },
+        })
+
+        const res = await GET(createGetRequest({
+            sessionId: 'history-session',
+            messageId: 'message-2',
+            message: 'olur et',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: 'Tıp için hangi ayrıntıyı kontrol edeyim: eğitim süresi mi, mezuniyet olanakları mı?',
+            skillImage: null,
+        })
+        expect(buildOpenAiFileSearchDemoReplyMock).toHaveBeenCalledWith(expect.objectContaining({
+            message: 'olur et',
+            conversationId: 'conversation-1',
+            conversationHistory: [
+                {
+                    role: 'user',
+                    content: "tip'ta burslu program var mı",
+                },
+                {
+                    role: 'assistant',
+                    content:
+                        'İsterseniz bu programlardan birinin eğitim süresi veya mezuniyet olanaklarını da kaynaklardan kontrol edebilirim.',
+                },
+            ],
+        }))
+    })
+
     it('does not start another token-consuming recovery while pending poll recovery is already running', async () => {
         vi.stubEnv('DEMO_CHAT_SYNC_REPLY_TIMEOUT_MS', '1000')
 

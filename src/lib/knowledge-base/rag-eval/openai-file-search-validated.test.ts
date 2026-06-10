@@ -118,6 +118,369 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
     })
   })
 
+  it('uses recent conversation history to clarify ambiguous continuation messages before retrieval', async () => {
+    const create = vi.fn()
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              action: 'clarify',
+              reason: 'ambiguous_assistant_offer',
+              rewritten_question: '',
+              clarification_question:
+                'Tıp için hangi ayrıntıyı kontrol edeyim: eğitim süresi mi, mezuniyet olanakları mı?',
+              confidence: 0.92,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 180, completion_tokens: 34, total_tokens: 214 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'olur et',
+      qualityMode: 'strict',
+      contextualOrchestratorCreateCompletion,
+      conversationHistory: [
+        { role: 'user', content: "tip'ta burslu program var mı" },
+        {
+          role: 'assistant',
+          content:
+            'İsterseniz bu programlardan birinin eğitim süresi veya mezuniyet olanaklarını da kaynaklardan kontrol edebilirim.',
+        },
+      ],
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(contextualOrchestratorCreateCompletion).toHaveBeenCalledOnce()
+    expect(result).toMatchObject({
+      provider: 'openai_file_search_validated',
+      answer: 'Tıp için hangi ayrıntıyı kontrol edeyim: eğitim süresi mi, mezuniyet olanakları mı?',
+      citations: [],
+      refusal: false,
+      usage: {
+        inputTokens: 180,
+        outputTokens: 34,
+        totalTokens: 214,
+        toolCalls: 0,
+      },
+      diagnostics: {
+        contextualOrchestration: 'clarify',
+        clarification: 'ambiguous_assistant_offer',
+      },
+    })
+    expect(result.answer).not.toContain('Olur et hakkında')
+  })
+
+  it('tries configured primary source groups before the broader approved corpus', async () => {
+    const create = vi
+      .fn()
+      .mockResolvedValueOnce({
+        id: 'resp_brochure',
+        output_text: 'brochure retrieval complete',
+        output: [
+          {
+            type: 'file_search_call',
+            status: 'completed',
+            results: [
+              {
+                file_id: 'file_brochure',
+                filename: 'brochure.md',
+                score: 0.93,
+                text: 'Tanıtım broşüründe aday öğrencilere yönelik programlar ve kampüs bilgileri özetlenir.',
+              },
+            ],
+          },
+        ],
+        usage: { input_tokens: 40, output_tokens: 5, total_tokens: 45 },
+      })
+      .mockResolvedValueOnce({
+        id: 'resp_broad',
+        output_text: 'broad retrieval complete',
+        output: [
+          {
+            type: 'file_search_call',
+            status: 'completed',
+            results: [
+              {
+                file_id: 'file_website',
+                filename: 'website.md',
+                score: 0.88,
+                text: 'Website HTML içeriğinde aday öğrenci sayfası ve genel tanıtım bilgileri bulunur.',
+              },
+            ],
+          },
+        ],
+        usage: { input_tokens: 50, output_tokens: 6, total_tokens: 56 },
+      })
+    const createCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer:
+                'Tanıtım broşüründe aday öğrencilere yönelik programlar ve kampüs bilgileri özetlenir.',
+              used_evidence_ids: ['ev_1'],
+              support_quotes: [
+                'Tanıtım broşüründe aday öğrencilere yönelik programlar ve kampüs bilgileri özetlenir.',
+              ],
+              engagement_question: '',
+              engagement_evidence_id: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 120, completion_tokens: 20, total_tokens: 140 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Aday öğrenciler için üniversitenizi kısaca tanıtır mısın?',
+      sourcePriorityGroups: ['brochure-overview-contact', 'brochure-campus-program-map'],
+      createCompletion,
+      citationSourcesByFilename: {
+        'brochure.md': {
+          title: 'Tanıtım Broşürü',
+        },
+        'website.md': {
+          title: 'Website Aday Öğrenci',
+        },
+      },
+    })
+
+    expect(create).toHaveBeenCalledTimes(2)
+    expect(create).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        tools: [
+          expect.objectContaining({
+            filters: {
+              type: 'in',
+              key: 'source_group',
+              value: ['brochure-overview-contact', 'brochure-campus-program-map'],
+            },
+          }),
+        ],
+      })
+    )
+    expect(create).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        tools: [expect.not.objectContaining({ filters: expect.anything() })],
+      })
+    )
+    expect(createCompletion).toHaveBeenCalledOnce()
+    expect(result.answer).toContain(
+      'Tanıtım broşüründe aday öğrencilere yönelik programlar ve kampüs bilgileri özetlenir.'
+    )
+    expect(result.citations[0]).toMatchObject({
+      providerSourceId: 'file_brochure',
+      title: 'Tanıtım Broşürü',
+    })
+    expect(result.diagnostics).toMatchObject({
+      sourcePriority: {
+        primarySourceGroups: ['brochure-overview-contact', 'brochure-campus-program-map'],
+        used: true,
+      },
+    })
+    expect(result.usage).toMatchObject({
+      inputTokens: 210,
+      outputTokens: 31,
+      totalTokens: 241,
+      toolCalls: 2,
+    })
+  })
+
+  it('runs LLM research planner hops and combines their evidence before answering', async () => {
+    const create = vi
+      .fn()
+      .mockResolvedValueOnce({
+        id: 'resp_hop_1',
+        output_text: 'hop 1 complete',
+        output: [
+          {
+            type: 'file_search_call',
+            status: 'completed',
+            results: [
+              {
+                file_id: 'file_admissions',
+                filename: 'admissions-page.md',
+                score: 0.94,
+                text: 'Aday öğrenci sayfasında fakülte ve bölümlere göz atma bilgisi yer alır.',
+              },
+            ],
+          },
+        ],
+        usage: { input_tokens: 50, output_tokens: 5, total_tokens: 55 },
+      })
+      .mockResolvedValueOnce({
+        id: 'resp_hop_2',
+        output_text: 'hop 2 complete',
+        output: [
+          {
+            type: 'file_search_call',
+            status: 'completed',
+            results: [
+              {
+                file_id: 'file_brochure_summary',
+                filename: 'brochure-summary.md',
+                score: 0.91,
+                text: 'Tanıtım broşüründe üniversitenin genel tanıtım özeti yer alır.',
+              },
+            ],
+          },
+        ],
+        usage: { input_tokens: 60, output_tokens: 6, total_tokens: 66 },
+      })
+    const researchPlannerCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              route: 'multi_hop_file_search',
+              reason: 'Website admissions page and brochure summary require separate evidence hops.',
+              required_evidence: ['admissions page evidence', 'brochure summary evidence'],
+              confidence: 0.9,
+              hops: [
+                {
+                  query: 'Aday öğrenci sayfası fakülte ve bölümlere göz atın',
+                  source_groups: ['admissions'],
+                  purpose: 'Find admissions page evidence.',
+                  max_results: 8,
+                },
+                {
+                  query: 'Tanıtım broşürü genel tanıtım özeti',
+                  source_groups: ['brochure-overview-contact'],
+                  purpose: 'Find brochure summary evidence.',
+                  max_results: 8,
+                },
+              ],
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 30, completion_tokens: 10, total_tokens: 40 },
+    }))
+    const createCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer:
+                'Aday öğrenci sayfasında fakülte ve bölümlere göz atma bilgisi yer alır. Tanıtım broşüründe üniversitenin genel tanıtım özeti yer alır.',
+              used_evidence_ids: ['ev_1', 'ev_2'],
+              support_quotes: [
+                'Aday öğrenci sayfasında fakülte ve bölümlere göz atma bilgisi yer alır.',
+                'Tanıtım broşüründe üniversitenin genel tanıtım özeti yer alır.',
+              ],
+              engagement_question: '',
+              engagement_evidence_id: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Tanıtım kaynakları ve broşür özetini birlikte kaynaklardan kontrol eder misin?',
+      qualityMode: 'strict',
+      enableLlmResearchPlanner: true,
+      researchPlannerCreateCompletion,
+      createCompletion,
+      citationSourcesByFilename: {
+        'admissions-page.md': {
+          title: 'Aday Öğrenci Sayfası',
+        },
+        'brochure-summary.md': {
+          title: 'Tanıtım Broşürü Özeti',
+        },
+      },
+    })
+
+    expect(researchPlannerCreateCompletion).toHaveBeenCalledOnce()
+    expect(create).toHaveBeenCalledTimes(2)
+    expect(create).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        input: 'Aday öğrenci sayfası fakülte ve bölümlere göz atın',
+        tools: [
+          expect.objectContaining({
+            filters: {
+              type: 'in',
+              key: 'source_group',
+              value: ['admissions'],
+            },
+          }),
+        ],
+      })
+    )
+    expect(create).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        input: 'Tanıtım broşürü genel tanıtım özeti',
+        tools: [
+          expect.objectContaining({
+            filters: {
+              type: 'in',
+              key: 'source_group',
+              value: ['brochure-overview-contact'],
+            },
+          }),
+        ],
+      })
+    )
+    expect(createCompletion).toHaveBeenCalledOnce()
+    expect(result.answer).toContain(
+      'Aday öğrenci sayfasında fakülte ve bölümlere göz atma bilgisi yer alır.'
+    )
+    expect(result.answer).toContain(
+      'Tanıtım broşüründe üniversitenin genel tanıtım özeti yer alır.'
+    )
+    expect(result.citations).toHaveLength(2)
+    expect(result.diagnostics).toMatchObject({
+      llmResearchPlan: {
+        route: 'multi_hop_file_search',
+        used: true,
+        hopCount: 2,
+        requiredEvidence: ['admissions page evidence', 'brochure summary evidence'],
+      },
+      researchBlackboard: {
+        attempts: [
+          expect.objectContaining({
+            stage: 'llm_research_hop',
+            query: 'Aday öğrenci sayfası fakülte ve bölümlere göz atın',
+            sourceGroups: ['admissions'],
+          }),
+          expect.objectContaining({
+            stage: 'llm_research_hop',
+            query: 'Tanıtım broşürü genel tanıtım özeti',
+            sourceGroups: ['brochure-overview-contact'],
+          }),
+        ],
+      },
+    })
+    expect(result.usage).toMatchObject({
+      inputTokens: 240,
+      outputTokens: 41,
+      totalTokens: 281,
+      toolCalls: 2,
+    })
+  })
+
   it('asks for clarification without retrieval when a price question lacks the target program or service', async () => {
     const create = vi.fn()
 

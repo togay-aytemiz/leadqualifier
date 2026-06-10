@@ -180,6 +180,15 @@ const ALL_PROGRAM_FEE_SOURCE_GROUPS = Array.from(
   new Set(PROGRAM_GROUPS.map((group) => group.sourceGroup))
 )
 
+export const BROCHURE_SOURCE_PRIORITY_GROUPS = Array.from(
+  new Set([
+    ...ALL_PROGRAM_FEE_SOURCE_GROUPS,
+    'brochure-overview-contact',
+    'brochure-scholarship-double-major',
+    'brochure-campus-program-map',
+  ])
+)
+
 const FIELD_PATTERNS: Array<{
   field: BrochureTableField
   label: string
@@ -257,7 +266,7 @@ function detectRequestedFields(question: string): BrochureTableField[] {
     .map(({ field }) => field)
   if (
     requestedFields.length === 0 &&
-    /(?:% ?50|\byuzde ?50\b|\bindirimli\s+program\b)/.test(normalized) &&
+    /(?:% ?50|\byuzde ?50\b|\bindirimli\s+program\b|\bburslu\s+program\b|\bucretli\s+program\b)/.test(normalized) &&
     /(?:var mi|varmi|mevcut mu|bulunuyor mu)/.test(normalized)
   ) {
     return ['price' satisfies BrochureTableField]

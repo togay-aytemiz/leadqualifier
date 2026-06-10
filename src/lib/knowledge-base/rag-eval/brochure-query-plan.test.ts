@@ -42,6 +42,21 @@ describe('planBrochureQuery', () => {
     })
   })
 
+  it('routes burslu program existence wording to the primary brochure table', () => {
+    const plan = planBrochureQuery("tip'ta burslu program var mı")
+
+    expect(plan).toMatchObject({
+      intent: 'brochure_table_fact',
+      programs: ['Tıp Fakültesi'],
+      variants: ['Burslu'],
+      requestedFields: ['price'],
+      sourceGroups: ['brochure-program-fee-tip'],
+    })
+    expect(plan.retryQuery).toContain('Tıp Fakültesi')
+    expect(plan.retryQuery).toContain('Burslu')
+    expect(plan.retryQuery).toContain('2025 Fiyat')
+  })
+
   it('keeps success rank separate from quota for burslu Optisyenlik', () => {
     expect(
       planBrochureQuery('Optisyenlik burslu programının başarı sırası ve kontenjanı nedir?')

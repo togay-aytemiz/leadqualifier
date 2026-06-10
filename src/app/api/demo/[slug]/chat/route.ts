@@ -49,6 +49,8 @@ const FAST_RAG_RESULT_LIMIT = 6
 const MAX_CONTEXTUAL_SEARCH_QUERY_CHARS = 500
 const MIN_CONTEXTUAL_ANCHOR_TOKEN_COVERAGE = 2
 const DEMO_MAINTENANCE_RETRY_AFTER_SECONDS = 15 * 60
+const DEMO_CHAT_RAG_HISTORY_TURN_LIMIT = 10
+const DEMO_CHAT_RAG_HISTORY_QUERY_LIMIT = DEMO_CHAT_RAG_HISTORY_TURN_LIMIT + 2
 
 type RouteContext = {
     params: Promise<{ slug: string }>
@@ -670,7 +672,8 @@ function shouldUseDemoConversationHistoryForRag(message: string) {
         .replace(/\s+/g, ' ')
         .trim()
 
-    return /\b(?:bu|su|o|ayni)\s+(?:program|bolum|fakulte|kampus|yerleske|ders|sinav|konu|belge|dokuman|yonetmelik|surec|birim)\b/u.test(normalized)
+    return /^(?:olur|olur et|tamam|evet|bak|kontrol et|olur bak|olur kontrol et|edebilirsin|devam|devam et)$/u.test(normalized)
+        || /\b(?:bu|su|o|ayni)\s+(?:program|bolum|fakulte|kampus|yerleske|ders|sinav|konu|belge|dokuman|yonetmelik|surec|birim)\b/u.test(normalized)
         || /\b(?:bu|su|o)\s+(?:programda|bolumde|fakultede|kampuste|yerleskede|derste|sinavda|konuda|belgede|dokumanda|yonetmelikte|surecte|birimde)\b/u.test(normalized)
         || /\b(?:bunda|bundaki|ondaki|orada|burada|bunun|onun|az onceki|onceki)\b/u.test(normalized)
 }
@@ -840,29 +843,37 @@ async function readRecentDemoChatHistory(input: {
 }): Promise<KnowledgeSearchPlanningTurn[]> {
     if (!input.conversationId) return []
 
-    const { data: messages, error } = await input.supabase
-        .from('messages')
-        .select('content, sender_type, metadata')
-        .eq('conversation_id', input.conversationId)
-        .order('created_at', { ascending: false })
-        .limit(8)
+    try {
+        const { data: messages, error } = await input.supabase
+            .from('messages')
+            .select('content, sender_type, metadata')
+            .eq('conversation_id', input.conversationId)
+            .order('created_at', { ascending: false })
+            .limit(DEMO_CHAT_RAG_HISTORY_QUERY_LIMIT)
 
-    if (error) throw error
+        if (error) {
+            console.error('Demo Chat: recent history read failed; continuing without history', error)
+            return []
+        }
 
-    return ((messages ?? []) as DemoChatHistoryMessageRow[])
-        .filter((message) => {
-            const metadata = message.metadata ?? {}
-            return metadata.demo_chat_message_id !== input.messageId
-                && metadata.demo_chat_reply_to_message_id !== input.messageId
-        })
-        .reverse()
-        .map((message) => {
-            const content = message.content?.trim() ?? ''
-            const role = message.sender_type === 'bot' ? 'assistant' : 'user'
-            return { role, content } satisfies KnowledgeSearchPlanningTurn
-        })
-        .filter((turn) => turn.content && !/^\[[^\]]+\]$/.test(turn.content))
-        .slice(-6)
+        return ((messages ?? []) as DemoChatHistoryMessageRow[])
+            .filter((message) => {
+                const metadata = message.metadata ?? {}
+                return metadata.demo_chat_message_id !== input.messageId
+                    && metadata.demo_chat_reply_to_message_id !== input.messageId
+            })
+            .reverse()
+            .map((message) => {
+                const content = message.content?.trim() ?? ''
+                const role = message.sender_type === 'bot' ? 'assistant' : 'user'
+                return { role, content } satisfies KnowledgeSearchPlanningTurn
+            })
+            .filter((turn) => turn.content && !/^\[[^\]]+\]$/.test(turn.content))
+            .slice(-DEMO_CHAT_RAG_HISTORY_TURN_LIMIT)
+    } catch (error) {
+        console.error('Demo Chat: recent history read failed; continuing without history', error)
+        return []
+    }
 }
 
 async function ingestDemoChatInboundOnly(input: {
@@ -1464,11 +1475,18 @@ async function recoverPendingDemoChatReplyExtractively(input: {
         conversationId = refreshedPendingInbound.conversationId ?? conversationId
     }
 
+    const conversationHistory = await readRecentDemoChatHistory({
+        supabase: input.supabase,
+        conversationId,
+        messageId: input.messageId
+    })
+
     const fileSearchReply = await buildOpenAiFileSearchDemoReply({
         supabase: input.supabase,
         channel: input.channel,
         message,
         conversationId,
+        conversationHistory,
     })
     if (fileSearchReply) {
         await persistDemoChatTextReply({
@@ -1486,20 +1504,12 @@ async function recoverPendingDemoChatReplyExtractively(input: {
         }
     }
 
-    const conversationHistory = shouldUseDemoConversationHistoryForRag(message)
-        ? await readRecentDemoChatHistory({
-            supabase: input.supabase,
-            conversationId,
-            messageId: input.messageId
-        })
-        : []
-
     const reply = await buildExtractiveDemoChatReply({
         supabase: input.supabase,
         channel: input.channel,
         message,
         conversationId,
-        conversationHistory
+        conversationHistory: shouldUseDemoConversationHistoryForRag(message) ? conversationHistory : []
     })
     if (!reply) return null
 

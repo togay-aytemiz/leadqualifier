@@ -2,6 +2,7 @@ import { calculateUsageCreditCost } from '@/lib/billing/credit-cost'
 import { resolveMvpResponseLanguage } from '@/lib/ai/language'
 import { buildClarificationGateResult } from '@/lib/knowledge-base/rag-clarification'
 import { generateGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-generate'
+import type { KnowledgeSearchPlanningTurn } from '@/lib/knowledge-base/query-planner'
 import type { RagChunk } from '@/lib/knowledge-base/rag'
 import { buildRagEvidencePack } from '@/lib/knowledge-base/evidence-pack'
 import {
@@ -36,6 +37,11 @@ import {
   type StrictLlmCreateCompletion,
   type StrictLlmEvaluatorResult,
 } from './strict-llm-evaluator'
+import {
+  runStrictLlmResearchPlanner,
+  type StrictLlmResearchPlanResult,
+  type StrictLlmResearchPlannerCreateCompletion,
+} from './strict-llm-research-planner'
 import { classifyStrictDirectAnswerQuality } from './strict-quality-rubric'
 
 type CitationSource = {
@@ -97,9 +103,19 @@ export type OpenAiFileSearchValidatedQuestionInput = {
   enableStrictLlmEvaluator?: boolean
   strictEvaluatorModel?: string
   strictEvaluatorCreateCompletion?: StrictLlmCreateCompletion
+  conversationHistory?: KnowledgeSearchPlanningTurn[]
+  contextualOrchestratorModel?: string
+  contextualOrchestratorCreateCompletion?: CreateCompletion
+  sourcePriorityGroups?: string[]
+  enableLlmResearchPlanner?: boolean
+  researchPlannerModel?: string
+  researchPlannerCreateCompletion?: StrictLlmResearchPlannerCreateCompletion
 }
 
 const NO_CLEAR_INFORMATION_ANSWER = 'Yüklenen belgelerde bu konuda net bir bilgi bulunmamaktadır.'
+const DEFAULT_CONTEXTUAL_ORCHESTRATOR_MODEL = 'gpt-4o-mini'
+const CONTEXTUAL_ORCHESTRATOR_MAX_OUTPUT_TOKENS = 260
+const MAX_CONTEXTUAL_HISTORY_TURNS = 10
 
 const TURKISH_CHAR_MAP: Record<string, string> = {
   ı: 'i',
@@ -430,6 +446,7 @@ function retrievalWithCombinedUsage(
 ): RagProviderResult {
   return {
     ...selected,
+    citations: dedupeProviderCitations(attempts.flatMap((attempt) => attempt.citations)),
     usage: combinedRetrievalUsage(attempts),
     timingsMs: {
       ...selected.timingsMs,
@@ -438,13 +455,50 @@ function retrievalWithCombinedUsage(
   }
 }
 
-function sourceGroupFilter(plan: BrochureQueryPlan): OpenAiFileSearchFilter | undefined {
-  if (plan.sourceGroups.length === 0) return undefined
+function uniqueSourceGroups(sourceGroups: string[] | undefined) {
+  return Array.from(new Set((sourceGroups ?? []).map((group) => group.trim()).filter(Boolean)))
+}
+
+function sourceGroupFilterForGroups(sourceGroups: string[]): OpenAiFileSearchFilter | undefined {
+  if (sourceGroups.length === 0) return undefined
   return {
     type: 'in',
     key: 'source_group',
-    value: plan.sourceGroups,
+    value: sourceGroups,
   }
+}
+
+function sourceGroupFilter(plan: BrochureQueryPlan): OpenAiFileSearchFilter | undefined {
+  return sourceGroupFilterForGroups(plan.sourceGroups)
+}
+
+function dedupeProviderCitations(citations: RagProviderCitation[]) {
+  const seen = new Set<string>()
+  return citations.filter((citation) => {
+    const key = [
+      citation.providerSourceId,
+      citation.title,
+      citation.url,
+      citation.quote,
+    ]
+      .filter(Boolean)
+      .join('|')
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+function isExactBrochureTablePlan(plan: BrochureQueryPlan) {
+  return plan.intent === 'brochure_table_fact'
+}
+
+function retrievalAttemptKey(query: string, sourceGroups: string[]) {
+  return `${normalizeForSupport(query)}|${sourceGroups.join(',')}`
+}
+
+function hasAnyCitation(attempts: RagProviderResult[]) {
+  return attempts.some((attempt) => attempt.citations.length > 0)
 }
 
 function approvedSourceRetryQuery(question: string, plan: BrochureQueryPlan) {
@@ -727,6 +781,7 @@ function clarificationResult(input: {
     reason?: string
     question: string
   }
+  usage?: RagProviderResult['usage']
 }): RagProviderResult {
   return {
     provider: 'openai_file_search_validated',
@@ -739,13 +794,7 @@ function clarificationResult(input: {
       generation: 0,
       validation: 0,
     },
-    usage: {
-      inputTokens: 0,
-      outputTokens: 0,
-      totalTokens: 0,
-      toolCalls: 0,
-      estimatedCredits: 0,
-    },
+    usage: input.usage ?? zeroUsage(),
     diagnostics: {
       queryIntent: input.queryIntent,
       retryCount: 0,
@@ -761,6 +810,273 @@ function zeroUsage() {
     totalTokens: 0,
     toolCalls: 0,
     estimatedCredits: 0,
+  }
+}
+
+type ContextualOrchestrationAction = 'standalone' | 'rewrite' | 'clarify' | 'refuse'
+
+type ContextualOrchestrationResult = {
+  action: ContextualOrchestrationAction
+  question: string
+  clarificationQuestion?: string
+  refusalAnswer?: string
+  reason?: string
+  usage?: RagProviderResult['usage']
+}
+
+function normalizeContextualHistory(history: KnowledgeSearchPlanningTurn[] | undefined) {
+  return (history ?? [])
+    .map((turn) => ({
+      role: turn.role,
+      content: turn.content.replace(/\s+/g, ' ').trim(),
+    }))
+    .filter((turn) => turn.content)
+    .slice(-MAX_CONTEXTUAL_HISTORY_TURNS)
+}
+
+function formatContextualHistory(history: KnowledgeSearchPlanningTurn[]) {
+  if (history.length === 0) return 'No recent conversation.'
+  return history
+    .map((turn, index) => {
+      const role = turn.role === 'assistant' ? 'Assistant' : 'User'
+      return `${index + 1}. ${role}: ${turn.content.slice(0, 500)}`
+    })
+    .join('\n')
+}
+
+function readContextualString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function readContextualNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function readContextualAction(value: unknown): ContextualOrchestrationAction | null {
+  if (value === 'standalone' || value === 'rewrite' || value === 'clarify' || value === 'refuse') {
+    return value
+  }
+  if (value === 'contextual_rewrite') return 'rewrite'
+  return null
+}
+
+function parseContextualJson(content: string): Record<string, unknown> | null {
+  try {
+    const trimmed = content
+      .trim()
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim()
+    const objectMatch = trimmed.match(/\{[\s\S]*\}/)
+    return JSON.parse(objectMatch?.[0] ?? trimmed) as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
+function normalizeContextualUsage(
+  usage: Awaited<ReturnType<CreateCompletion>>['usage'],
+  fallback: { input: string; output: string }
+): RagProviderResult['usage'] {
+  const inputTokens = usage?.prompt_tokens ?? Math.ceil(fallback.input.length / 4)
+  const outputTokens = usage?.completion_tokens ?? Math.ceil(fallback.output.length / 4)
+  const totalTokens = usage?.total_tokens ?? inputTokens + outputTokens
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    toolCalls: 0,
+    estimatedCredits: calculateUsageCreditCost({ inputTokens, outputTokens }),
+  }
+}
+
+function contextualCompletionParams(model: string) {
+  if (/^gpt-5(?:[.-]|$)/i.test(model) || /^o\d/i.test(model)) {
+    return {
+      reasoning_effort: 'none',
+      max_completion_tokens: CONTEXTUAL_ORCHESTRATOR_MAX_OUTPUT_TOKENS,
+    }
+  }
+
+  return {
+    temperature: 0,
+    max_tokens: CONTEXTUAL_ORCHESTRATOR_MAX_OUTPUT_TOKENS,
+  }
+}
+
+async function createDefaultContextualCompletion(
+  args: Record<string, unknown>,
+  options?: CreateCompletionOptions
+) {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('Missing OPENAI_API_KEY for contextual RAG orchestrator')
+  }
+  const { default: OpenAI } = await import('openai')
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  return openai.chat.completions.create(
+    args as never,
+    options?.signal ? { signal: options.signal } : undefined
+  ) as Promise<Awaited<ReturnType<CreateCompletion>>>
+}
+
+function isShortContinuationMessage(question: string) {
+  const normalized = normalizeForSupport(question)
+  return /^(?:olur|olur et|tamam|evet|bak|kontrol et|olur bak|olur kontrol et|edebilirsin|devam|devam et|yes|ok|okay|sure|go ahead)$/i.test(
+    normalized
+  )
+}
+
+function latestHistoryTurn(history: KnowledgeSearchPlanningTurn[], role: 'user' | 'assistant') {
+  return history
+    .slice()
+    .reverse()
+    .find((turn) => turn.role === role && turn.content.trim())
+}
+
+function fallbackContextualOrchestration(input: {
+  question: string
+  history: KnowledgeSearchPlanningTurn[]
+  reason?: string
+}): ContextualOrchestrationResult | null {
+  if (!isShortContinuationMessage(input.question) || input.history.length === 0) return null
+
+  const previousUser = latestHistoryTurn(input.history, 'user')?.content.trim()
+  const previousAssistant = latestHistoryTurn(input.history, 'assistant')?.content.trim()
+  const assistantSupport = normalizeForSupport(previousAssistant ?? '')
+  const hasAssistantOffer =
+    /(?:isterseniz|istersen|can check|kontrol edebilirim|bakabilirim|yardimci olabilirim)/.test(
+      assistantSupport
+    )
+  if (!previousUser || !hasAssistantOffer) {
+    return {
+      action: 'clarify',
+      question: input.question,
+      clarificationQuestion: 'Hangi konu veya ayrıntı için devam etmemi istersiniz?',
+      reason: input.reason ?? 'short_continuation_without_clear_offer',
+    }
+  }
+
+  const ambiguousOffer = /(?:veya|ya da|\/| or )/.test(assistantSupport)
+  if (ambiguousOffer) {
+    return {
+      action: 'clarify',
+      question: input.question,
+      clarificationQuestion:
+        'Bir önceki konuyla ilgili hangi ayrıntıyı kontrol etmemi istersiniz?',
+      reason: input.reason ?? 'ambiguous_assistant_offer',
+    }
+  }
+
+  return {
+    action: 'rewrite',
+    question: previousUser,
+    reason: input.reason ?? 'short_continuation_previous_topic',
+  }
+}
+
+function buildContextualOrchestrationMessages(input: {
+  question: string
+  history: KnowledgeSearchPlanningTurn[]
+}) {
+  const system = [
+    'You are a domain-independent conversation orchestration layer for a grounded RAG assistant.',
+    'Do not answer the user.',
+    'Decide whether the current user message is standalone, should be rewritten using recent conversation, needs clarification, or must be refused for safety.',
+    'Always use the recent conversation when it changes what the latest message means.',
+    'If the latest message only accepts an assistant offer, rewrite it only when the offer has one clear target. If the offer has multiple possible targets, ask a short clarification question.',
+    'Never invent organization-specific facts. Preserve the user language.',
+    'Return only valid JSON with keys: action, reason, rewritten_question, clarification_question, refusal_answer, confidence.',
+    'Allowed action values: standalone, rewrite, clarify, refuse.',
+  ].join(' ')
+  const user = [
+    `Recent conversation, oldest to newest:\n${formatContextualHistory(input.history)}`,
+    `Latest user message:\n${input.question}`,
+  ].join('\n\n')
+  return [
+    { role: 'system', content: system },
+    { role: 'user', content: user },
+  ]
+}
+
+async function runContextualOrchestrator(input: {
+  question: string
+  history: KnowledgeSearchPlanningTurn[]
+  model?: string
+  createCompletion?: CreateCompletion
+}): Promise<ContextualOrchestrationResult | null> {
+  if (input.history.length === 0) return null
+
+  const model =
+    input.model?.trim() ||
+    process.env.OPENAI_RAG_CONTEXTUAL_ORCHESTRATOR_MODEL?.trim() ||
+    DEFAULT_CONTEXTUAL_ORCHESTRATOR_MODEL
+  const messages = buildContextualOrchestrationMessages(input)
+  const prompt = messages.map((message) => message.content).join('\n\n')
+  const createCompletion = input.createCompletion ?? createDefaultContextualCompletion
+
+  try {
+    const completion = await createCompletion({
+      model,
+      response_format: { type: 'json_object' },
+      messages,
+      ...contextualCompletionParams(model),
+    })
+    const content = completion.choices?.[0]?.message?.content ?? ''
+    const parsed = parseContextualJson(content)
+    const action = readContextualAction(parsed?.action)
+    const reason = readContextualString(parsed?.reason)
+    const confidence = readContextualNumber(parsed?.confidence)
+    const rewrittenQuestion = readContextualString(parsed?.rewritten_question)
+    const clarificationQuestion = readContextualString(parsed?.clarification_question)
+    const refusalAnswer = readContextualString(parsed?.refusal_answer)
+    const usage = normalizeContextualUsage(completion.usage, { input: prompt, output: content })
+
+    if (action === 'clarify' && clarificationQuestion) {
+      return {
+        action,
+        question: input.question,
+        clarificationQuestion,
+        reason: reason || 'contextual_clarification',
+        usage,
+      }
+    }
+    if (action === 'refuse' && refusalAnswer) {
+      return {
+        action,
+        question: input.question,
+        refusalAnswer,
+        reason: reason || 'contextual_refusal',
+        usage,
+      }
+    }
+    if (action === 'rewrite' && rewrittenQuestion) {
+      return {
+        action,
+        question: rewrittenQuestion,
+        reason: reason || 'contextual_rewrite',
+        usage,
+      }
+    }
+    if (action === 'standalone') {
+      return {
+        action,
+        question: rewrittenQuestion || input.question,
+        reason: reason || 'standalone',
+        usage,
+      }
+    }
+
+    return fallbackContextualOrchestration({
+      question: input.question,
+      history: input.history,
+      reason: confidence !== undefined ? 'invalid_contextual_orchestrator_output' : reason,
+    })
+  } catch (error) {
+    return fallbackContextualOrchestration({
+      question: input.question,
+      history: input.history,
+      reason: 'contextual_orchestrator_error',
+    })
   }
 }
 
@@ -807,17 +1123,134 @@ export async function runOpenAiFileSearchValidatedQuestion(
   const startedAt = Date.now()
   const retrievalStartedAt = Date.now()
   const qualityMode = input.qualityMode ?? 'validated'
+  const conversationHistory = normalizeContextualHistory(input.conversationHistory)
+  const contextualOrchestration = await runContextualOrchestrator({
+    question: input.question,
+    history: conversationHistory,
+    model: input.contextualOrchestratorModel,
+    createCompletion: input.contextualOrchestratorCreateCompletion,
+  })
+  const questionForAnswer = contextualOrchestration?.question.trim() || input.question
+  const applyContextualOrchestration = (result: RagProviderResult): RagProviderResult => {
+    if (!contextualOrchestration) return result
+    const usage = contextualOrchestration.usage
+      ? usageWithExtra(result.usage, contextualOrchestration.usage)
+      : result.usage
+    return {
+      ...result,
+      usage,
+      diagnostics: {
+        ...result.diagnostics,
+        contextualOrchestration: contextualOrchestration.action,
+        ...(contextualOrchestration.reason
+          ? { contextualReason: contextualOrchestration.reason }
+          : {}),
+        ...(questionForAnswer !== input.question ? { contextualQuestion: questionForAnswer } : {}),
+      },
+    }
+  }
+
+  if (contextualOrchestration?.action === 'clarify' && contextualOrchestration.clarificationQuestion) {
+    return applyContextualOrchestration(
+      clarificationResult({
+        startedAt,
+        queryIntent: 'contextual_followup',
+        clarification: {
+          reason: contextualOrchestration.reason,
+          question: contextualOrchestration.clarificationQuestion,
+        },
+      })
+    )
+  }
+
+  if (contextualOrchestration?.action === 'refuse' && contextualOrchestration.refusalAnswer) {
+    return applyContextualOrchestration({
+      provider: 'openai_file_search_validated',
+      answer: contextualOrchestration.refusalAnswer,
+      citations: [],
+      refusal: true,
+      timingsMs: {
+        total: Date.now() - startedAt,
+        retrieval: 0,
+        generation: 0,
+        validation: 0,
+      },
+      usage: zeroUsage(),
+      diagnostics: {
+        queryIntent: 'contextual_followup',
+        retryCount: 0,
+      },
+    })
+  }
+
   const strictUnderstanding =
-    qualityMode === 'strict' ? understandStrictQuestion(input.question) : null
-  const effectiveQuestion = strictUnderstanding?.normalizedQuestion ?? input.question
+    qualityMode === 'strict' ? understandStrictQuestion(questionForAnswer) : null
+  const effectiveQuestion = strictUnderstanding?.normalizedQuestion ?? questionForAnswer
   const plan = planBrochureQuery(effectiveQuestion)
+  const sourcePriorityGroups = uniqueSourceGroups(input.sourcePriorityGroups)
+  const sourcePriorityFallbackGroups = isExactBrochureTablePlan(plan)
+    ? plan.sourceGroups
+    : sourcePriorityGroups.length === 0
+      ? plan.sourceGroups
+      : plan.sourceGroups.length > 0 &&
+          !plan.sourceGroups.every((group) => sourcePriorityGroups.includes(group))
+        ? plan.sourceGroups
+        : []
+  let sourcePriorityUsed = false
+  let llmResearchPlan: StrictLlmResearchPlanResult | null = null
   const strictLlmEvaluatorEnabled = Boolean(strictUnderstanding && input.enableStrictLlmEvaluator)
+  const sourcePriorityDiagnostics = () =>
+    sourcePriorityGroups.length > 0
+      ? {
+          primarySourceGroups: sourcePriorityGroups,
+          ...(sourcePriorityFallbackGroups.length > 0
+            ? { fallbackSourceGroups: sourcePriorityFallbackGroups }
+            : {}),
+          used: sourcePriorityUsed,
+        }
+      : undefined
+  const applySourcePriorityDiagnostics = (result: RagProviderResult): RagProviderResult => {
+    const diagnostics = sourcePriorityDiagnostics()
+    if (!diagnostics) return result
+    return {
+      ...result,
+      diagnostics: {
+        ...result.diagnostics,
+        sourcePriority: diagnostics,
+      },
+    }
+  }
+  const llmResearchPlanDiagnostics = () =>
+    llmResearchPlan
+      ? {
+          route: llmResearchPlan.route,
+          reason: llmResearchPlan.reason,
+          requiredEvidence: llmResearchPlan.requiredEvidence,
+          used: true,
+          hopCount: llmResearchPlan.hops.length,
+          ...(typeof llmResearchPlan.confidence === 'number'
+            ? { confidence: llmResearchPlan.confidence }
+            : {}),
+        }
+      : undefined
+  const applyLlmResearchPlanDiagnostics = (result: RagProviderResult): RagProviderResult => {
+    const diagnostics = llmResearchPlanDiagnostics()
+    if (!diagnostics || !llmResearchPlan || result.diagnostics?.llmResearchPlan) return result
+    return {
+      ...result,
+      usage: usageWithExtra(result.usage, llmResearchPlan.usage),
+      diagnostics: {
+        ...result.diagnostics,
+        llmResearchPlan: diagnostics,
+      },
+    }
+  }
   const buildResearchPlan = (
     catalogAnswer: StrictCatalogAnswer | null = null
   ): StrictResearchPlan | undefined =>
     strictUnderstanding
       ? buildStrictResearchPlan({
-          question: input.question,
+          question: questionForAnswer,
           understanding: strictUnderstanding,
           brochurePlan: plan,
           catalogAnswer,
@@ -849,14 +1282,17 @@ export async function runOpenAiFileSearchValidatedQuestion(
     strictVerdict?: string,
     claimLedger?: ReturnType<typeof buildStrictClaimLedger>
   ): RagProviderResult => {
-    if (!strictDiagnostics) return result
+    const contextualResult = applyLlmResearchPlanDiagnostics(
+      applySourcePriorityDiagnostics(applyContextualOrchestration(result))
+    )
+    if (!strictDiagnostics) return contextualResult
     if (strictVerdict && researchBlackboard) {
       researchBlackboard.finalVerdict = strictVerdict
     }
     return {
-      ...result,
+      ...contextualResult,
       diagnostics: {
-        ...result.diagnostics,
+        ...contextualResult.diagnostics,
         ...strictDiagnostics,
         ...(strictVerdict ? { strictVerdict } : {}),
         ...(claimLedger ? { claimLedger: summarizeStrictClaimLedger(claimLedger) } : {}),
@@ -897,15 +1333,17 @@ export async function runOpenAiFileSearchValidatedQuestion(
     },
   })
   const finalizeCatalog = (catalogAnswer: StrictCatalogAnswer) =>
-    strictDirectResult({
-      startedAt,
-      answer: catalogAnswer.answer,
-      citations: catalogAnswer.citations,
-      refusal: catalogAnswer.refusal,
-      strictVerdict: catalogAnswer.reason,
-      normalizedQuestion: effectiveQuestion,
-      researchPlan: researchPlanDiagnostics(catalogAnswer),
-    })
+    applyContextualOrchestration(
+      strictDirectResult({
+        startedAt,
+        answer: catalogAnswer.answer,
+        citations: catalogAnswer.citations,
+        refusal: catalogAnswer.refusal,
+        strictVerdict: catalogAnswer.reason,
+        normalizedQuestion: effectiveQuestion,
+        researchPlan: researchPlanDiagnostics(catalogAnswer),
+      })
+    )
   const applyStrictLlmEvaluator = async (
     result: RagProviderResult,
     evaluatorCitations: RagProviderCitation[] = result.citations
@@ -913,7 +1351,7 @@ export async function runOpenAiFileSearchValidatedQuestion(
     if (!strictUnderstanding || !strictLlmEvaluatorEnabled) return result
 
     const evaluation = await evaluateAnswerWithStrictLlm({
-      question: input.question,
+      question: questionForAnswer,
       normalizedQuestion: effectiveQuestion,
       understanding: strictUnderstanding,
       answer: result.answer,
@@ -932,7 +1370,7 @@ export async function runOpenAiFileSearchValidatedQuestion(
       const repairedCritic = speculativeRepair
         ? null
         : evaluateStrictAnswer({
-            question: input.question,
+            question: questionForAnswer,
             understanding: strictUnderstanding,
             answer: evaluation.verdict.revisedAnswer,
             citations: evaluatorCitations,
@@ -1013,7 +1451,7 @@ export async function runOpenAiFileSearchValidatedQuestion(
     if (!strictUnderstanding || !strictResearchPlan) return null
 
     const retryPlan = buildStrictEvidenceRetryPlan({
-      question: input.question,
+      question: questionForAnswer,
       understanding: strictUnderstanding,
       researchPlan: strictResearchPlan,
       criticReason: verdict.reason,
@@ -1159,13 +1597,13 @@ export async function runOpenAiFileSearchValidatedQuestion(
     )
 
     const retryClaimLedger = buildStrictClaimLedger({
-      question: input.question,
+      question: questionForAnswer,
       understanding: strictUnderstanding,
       answer: retryResult.answer,
       citations: retryResult.citations,
     })
     const retryCritic = evaluateStrictAnswer({
-      question: input.question,
+      question: questionForAnswer,
       understanding: strictUnderstanding,
       answer: retryResult.answer,
       citations: retryResult.citations,
@@ -1180,15 +1618,19 @@ export async function runOpenAiFileSearchValidatedQuestion(
   }
 
   const finalizeWithCritic = async (result: RagProviderResult): Promise<RagProviderResult> => {
-    if (!strictUnderstanding) return result
+    if (!strictUnderstanding) {
+      return applyLlmResearchPlanDiagnostics(
+        applySourcePriorityDiagnostics(applyContextualOrchestration(result))
+      )
+    }
     const claimLedger = buildStrictClaimLedger({
-      question: input.question,
+      question: questionForAnswer,
       understanding: strictUnderstanding,
       answer: result.answer,
       citations: result.citations,
     })
     const verdict = evaluateStrictAnswer({
-      question: input.question,
+      question: questionForAnswer,
       understanding: strictUnderstanding,
       answer: result.answer,
       citations: result.citations,
@@ -1227,20 +1669,22 @@ export async function runOpenAiFileSearchValidatedQuestion(
   }
 
   if (strictUnderstanding?.safety && strictUnderstanding.safety !== 'none') {
-    return strictDirectResult({
-      startedAt,
-      answer: strictSafetyAnswer(strictUnderstanding.safety),
-      citations: [],
-      refusal: true,
-      strictVerdict: 'unsafe_sensitive_data',
-      normalizedQuestion: effectiveQuestion,
-      researchPlan: researchPlanDiagnostics(null),
-    })
+    return applyContextualOrchestration(
+      strictDirectResult({
+        startedAt,
+        answer: strictSafetyAnswer(strictUnderstanding.safety),
+        citations: [],
+        refusal: true,
+        strictVerdict: 'unsafe_sensitive_data',
+        normalizedQuestion: effectiveQuestion,
+        researchPlan: researchPlanDiagnostics(null),
+      })
+    )
   }
 
   const catalogAnswer = strictUnderstanding
     ? resolveStrictCatalogAnswer({
-        question: input.question,
+        question: questionForAnswer,
         understanding: strictUnderstanding,
       })
     : null
@@ -1266,6 +1710,23 @@ export async function runOpenAiFileSearchValidatedQuestion(
         clarification,
       })
     )
+  }
+
+  const deterministicResearchPlan = buildResearchPlan(null)
+  if (
+    strictUnderstanding &&
+    deterministicResearchPlan &&
+    input.enableLlmResearchPlanner &&
+    !isExactBrochureTablePlan(plan)
+  ) {
+    llmResearchPlan = await runStrictLlmResearchPlanner({
+      question: questionForAnswer,
+      normalizedQuestion: effectiveQuestion,
+      deterministicPlan: deterministicResearchPlan,
+      brochureSourceGroups: sourcePriorityGroups,
+      model: input.researchPlannerModel,
+      createCompletion: input.researchPlannerCreateCompletion,
+    })
   }
 
   async function runStrictLlmRetry(inputRetry: {
@@ -1450,7 +1911,7 @@ export async function runOpenAiFileSearchValidatedQuestion(
     }
 
     const retryCritic = evaluateStrictAnswer({
-      question: input.question,
+      question: questionForAnswer,
       understanding: strictUnderstanding,
       answer: retryResult.answer,
       citations: retryResult.citations,
@@ -1473,27 +1934,111 @@ export async function runOpenAiFileSearchValidatedQuestion(
     return finalizeLlmDiagnostics(finalize(retryResult, retryCritic.reason), inputRetry.evaluation)
   }
 
-  const firstRetrieval = await runOpenAiFileSearchQuestion({
-    client: input.client,
-    model: input.model,
-    vectorStoreId: input.vectorStoreId,
-    question: effectiveQuestion,
-    maxResults: input.maxResults,
-    maxOutputTokens: input.maxOutputTokens,
-    instructionProfile: input.instructionProfile,
-    extraInstructions:
-      'Use the file_search tool and keep any direct answer minimal; Qualy will validate and rewrite from retrieved evidence separately.',
-    citationSourcesByFilename: input.citationSourcesByFilename,
-    filters: sourceGroupFilter(plan),
-  })
-  recordResearchAttempt({
-    stage: 'initial_retrieval',
-    query: effectiveQuestion,
-    sourceGroups: plan.sourceGroups,
-    citationCount: firstRetrieval.citations.length,
-  })
-  const retrievalAttempts = [firstRetrieval]
-  let retrieval = firstRetrieval
+  const retrievalAttempts: RagProviderResult[] = []
+  const retrievalAttemptKeys = new Set<string>()
+  const shouldRunSourcePriority =
+    sourcePriorityGroups.length > 0 && !isExactBrochureTablePlan(plan)
+
+  if (shouldRunSourcePriority) {
+    sourcePriorityUsed = true
+    retrievalAttemptKeys.add(retrievalAttemptKey(effectiveQuestion, sourcePriorityGroups))
+    const priorityRetrieval = await runOpenAiFileSearchQuestion({
+      client: input.client,
+      model: input.model,
+      vectorStoreId: input.vectorStoreId,
+      question: effectiveQuestion,
+      maxResults: input.maxResults,
+      maxOutputTokens: input.maxOutputTokens,
+      instructionProfile: input.instructionProfile,
+      extraInstructions:
+        'Use the file_search tool and keep any direct answer minimal; Qualy will validate and rewrite from retrieved evidence separately. Prefer these configured primary sources before broader approved corpus evidence.',
+      citationSourcesByFilename: input.citationSourcesByFilename,
+      filters: sourceGroupFilterForGroups(sourcePriorityGroups),
+    })
+    retrievalAttempts.push(priorityRetrieval)
+    recordResearchAttempt({
+      stage: 'source_priority_retrieval',
+      query: effectiveQuestion,
+      sourceGroups: sourcePriorityGroups,
+      citationCount: priorityRetrieval.citations.length,
+    })
+  }
+
+  for (const hop of llmResearchPlan?.hops ?? []) {
+    const sourceGroups = uniqueSourceGroups(hop.sourceGroups)
+    const attemptKey = retrievalAttemptKey(hop.query, sourceGroups)
+    if (retrievalAttemptKeys.has(attemptKey)) continue
+    retrievalAttemptKeys.add(attemptKey)
+
+    const hopRetrieval = await runOpenAiFileSearchQuestion({
+      client: input.client,
+      model: input.model,
+      vectorStoreId: input.vectorStoreId,
+      question: hop.query,
+      maxResults: Math.max(input.maxResults ?? 8, hop.maxResults ?? 8),
+      maxOutputTokens: input.maxOutputTokens,
+      instructionProfile: input.instructionProfile,
+      extraInstructions: [
+        'Use the file_search tool and retrieve direct evidence for this research-plan hop.',
+        'Keep any direct answer minimal; Qualy will validate and rewrite from retrieved evidence separately.',
+        `Hop purpose: ${hop.purpose}`,
+      ].join(' '),
+      citationSourcesByFilename: input.citationSourcesByFilename,
+      filters: sourceGroupFilterForGroups(sourceGroups),
+    })
+    retrievalAttempts.push(hopRetrieval)
+    recordResearchAttempt({
+      stage: 'llm_research_hop',
+      query: hop.query,
+      sourceGroups,
+      citationCount: hopRetrieval.citations.length,
+      reason: hop.purpose,
+    })
+  }
+
+  const shouldRunDefaultRetrieval =
+    !llmResearchPlan || retrievalAttempts.length === 0 || !hasAnyCitation(retrievalAttempts)
+
+  if (shouldRunDefaultRetrieval) {
+    const fallbackKey = retrievalAttemptKey(effectiveQuestion, sourcePriorityFallbackGroups)
+    if (!retrievalAttemptKeys.has(fallbackKey)) {
+      const firstRetrieval = await runOpenAiFileSearchQuestion({
+        client: input.client,
+        model: input.model,
+        vectorStoreId: input.vectorStoreId,
+        question: effectiveQuestion,
+        maxResults: input.maxResults,
+        maxOutputTokens: input.maxOutputTokens,
+        instructionProfile: input.instructionProfile,
+        extraInstructions:
+          'Use the file_search tool and keep any direct answer minimal; Qualy will validate and rewrite from retrieved evidence separately.',
+        citationSourcesByFilename: input.citationSourcesByFilename,
+        filters: sourceGroupFilterForGroups(sourcePriorityFallbackGroups),
+      })
+      recordResearchAttempt({
+        stage: shouldRunSourcePriority ? 'fallback_retrieval' : 'initial_retrieval',
+        query: effectiveQuestion,
+        sourceGroups: sourcePriorityFallbackGroups,
+        citationCount: firstRetrieval.citations.length,
+      })
+      retrievalAttempts.push(firstRetrieval)
+      retrievalAttemptKeys.add(fallbackKey)
+    }
+  }
+
+  let retrieval = retrievalAttempts[retrievalAttempts.length - 1] ?? {
+    provider: 'openai_file_search_validated' as const,
+    answer: '',
+    citations: [],
+    refusal: true,
+    timingsMs: {
+      total: 0,
+      retrieval: 0,
+      generation: 0,
+      validation: 0,
+    },
+    usage: zeroUsage(),
+  }
 
   if (plan.intent === 'brochure_table_fact') {
     let tableFact = resolveBrochureTableFact({

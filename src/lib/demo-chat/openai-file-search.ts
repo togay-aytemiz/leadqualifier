@@ -4,6 +4,8 @@ import { resolveMvpResponseLanguage } from '@/lib/ai/language'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { runOpenAiFileSearchValidatedQuestion } from '@/lib/knowledge-base/rag-eval/openai-file-search-validated'
+import { BROCHURE_SOURCE_PRIORITY_GROUPS } from '@/lib/knowledge-base/rag-eval/brochure-query-plan'
+import type { KnowledgeSearchPlanningTurn } from '@/lib/knowledge-base/query-planner'
 import type { DemoChatChannel } from '@/lib/demo-chat/channel'
 
 type SupabaseLike = Parameters<typeof recordAiUsage>[0]['supabase']
@@ -24,6 +26,7 @@ const DEFAULT_FILE_SEARCH_DEMO_SLUGS = ['yiu-tanitim-gunleri-2026']
 const DEFAULT_RETRIEVAL_MODEL = 'gpt-4.1-mini'
 const DEFAULT_ANSWER_MODEL = 'gpt-4o-mini'
 const DEFAULT_EVALUATOR_MODEL = 'gpt-4o-mini'
+const DEFAULT_RESEARCH_PLANNER_MODEL = 'gpt-4o-mini'
 
 function readEnabledSlugs() {
     const raw = process.env.DEMO_CHAT_FILE_SEARCH_SLUGS?.trim()
@@ -65,10 +68,36 @@ function readStrictLlmEvaluatorEnabled(qualityMode: 'validated' | 'strict') {
     return qualityMode === 'strict' && process.env.DEMO_CHAT_FILE_SEARCH_LLM_EVALUATOR !== '0'
 }
 
+function readResearchPlannerEnabled(qualityMode: 'validated' | 'strict') {
+    return qualityMode === 'strict' && process.env.DEMO_CHAT_FILE_SEARCH_RESEARCH_PLANNER !== '0'
+}
+
 function readStrictEvaluatorModel() {
     return process.env.DEMO_CHAT_FILE_SEARCH_EVALUATOR_MODEL?.trim()
         || process.env.OPENAI_RAG_EVALUATOR_MODEL?.trim()
         || DEFAULT_EVALUATOR_MODEL
+}
+
+function readResearchPlannerModel() {
+    return process.env.DEMO_CHAT_FILE_SEARCH_RESEARCH_PLANNER_MODEL?.trim()
+        || process.env.OPENAI_RAG_RESEARCH_PLANNER_MODEL?.trim()
+        || DEFAULT_RESEARCH_PLANNER_MODEL
+}
+
+function usageModelName(input: {
+    retrievalModel: string
+    answerModel: string
+    strictEvaluatorModel: string
+    strictLlmEvaluatorEnabled: boolean
+    researchPlannerModel: string
+    researchPlannerEnabled: boolean
+}) {
+    return Array.from(new Set([
+        input.retrievalModel,
+        input.answerModel,
+        ...(input.researchPlannerEnabled ? [input.researchPlannerModel] : []),
+        ...(input.strictLlmEvaluatorEnabled ? [input.strictEvaluatorModel] : []),
+    ])).join('+')
 }
 
 function mapCitationMetadata(citations: Array<{
@@ -90,6 +119,7 @@ export async function buildOpenAiFileSearchDemoReply(input: {
     channel: DemoChatChannel
     message: string
     conversationId?: string | null
+    conversationHistory?: KnowledgeSearchPlanningTurn[]
 }) {
     if (!shouldUseOpenAiFileSearch(input.channel)) return null
 
@@ -110,6 +140,8 @@ export async function buildOpenAiFileSearchDemoReply(input: {
         const qualityMode = readQualityMode()
         const strictLlmEvaluatorEnabled = readStrictLlmEvaluatorEnabled(qualityMode)
         const strictEvaluatorModel = readStrictEvaluatorModel()
+        const researchPlannerEnabled = readResearchPlannerEnabled(qualityMode)
+        const researchPlannerModel = readResearchPlannerModel()
         const vectorStoreId = readVectorStoreId()
         const openai = new OpenAI({ apiKey })
         const result = await runOpenAiFileSearchValidatedQuestion({
@@ -118,14 +150,18 @@ export async function buildOpenAiFileSearchDemoReply(input: {
             answerModel,
             vectorStoreId,
             question: input.message,
+            conversationHistory: input.conversationHistory ?? [],
             instructionProfile: 'qualy',
             citationSourcesByFilename: sourceManifest.sourcesByFilename,
+            sourcePriorityGroups: BROCHURE_SOURCE_PRIORITY_GROUPS,
             maxResults: 8,
             maxOutputTokens: 900,
             settings,
             qualityMode,
             enableStrictLlmEvaluator: strictLlmEvaluatorEnabled,
             strictEvaluatorModel,
+            enableLlmResearchPlanner: researchPlannerEnabled,
+            researchPlannerModel,
         })
         const answer = result.answer.trim()
         if (!answer) return null
@@ -135,11 +171,14 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                 await recordAiUsage({
                     organizationId: input.channel.organizationId,
                     category: 'rag',
-                    model: strictLlmEvaluatorEnabled
-                        ? `${retrievalModel}+${answerModel}+${strictEvaluatorModel}`
-                        : retrievalModel === answerModel
-                            ? retrievalModel
-                            : `${retrievalModel}+${answerModel}`,
+                    model: usageModelName({
+                        retrievalModel,
+                        answerModel,
+                        strictEvaluatorModel,
+                        strictLlmEvaluatorEnabled,
+                        researchPlannerModel,
+                        researchPlannerEnabled,
+                    }),
                     inputTokens: result.usage.inputTokens,
                     outputTokens: result.usage.outputTokens,
                     totalTokens: result.usage.totalTokens,
@@ -149,9 +188,13 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                         demo_chat_channel_id: input.channel.id,
                         ...(input.conversationId ? { conversation_id: input.conversationId } : {}),
                         vector_store_id: vectorStoreId,
+                        source_priority_groups: BROCHURE_SOURCE_PRIORITY_GROUPS,
                         quality_mode: qualityMode,
                         strict_llm_evaluator_enabled: strictLlmEvaluatorEnabled,
                         strict_evaluator_model: strictEvaluatorModel,
+                        research_planner_enabled: researchPlannerEnabled,
+                        research_planner_model: researchPlannerModel,
+                        conversation_history_turn_count: input.conversationHistory?.length ?? 0,
                         tool_calls: result.usage.toolCalls,
                         estimated_credits: result.usage.estimatedCredits,
                         diagnostics: result.diagnostics,
@@ -178,11 +221,15 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                     answer_model: answerModel,
                     strict_evaluator_model: strictEvaluatorModel,
                     strict_llm_evaluator_enabled: strictLlmEvaluatorEnabled,
+                    research_planner_enabled: researchPlannerEnabled,
+                    research_planner_model: researchPlannerModel,
+                    source_priority_groups: BROCHURE_SOURCE_PRIORITY_GROUPS,
                     quality_mode: qualityMode,
                     refusal: result.refusal,
                     timings_ms: result.timingsMs,
                     diagnostics: result.diagnostics,
                     usage: result.usage,
+                    conversation_history_turn_count: input.conversationHistory?.length ?? 0,
                 },
                 source_titles: citations.map((citation) => citation.title).filter(Boolean),
                 source_urls: citations.map((citation) => citation.url).filter(Boolean),

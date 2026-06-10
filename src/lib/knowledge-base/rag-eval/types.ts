@@ -61,6 +61,22 @@ export type RagProviderResult = {
     retryCount?: number
     followup?: string
     clarification?: string
+    contextualOrchestration?: string
+    contextualReason?: string
+    contextualQuestion?: string
+    sourcePriority?: {
+      primarySourceGroups: string[]
+      fallbackSourceGroups?: string[]
+      used: boolean
+    }
+    llmResearchPlan?: {
+      route: string
+      reason: string
+      requiredEvidence: string[]
+      used: boolean
+      hopCount: number
+      confidence?: number
+    }
     qualityMode?: 'validated' | 'strict'
     normalizedQuestion?: string
     strictVerdict?: string
