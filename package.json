@@ -18,6 +18,7 @@
     "knowledge:import-crawl": "node scripts/knowledge/import-crawl-corpus.mjs",
     "knowledge:reindex-org": "npx tsx scripts/knowledge/reindex-org-knowledge.ts",
     "rag:eval": "npx tsx scripts/knowledge/rag-eval-runner.ts",
+    "rag:pending-followups:live": "npx tsx scripts/knowledge/rag-pending-state-followup-live-eval.ts",
     "rag:yiu-pdfs:download": "npx tsx scripts/knowledge/rag-download-yiu-link-pdfs.ts",
     "rag:yiu-approved-corpus:manifest": "npx tsx scripts/knowledge/rag-build-yiu-approved-corpus-manifest.ts",
     "rag:yiu-brochure:manifest": "npx tsx scripts/knowledge/rag-build-yiu-brochure-manifest.ts",

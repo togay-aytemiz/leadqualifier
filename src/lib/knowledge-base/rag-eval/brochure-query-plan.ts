@@ -199,10 +199,11 @@ const FIELD_PATTERNS: Array<{
     label: '2025 Fiyat',
     patterns: [
       /\bfiyat/,
-      /\bucret/,
+      /\bucret(?:i|ler|leri)?\b/,
       /\bkac\s+para\b/,
       /\bkaca\b/,
       /\bkac\s*tl\b/,
+      /\bne\s+kadar\b/,
       /\bne\s+kadar\s+tutar\b/,
       /\bmaliyet/,
     ],

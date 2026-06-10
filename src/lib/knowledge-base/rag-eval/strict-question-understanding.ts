@@ -277,7 +277,11 @@ function pushIntent(intents: StrictQuestionIntent[], intent: StrictQuestionInten
 function detectIntents(search: string, safety: StrictQuestionSafety) {
   const intents: StrictQuestionIntent[] = []
 
-  if (/(?:kac para|kac tl|ucret|ucreti|ucretler|fiyat|fiyati|maliyet|tutar)/.test(search)) {
+  if (
+    /(?:kac para|kac tl|ne kadar|ucret(?:i|ler|leri)?\b|fiyat(?:i|lar|lari)?\b|maliyet|tutar)/.test(
+      search
+    )
+  ) {
     pushIntent(intents, 'price')
   }
   if (/(?:kontenjan|kac kisi|kac ogrenci)/.test(search)) pushIntent(intents, 'quota')
@@ -293,7 +297,7 @@ function detectIntents(search: string, safety: StrictQuestionSafety) {
     pushIntent(intents, 'existence')
   }
   if (
-    /(?:hangi fakulte|hangi fakulteler|fakulteler|hangi bolum|hangi bolumler|hangi program|hangi programlar|bolumleri|programlari|listeler|listele|neler var)/.test(
+    /(?:hangi fakulte|hangi fakulteler|fakulteler|hangi bolum|hangi bolumler|hangi program|hangi programlar|bolumleri|programlari|bolumlere kayit|programlara kayit|kayit olabilecegim bolum|kayit olabilecegim program|listeler|listele|neler var)/.test(
       search
     )
   ) {
@@ -330,9 +334,10 @@ function withQuestionMark(value: string) {
 
 function normalizeQuestionText(question: string, entities: StrictQuestionEntity[], search: string) {
   const entity = entities[0]
-  const asksPrice = /(?:kac para|kac tl|ucret|ucreti|ucretler|fiyat|fiyati|maliyet|tutar)/.test(
-    search
-  )
+  const asksPrice =
+    /(?:kac para|kac tl|ne kadar|ucret(?:i|ler|leri)?\b|fiyat(?:i|lar|lari)?\b|maliyet|tutar)/.test(
+      search
+    )
   const asksExistence = /(?:var mi|varmi|var m[ıi]|mevcut mu|bulunuyor mu)/.test(search)
   const asksListing =
     /(?:bolumleri|programlari|fakulteler|hangi fakulte|hangi bolum|hangi program|listeler|listele)/.test(

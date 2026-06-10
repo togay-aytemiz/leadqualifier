@@ -5,6 +5,7 @@ import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 export interface KnowledgeSearchPlanningTurn {
     role: 'user' | 'assistant'
     content: string
+    metadata?: Record<string, unknown> | null
 }
 
 export interface KnowledgeSearchQueryPlanUsage {

@@ -11,12 +11,19 @@ import {
   type OpenAiFileSearchInstructionProfile,
   runOpenAiFileSearchQuestion,
 } from './openai-file-search'
-import { planBrochureQuery, type BrochureQueryPlan } from './brochure-query-plan'
+import {
+  planBrochureQuery,
+  type BrochureQueryPlan,
+  type BrochureTableField,
+} from './brochure-query-plan'
 import { resolveBrochureTableFact } from './brochure-table'
 import { resolveApprovedSourceFact } from './approved-source-facts'
 import { buildValidatedFollowup } from './validated-followup'
-import type { RagProviderCitation, RagProviderResult } from './types'
-import { understandStrictQuestion } from './strict-question-understanding'
+import type { RagPendingClarificationState, RagProviderCitation, RagProviderResult } from './types'
+import {
+  understandStrictQuestion,
+  type StrictQuestionUnderstanding,
+} from './strict-question-understanding'
 import { resolveStrictCatalogAnswer, type StrictCatalogAnswer } from './strict-fact-catalog'
 import {
   evaluateStrictAnswer,
@@ -43,6 +50,13 @@ import {
   type StrictLlmResearchPlannerCreateCompletion,
 } from './strict-llm-research-planner'
 import { classifyStrictDirectAnswerQuality } from './strict-quality-rubric'
+import {
+  buildRagPendingClarificationState,
+  findLatestRagPendingClarificationState,
+  formatRagPendingClarificationForPrompt,
+  normalizeRagPendingClarificationState,
+  resolveRagPendingClarificationFollowup,
+} from './pending-clarification-state'
 
 type CitationSource = {
   title?: string
@@ -106,6 +120,7 @@ export type OpenAiFileSearchValidatedQuestionInput = {
   conversationHistory?: KnowledgeSearchPlanningTurn[]
   contextualOrchestratorModel?: string
   contextualOrchestratorCreateCompletion?: CreateCompletion
+  pendingClarification?: RagPendingClarificationState
   sourcePriorityGroups?: string[]
   enableLlmResearchPlanner?: boolean
   researchPlannerModel?: string
@@ -115,6 +130,7 @@ export type OpenAiFileSearchValidatedQuestionInput = {
 const NO_CLEAR_INFORMATION_ANSWER = 'Yüklenen belgelerde bu konuda net bir bilgi bulunmamaktadır.'
 const DEFAULT_CONTEXTUAL_ORCHESTRATOR_MODEL = 'gpt-4o-mini'
 const CONTEXTUAL_ORCHESTRATOR_MAX_OUTPUT_TOKENS = 260
+const CONTEXTUAL_ORCHESTRATOR_MIN_CONFIDENCE = 0.62
 const MAX_CONTEXTUAL_HISTORY_TURNS = 10
 
 const TURKISH_CHAR_MAP: Record<string, string> = {
@@ -782,6 +798,7 @@ function clarificationResult(input: {
     question: string
   }
   usage?: RagProviderResult['usage']
+  pendingClarification?: RagPendingClarificationState | null
 }): RagProviderResult {
   return {
     provider: 'openai_file_search_validated',
@@ -799,8 +816,82 @@ function clarificationResult(input: {
       queryIntent: input.queryIntent,
       retryCount: 0,
       clarification: input.clarification.reason,
+      ...(input.pendingClarification ? { pendingClarification: input.pendingClarification } : {}),
     },
   }
+}
+
+function buildStrictMissingSubjectClarification(input: {
+  understanding: StrictQuestionUnderstanding
+  plan: BrochureQueryPlan
+  contextualAction?: string
+  contextualTurnType?: string
+}): { reason: string; question: string } | null {
+  if (input.contextualAction === 'rewrite' || input.contextualTurnType === 'clarification_answer') {
+    return null
+  }
+
+  const search = input.understanding.normalizedSearch
+  const hasProgram =
+    input.understanding.entities.some((entity) => entity.kind === 'program') ||
+    input.plan.programs.length > 0
+
+  if (!hasProgram && /(?:bolumlere kayit|programlara kayit|kayit olabilirim)/.test(search)) {
+    return {
+      reason: 'missing_program_list_scope',
+      question:
+        'Burslu programları mı, yoksa genel olarak tüm lisans ve ön lisans programlarını mı görmek istiyorsunuz?',
+    }
+  }
+
+  if (!hasProgram && input.understanding.intents.includes('quota')) {
+    return {
+      reason: 'missing_quota_program',
+      question: 'Hangi programın kontenjanını öğrenmek istiyorsunuz?',
+    }
+  }
+
+  if (
+    /(?:burs).{0,40}(?:kac|ne kadar|tutar|oran)|(?:kac|ne kadar|tutar|oran).{0,40}(?:burs)/.test(
+      search
+    ) &&
+    !/(?:yks|ustun basari|tercih bursu|akademik basari|kardes|sehit|gazi|sporcu|sosyal destek|ilk\s*100|ilk\s*500|ilk\s*1000|ilk\s*10000)/.test(
+      search
+    )
+  ) {
+    return {
+      reason: 'missing_scholarship_type',
+      question: 'Hangi burs türünün tutarını veya oranını öğrenmek istiyorsunuz?',
+    }
+  }
+
+  if (
+    !hasProgram &&
+    /(?:staj|klinik uygulama|uygulamali egitim).{0,60}(?:kac gun|sure|suresi)|(?:kac gun|sure|suresi).{0,60}(?:staj|klinik uygulama|uygulamali egitim)/.test(
+      search
+    )
+  ) {
+    return {
+      reason: 'missing_internship_program',
+      question: 'Hangi bölüm veya program için staj süresini öğrenmek istiyorsunuz?',
+    }
+  }
+
+  if (!hasProgram && /(?:kac yil|kac yillik|egitim suresi|ne kadar sur)/.test(search)) {
+    return {
+      reason: 'missing_duration_program',
+      question: 'Hangi bölüm veya programın eğitim süresini öğrenmek istiyorsunuz?',
+    }
+  }
+
+  if (!hasProgram && /hazirlik/.test(search)) {
+    return {
+      reason: 'missing_preparation_program',
+      question: 'Hangi program için hazırlık bilgisini öğrenmek istiyorsunuz?',
+    }
+  }
+
+  return null
 }
 
 function zeroUsage() {
@@ -822,6 +913,21 @@ type ContextualOrchestrationResult = {
   refusalAnswer?: string
   reason?: string
   usage?: RagProviderResult['usage']
+  turnType?: string
+  resolvedIntent?: string
+  originalUserQuestion?: string
+  latestUserClarification?: string
+  shouldRetrieve?: boolean
+  doNotRetrieveText?: string[]
+  retrievalIntent?: string
+  requestedMetric?: string
+  sourcePreference?: string[]
+  riskLevel?: string
+  stateDecision?: string
+  stateConfidence?: number
+  stateReason?: string
+  consumedPendingState?: boolean
+  pendingClarificationUsed?: boolean
 }
 
 function normalizeContextualHistory(history: KnowledgeSearchPlanningTurn[] | undefined) {
@@ -829,6 +935,7 @@ function normalizeContextualHistory(history: KnowledgeSearchPlanningTurn[] | und
     .map((turn) => ({
       role: turn.role,
       content: turn.content.replace(/\s+/g, ' ').trim(),
+      ...(turn.metadata ? { metadata: turn.metadata } : {}),
     }))
     .filter((turn) => turn.content)
     .slice(-MAX_CONTEXTUAL_HISTORY_TURNS)
@@ -848,8 +955,21 @@ function readContextualString(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+function readContextualStringArray(value: unknown) {
+  if (!Array.isArray(value)) return []
+
+  return value
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter(Boolean)
+    .slice(0, 8)
+}
+
 function readContextualNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function readContextualBoolean(value: unknown) {
+  return typeof value === 'boolean' ? value : undefined
 }
 
 function readContextualAction(value: unknown): ContextualOrchestrationAction | null {
@@ -858,6 +978,42 @@ function readContextualAction(value: unknown): ContextualOrchestrationAction | n
   }
   if (value === 'contextual_rewrite') return 'rewrite'
   return null
+}
+
+function readContextualMetadata(parsed: Record<string, unknown> | null) {
+  if (!parsed) return {}
+
+  const turnType = readContextualString(parsed.turn_type)
+  const resolvedIntent = readContextualString(parsed.resolved_user_intent)
+  const originalUserQuestion = readContextualString(parsed.original_user_question_used)
+  const latestUserClarification = readContextualString(parsed.latest_user_clarification_used)
+  const shouldRetrieve = readContextualBoolean(parsed.should_retrieve)
+  const doNotRetrieveText = readContextualStringArray(parsed.do_not_retrieve_text)
+  const retrievalIntent = readContextualString(parsed.retrieval_intent)
+  const requestedMetric = readContextualString(parsed.requested_metric)
+  const sourcePreference = readContextualStringArray(parsed.source_preference)
+  const riskLevel = readContextualString(parsed.risk_level)
+  const stateDecision = readContextualString(parsed.state_decision)
+  const stateConfidence = readContextualNumber(parsed.state_confidence)
+  const stateReason = readContextualString(parsed.state_reason)
+  const consumedPendingState = readContextualBoolean(parsed.consumed_pending_state)
+
+  return {
+    ...(turnType ? { turnType } : {}),
+    ...(resolvedIntent ? { resolvedIntent } : {}),
+    ...(originalUserQuestion ? { originalUserQuestion } : {}),
+    ...(latestUserClarification ? { latestUserClarification } : {}),
+    ...(shouldRetrieve !== undefined ? { shouldRetrieve } : {}),
+    ...(doNotRetrieveText.length > 0 ? { doNotRetrieveText } : {}),
+    ...(retrievalIntent ? { retrievalIntent } : {}),
+    ...(requestedMetric ? { requestedMetric } : {}),
+    ...(sourcePreference.length > 0 ? { sourcePreference } : {}),
+    ...(riskLevel ? { riskLevel } : {}),
+    ...(stateDecision ? { stateDecision } : {}),
+    ...(stateConfidence !== undefined ? { stateConfidence } : {}),
+    ...(stateReason ? { stateReason } : {}),
+    ...(consumedPendingState !== undefined ? { consumedPendingState } : {}),
+  } satisfies Partial<ContextualOrchestrationResult>
 }
 
 function parseContextualJson(content: string): Record<string, unknown> | null {
@@ -933,12 +1089,223 @@ function latestHistoryTurn(history: KnowledgeSearchPlanningTurn[], role: 'user' 
     .find((turn) => turn.role === role && turn.content.trim())
 }
 
-function fallbackContextualOrchestration(input: {
+const CONTEXTUAL_CLARIFICATION_STOPWORDS = new Set([
+  'acaba',
+  'almak',
+  'alabilir',
+  'bilgi',
+  'bir',
+  'bu',
+  'genel',
+  'hakkinizda',
+  'hakkinda',
+  'hangi',
+  'hangisi',
+  'icin',
+  'istiyor',
+  'istiyorum',
+  'istiyorsunuz',
+  'mi',
+  'misiniz',
+  'musunuz',
+  'miyim',
+  'mu',
+  'nedir',
+  'olarak',
+  've',
+  'veya',
+  'ya',
+  'yoksa',
+])
+
+function contextualMeaningTokens(value: string) {
+  return normalizeForSupport(value)
+    .split(/[^a-z0-9]+/i)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3)
+    .filter((token) => !CONTEXTUAL_CLARIFICATION_STOPWORDS.has(token))
+}
+
+function inferRequestedMetricFromText(value: string): string | undefined {
+  const normalized = normalizeForSupport(value)
+  if (!normalized) return undefined
+  if (/(?:taban puan|puanlar nedir|puanlari nedir)/.test(normalized)) return 'base_score'
+  if (/(?:basari siral|siralama nedir|sıralama nedir)/.test(normalized)) {
+    return 'success_rank'
+  }
+  if (/(?:kontenjan|kac kisi|kac ogrenci)/.test(normalized)) return 'quota'
+  if (/(?:kac para|kac tl|ucret(?:i|ler|leri)?\b|fiyat(?:i|lar|lari)?\b|ne kadar|maliyet|tutar)/.test(normalized)) {
+    return 'price'
+  }
+  if (/(?:staj|klinik uygulama|uygulamali egitim).{0,60}(?:kac gun|sure|suresi)|(?:kac gun|sure|suresi).{0,60}(?:staj|klinik uygulama|uygulamali egitim)/.test(normalized)) {
+    return 'internship_duration'
+  }
+  if (/(?:kac yil|kac yillik|egitim suresi|ne kadar sur)/.test(normalized)) {
+    return 'program_duration'
+  }
+  if (/hazirlik/.test(normalized)) return 'preparation'
+  if (/(?:nerede|nerde|adres|kampus|kampusu|yerleske)/.test(normalized)) return 'location'
+  if (/(?:hangi bolum|hangi program|bolumlere kayit|programlara kayit|tum bolum|tüm bölüm|listele|listeler)/.test(normalized)) {
+    return 'program_list'
+  }
+  return undefined
+}
+
+function requestedMetricToTableFields(metric: string | undefined): BrochureTableField[] {
+  if (metric === 'base_score') return ['base_score']
+  if (metric === 'success_rank') return ['success_rank']
+  if (metric === 'quota') return ['quota']
+  if (metric === 'price') return ['price']
+  return []
+}
+
+function requestedMetricSearchPhrase(metric: string | undefined) {
+  if (metric === 'base_score') return '2024 taban puanı'
+  if (metric === 'success_rank') return '2024 başarı sırası'
+  if (metric === 'quota') return '2025 kontenjanı'
+  if (metric === 'price') return '2025 ücret/fiyat'
+  if (metric === 'internship_duration') return 'staj süresi kaç gün'
+  if (metric === 'program_duration') return 'eğitim süresi kaç yıl'
+  if (metric === 'preparation') return 'hazırlık sınıfı bilgisi'
+  if (metric === 'location') return 'konum veya yerleşke'
+  if (metric === 'program_list') return 'program listesi'
+  return ''
+}
+
+function augmentQuestionWithRequestedMetric(input: { question: string; metric?: string }) {
+  const phrase = requestedMetricSearchPhrase(input.metric)
+  if (!phrase) return input.question
+
+  const normalizedQuestion = normalizeForSupport(input.question)
+  const normalizedPhrase = normalizeForSupport(phrase)
+  const phraseTokens = contextualMeaningTokens(normalizedPhrase)
+  const alreadyContainsMetric = phraseTokens.some((token) => normalizedQuestion.includes(token))
+  if (alreadyContainsMetric) return input.question
+
+  return `İstenen bilgi: ${phrase}\n${input.question}`
+}
+
+function assistantLooksLikeClarificationQuestion(value: string) {
+  const normalized = normalizeForSupport(value)
+  const hasQuestionMark = /[?？]/.test(value)
+  const hasStrongClarificationCue =
+    /(?:\bhangi\b|\bhangisi\b|\byoksa\b|\bbelirt|\bpaylas|\bnetlestir|\bkapsam|\bsecenek|\btercih|\bgerekir|\bgerekiyor)/.test(
+      normalized
+    )
+  if (!hasQuestionMark && !hasStrongClarificationCue) return false
+
+  return /(?:\bhangi\b|\bhangisi\b|\byoksa\b|\bmi\b|\bmisiniz\b|\bmusunuz\b|\bbelirt|\bpaylas|\bnetlestir|\bkapsam|\bsecenek|\btercih|\bgerekir|\bgerekiyor)/.test(
+    normalized
+  )
+}
+
+function messageLooksLikeFreshQuestion(value: string) {
+  const normalized = normalizeForSupport(value)
+  return (
+    /[?？]/.test(value) ||
+    /(?:\bne\b|\bnedir\b|\bneler\b|\bhangi\b|\bhangileri\b|\bkac\b|\bkactir\b|\bnerede\b|\bneresi\b|\bnasil\b|\bneden\b|\bniye\b|\bvar mi\b|\bvarmi\b|\bolur mu\b|\bolurmu\b|\bmi\b|\bmu\b|\bmiyim\b|\bmisiniz\b|\bmusunuz\b)/.test(
+      normalized
+    )
+  )
+}
+
+function answerOverlapsAssistantClarificationOptions(input: {
+  question: string
+  assistantQuestion: string
+}) {
+  const answerTokens = new Set(contextualMeaningTokens(input.question))
+  if (answerTokens.size === 0) return false
+
+  const assistantTokens = new Set(contextualMeaningTokens(input.assistantQuestion))
+  const overlapCount = [...answerTokens].filter((token) => assistantTokens.has(token)).length
+  if (overlapCount >= 2) return true
+
+  return [...answerTokens].some((token) => token.length >= 5 && assistantTokens.has(token))
+}
+
+function previousAssistantTextAppearsInRewrite(input: {
+  rewrittenQuestion: string
+  history: KnowledgeSearchPlanningTurn[]
+}) {
+  const previousAssistant = latestHistoryTurn(input.history, 'assistant')?.content.trim()
+  if (!previousAssistant) return false
+
+  const rewritten = normalizeForSupport(input.rewrittenQuestion)
+  const assistant = normalizeForSupport(previousAssistant)
+  if (assistant.length < 30) return false
+
+  const assistantLead = assistant.slice(0, Math.min(80, assistant.length))
+  return assistantLead.length >= 30 && rewritten.includes(assistantLead)
+}
+
+function resolveClarificationAnswerFromHistory(input: {
   question: string
   history: KnowledgeSearchPlanningTurn[]
   reason?: string
+  usage?: RagProviderResult['usage']
 }): ContextualOrchestrationResult | null {
-  if (!isShortContinuationMessage(input.question) || input.history.length === 0) return null
+  const previousUser = latestHistoryTurn(input.history, 'user')?.content.trim()
+  const previousAssistant = latestHistoryTurn(input.history, 'assistant')?.content.trim()
+  const latestQuestion = input.question.trim()
+  if (!previousUser || !previousAssistant || !latestQuestion) return null
+  if (!assistantLooksLikeClarificationQuestion(previousAssistant)) return null
+
+  const looksLikeAnswer =
+    answerOverlapsAssistantClarificationOptions({
+      question: latestQuestion,
+      assistantQuestion: previousAssistant,
+    }) || !messageLooksLikeFreshQuestion(latestQuestion)
+  if (!looksLikeAnswer) return null
+  const requestedMetric = inferRequestedMetricFromText(previousUser)
+
+  return {
+    action: 'rewrite',
+    question: `Önceki soru: ${previousUser}\nKullanıcının netleştirmesi: ${latestQuestion}`,
+    reason: input.reason ?? 'clarification_answer_rewrite',
+    turnType: 'clarification_answer',
+    resolvedIntent: `${previousUser} — ${latestQuestion}`,
+    originalUserQuestion: previousUser,
+    latestUserClarification: latestQuestion,
+    shouldRetrieve: true,
+    doNotRetrieveText: [previousAssistant],
+    ...(requestedMetric
+      ? {
+          requestedMetric,
+          retrievalIntent: requestedMetric,
+        }
+      : {}),
+    ...(input.usage ? { usage: input.usage } : {}),
+  }
+}
+
+function fallbackContextualOrchestration(input: {
+  question: string
+  history: KnowledgeSearchPlanningTurn[]
+  pendingClarification?: RagPendingClarificationState | null
+  reason?: string
+  usage?: RagProviderResult['usage']
+}): ContextualOrchestrationResult | null {
+  const pendingClarification = resolveRagPendingClarificationFollowup({
+    latestUserMessage: input.question,
+    pending: input.pendingClarification,
+  })
+  if (pendingClarification) {
+    return {
+      ...pendingClarification,
+      usage: input.usage,
+    }
+  }
+
+  if (input.history.length === 0) return null
+
+  const clarificationAnswer = resolveClarificationAnswerFromHistory({
+    question: input.question,
+    history: input.history,
+    usage: input.usage,
+  })
+  if (clarificationAnswer) return clarificationAnswer
+
+  if (!isShortContinuationMessage(input.question)) return null
 
   const previousUser = latestHistoryTurn(input.history, 'user')?.content.trim()
   const previousAssistant = latestHistoryTurn(input.history, 'assistant')?.content.trim()
@@ -977,19 +1344,41 @@ function fallbackContextualOrchestration(input: {
 function buildContextualOrchestrationMessages(input: {
   question: string
   history: KnowledgeSearchPlanningTurn[]
+  pendingClarification?: RagPendingClarificationState | null
 }) {
   const system = [
     'You are a domain-independent conversation orchestration layer for a grounded RAG assistant.',
     'Do not answer the user.',
-    'Decide whether the current user message is standalone, should be rewritten using recent conversation, needs clarification, or must be refused for safety.',
+    'First classify the latest user message with exactly one turn_type: new_question, clarification_answer, assistant_offer_acceptance, correction, scope_selection, multi_question, off_topic, or unsafe_or_private_action.',
+    'Then decide whether the current user message is standalone, should be rewritten using recent conversation, needs clarification, or must be refused for safety.',
     'Always use the recent conversation when it changes what the latest message means.',
+    'If pending clarification state is present, explicitly decide how the latest user message relates to it with state_decision: use, ignore, split, or clarify.',
+    'Use state_decision "use" when the latest message fills the missing slot or selects a scope, even if it is long, typo-heavy, or phrased like a question.',
+    'Use state_decision "ignore" when the latest message is a fresh independent question that should not consume the pending state.',
+    'Use state_decision "split" when the latest message both answers the pending clarification and adds a new related question or requested facet.',
+    'Use state_decision "clarify" when the latest message is too vague to safely map to the pending state.',
+    'Always include state_confidence, state_reason, and consumed_pending_state when pending clarification state is present.',
+    'If the previous assistant asked a clarification question and the latest user message answers it, rewrite to a standalone search question using the original user question plus the user clarification. This applies to short answers and long natural-language answers.',
+    'Assistant clarification or offer text is context only. Do not search for the assistant clarification question itself. Put assistant text that must not be retrieved in do_not_retrieve_text, and do not copy it into rewritten_question except when quoting it is absolutely necessary.',
     'If the latest message only accepts an assistant offer, rewrite it only when the offer has one clear target. If the offer has multiple possible targets, ask a short clarification question.',
+    `If confidence is below ${CONTEXTUAL_ORCHESTRATOR_MIN_CONFIDENCE}, action must be clarify unless the user intent is plainly resolved from the conversation.`,
+    'For clarification_answer turns, preserve the original requested metric/facet from the earlier user question in requested_metric. Examples: fee, quota, base_score, success_rank, program_duration, internship_duration, preparation, location, program_list. The latest user clarification usually fills entity/scope, not the metric.',
+    'Add a mini retrieval plan when retrieval should run: retrieval_intent, source_preference, and risk_level. Use source_preference values like primary_campaign_material, website_html, approved_pdf, structured_catalog, or broad_approved_corpus when useful.',
     'Never invent organization-specific facts. Preserve the user language.',
-    'Return only valid JSON with keys: action, reason, rewritten_question, clarification_question, refusal_answer, confidence.',
+    'Return only valid JSON with keys: turn_type, action, reason, resolved_user_intent, rewritten_question, original_user_question_used, latest_user_clarification_used, should_retrieve, do_not_retrieve_text, retrieval_intent, requested_metric, source_preference, risk_level, state_decision, state_confidence, state_reason, consumed_pending_state, clarification_question, refusal_answer, confidence.',
     'Allowed action values: standalone, rewrite, clarify, refuse.',
+    'Example 1: User asked "hangi bölümlere kayıt olabilirim"; Assistant asked "Burslu programlar mı yoksa genel olarak tüm bölümler mi?"; latest user says "tümü". Return turn_type clarification_answer, action rewrite, state_decision "use", consumed_pending_state true, rewritten_question "Önceki soru: hangi bölümlere kayıt olabilirim\\nKullanıcının netleştirmesi: tümü", do_not_retrieve_text with the assistant question, retrieval_intent "program_list", requested_metric "program_list".',
+    'Example 1b: User asked "taban puanlar nedir"; Assistant asked which program/variant; latest user says "Tıp İngilizce ücretli". Return turn_type clarification_answer, action rewrite, state_decision "use", requested_metric "base_score", retrieval_intent "base_score". Do not change the metric to fee just because the clarification contains "ücretli"; that is a row variant.',
+    'Example 1c: Pending state asks which scope; latest user says "tümü, ücretleri de yaz". Return turn_type multi_question, action rewrite, state_decision "split", consumed_pending_state true.',
+    'Example 1d: Pending state exists, but latest user asks "çalışma saatleri nedir?". Return turn_type new_question, action standalone, state_decision "ignore", consumed_pending_state false.',
+    'Example 1e: Pending state exists, but latest user says "hangisi daha iyi". Return action clarify, state_decision "clarify", consumed_pending_state false, and ask a short clarification.',
+    'Example 2: User asked "tıp hakkında bilgi"; Assistant offered "eğitim süresi veya mezuniyet olanakları"; latest user says "mezuniyet olanaklarını kontrol et". Return turn_type assistant_offer_acceptance, action rewrite, and use only the original user question plus selected offer target.',
+    'Example 3: Latest user asks "peki yurt var mı?" after an unrelated prior topic. Return turn_type new_question, action standalone, and keep the latest question as the retrieval target.',
+    'Example 4: Latest user says "TC kimliğimi buraya yazayım mı?" Return turn_type unsafe_or_private_action, action refuse, and provide a short safety refusal.',
   ].join(' ')
   const user = [
     `Recent conversation, oldest to newest:\n${formatContextualHistory(input.history)}`,
+    `Pending clarification state:\n${formatRagPendingClarificationForPrompt(input.pendingClarification)}`,
     `Latest user message:\n${input.question}`,
   ].join('\n\n')
   return [
@@ -1001,10 +1390,11 @@ function buildContextualOrchestrationMessages(input: {
 async function runContextualOrchestrator(input: {
   question: string
   history: KnowledgeSearchPlanningTurn[]
+  pendingClarification?: RagPendingClarificationState | null
   model?: string
   createCompletion?: CreateCompletion
 }): Promise<ContextualOrchestrationResult | null> {
-  if (input.history.length === 0) return null
+  if (input.history.length === 0 && !input.pendingClarification) return null
 
   const model =
     input.model?.trim() ||
@@ -1024,20 +1414,38 @@ async function runContextualOrchestrator(input: {
     const content = completion.choices?.[0]?.message?.content ?? ''
     const parsed = parseContextualJson(content)
     const action = readContextualAction(parsed?.action)
+    const metadata = readContextualMetadata(parsed)
     const reason = readContextualString(parsed?.reason)
     const confidence = readContextualNumber(parsed?.confidence)
     const rewrittenQuestion = readContextualString(parsed?.rewritten_question)
     const clarificationQuestion = readContextualString(parsed?.clarification_question)
     const refusalAnswer = readContextualString(parsed?.refusal_answer)
     const usage = normalizeContextualUsage(completion.usage, { input: prompt, output: content })
+    const pendingClarificationRepair = resolveRagPendingClarificationFollowup({
+      latestUserMessage: input.question,
+      pending: input.pendingClarification,
+      llmAction: action ?? undefined,
+      llmTurnType: metadata.turnType,
+      llmStateDecision: metadata.stateDecision,
+      llmStateConfidence: metadata.stateConfidence,
+      llmStateReason: metadata.stateReason,
+      llmClarificationQuestion: clarificationQuestion,
+    })
+    const clarificationAnswerRepair = resolveClarificationAnswerFromHistory({
+      question: input.question,
+      history: input.history,
+      usage,
+    })
 
-    if (action === 'clarify' && clarificationQuestion) {
+    if (action === 'clarify') {
       return {
         action,
         question: input.question,
-        clarificationQuestion,
+        clarificationQuestion:
+          clarificationQuestion || 'Hangi konu veya kapsamı kastettiğinizi biraz daha netleştirir misiniz?',
         reason: reason || 'contextual_clarification',
         usage,
+        ...metadata,
       }
     }
     if (action === 'refuse' && refusalAnswer) {
@@ -1047,34 +1455,87 @@ async function runContextualOrchestrator(input: {
         refusalAnswer,
         reason: reason || 'contextual_refusal',
         usage,
+        ...metadata,
       }
     }
-    if (action === 'rewrite' && rewrittenQuestion) {
+    if (
+      action &&
+      confidence !== undefined &&
+      confidence < CONTEXTUAL_ORCHESTRATOR_MIN_CONFIDENCE &&
+      !clarificationAnswerRepair
+    ) {
+      if (pendingClarificationRepair) {
+        return {
+          ...pendingClarificationRepair,
+          usage,
+        }
+      }
+      return {
+        action: 'clarify',
+        question: input.question,
+        clarificationQuestion:
+          clarificationQuestion || 'Hangi konu veya kapsamı kastettiğinizi biraz daha netleştirir misiniz?',
+        reason: 'low_confidence_contextual_orchestration',
+        usage,
+        ...metadata,
+      }
+    }
+    if (action === 'rewrite' && (rewrittenQuestion || metadata.resolvedIntent)) {
+      if (pendingClarificationRepair) {
+        return {
+          ...pendingClarificationRepair,
+          usage,
+        }
+      }
+
+      if (
+        clarificationAnswerRepair &&
+        previousAssistantTextAppearsInRewrite({
+          rewrittenQuestion,
+          history: input.history,
+        })
+      ) {
+        return clarificationAnswerRepair
+      }
+
       return {
         action,
-        question: rewrittenQuestion,
+        question: rewrittenQuestion || metadata.resolvedIntent || input.question,
         reason: reason || 'contextual_rewrite',
         usage,
+        ...metadata,
       }
     }
     if (action === 'standalone') {
+      if (pendingClarificationRepair) {
+        return {
+          ...pendingClarificationRepair,
+          usage,
+        }
+      }
+      if (clarificationAnswerRepair) return clarificationAnswerRepair
+
       return {
         action,
         question: rewrittenQuestion || input.question,
         reason: reason || 'standalone',
         usage,
+        ...metadata,
       }
     }
 
     return fallbackContextualOrchestration({
       question: input.question,
       history: input.history,
+      pendingClarification: input.pendingClarification,
       reason: confidence !== undefined ? 'invalid_contextual_orchestrator_output' : reason,
+      usage,
     })
   } catch (error) {
     return fallbackContextualOrchestration({
       question: input.question,
       history: input.history,
+      pendingClarification: input.pendingClarification,
       reason: 'contextual_orchestrator_error',
     })
   }
@@ -1124,13 +1585,31 @@ export async function runOpenAiFileSearchValidatedQuestion(
   const retrievalStartedAt = Date.now()
   const qualityMode = input.qualityMode ?? 'validated'
   const conversationHistory = normalizeContextualHistory(input.conversationHistory)
+  const pendingClarification =
+    normalizeRagPendingClarificationState(input.pendingClarification) ??
+    findLatestRagPendingClarificationState(conversationHistory)
   const contextualOrchestration = await runContextualOrchestrator({
     question: input.question,
     history: conversationHistory,
+    pendingClarification,
     model: input.contextualOrchestratorModel,
     createCompletion: input.contextualOrchestratorCreateCompletion,
   })
-  const questionForAnswer = contextualOrchestration?.question.trim() || input.question
+  const contextualRequestedMetric =
+    contextualOrchestration?.requestedMetric ||
+    inferRequestedMetricFromText(contextualOrchestration?.retrievalIntent ?? '') ||
+    inferRequestedMetricFromText(contextualOrchestration?.originalUserQuestion ?? '') ||
+    (contextualOrchestration?.turnType === 'clarification_answer'
+      ? inferRequestedMetricFromText(contextualOrchestration.question)
+      : undefined)
+  const rawQuestionForAnswer = contextualOrchestration?.question.trim() || input.question
+  const questionForAnswer =
+    contextualOrchestration?.turnType === 'clarification_answer'
+      ? augmentQuestionWithRequestedMetric({
+          question: rawQuestionForAnswer,
+          metric: contextualRequestedMetric,
+        })
+      : rawQuestionForAnswer
   const applyContextualOrchestration = (result: RagProviderResult): RagProviderResult => {
     if (!contextualOrchestration) return result
     const usage = contextualOrchestration.usage
@@ -1146,6 +1625,49 @@ export async function runOpenAiFileSearchValidatedQuestion(
           ? { contextualReason: contextualOrchestration.reason }
           : {}),
         ...(questionForAnswer !== input.question ? { contextualQuestion: questionForAnswer } : {}),
+        ...(contextualOrchestration.turnType
+          ? { contextualTurnType: contextualOrchestration.turnType }
+          : {}),
+        ...(contextualOrchestration.resolvedIntent
+          ? { contextualResolvedIntent: contextualOrchestration.resolvedIntent }
+          : {}),
+        ...(contextualOrchestration.originalUserQuestion
+          ? { contextualOriginalQuestion: contextualOrchestration.originalUserQuestion }
+          : {}),
+        ...(contextualOrchestration.latestUserClarification
+          ? { contextualLatestClarification: contextualOrchestration.latestUserClarification }
+          : {}),
+        ...(contextualOrchestration.shouldRetrieve !== undefined
+          ? { contextualShouldRetrieve: contextualOrchestration.shouldRetrieve }
+          : {}),
+        ...(contextualOrchestration.doNotRetrieveText?.length
+          ? { contextualDoNotRetrieveText: contextualOrchestration.doNotRetrieveText }
+          : {}),
+        ...(contextualOrchestration.retrievalIntent
+          ? { contextualRetrievalIntent: contextualOrchestration.retrievalIntent }
+          : {}),
+        ...(contextualRequestedMetric ? { contextualRequestedMetric } : {}),
+        ...(contextualOrchestration.sourcePreference?.length
+          ? { contextualSourcePreference: contextualOrchestration.sourcePreference }
+          : {}),
+        ...(contextualOrchestration.riskLevel
+          ? { contextualRiskLevel: contextualOrchestration.riskLevel }
+          : {}),
+        ...(contextualOrchestration.stateDecision
+          ? { contextualStateDecision: contextualOrchestration.stateDecision }
+          : {}),
+        ...(contextualOrchestration.stateConfidence !== undefined
+          ? { contextualStateConfidence: contextualOrchestration.stateConfidence }
+          : {}),
+        ...(contextualOrchestration.stateReason
+          ? { contextualStateReason: contextualOrchestration.stateReason }
+          : {}),
+        ...(contextualOrchestration.consumedPendingState !== undefined
+          ? { contextualConsumedPendingState: contextualOrchestration.consumedPendingState }
+          : {}),
+        ...(contextualOrchestration.pendingClarificationUsed
+          ? { pendingClarificationUsed: true }
+          : {}),
       },
     }
   }
@@ -1159,6 +1681,15 @@ export async function runOpenAiFileSearchValidatedQuestion(
           reason: contextualOrchestration.reason,
           question: contextualOrchestration.clarificationQuestion,
         },
+        pendingClarification: buildRagPendingClarificationState({
+          originalQuestion: input.question,
+          clarificationQuestion: contextualOrchestration.clarificationQuestion,
+          requestedMetric: contextualRequestedMetric,
+          retrievalIntent: contextualOrchestration.retrievalIntent ?? contextualRequestedMetric,
+          sourcePreference: contextualOrchestration.sourcePreference,
+          riskLevel: contextualOrchestration.riskLevel,
+          doNotRetrieveText: contextualOrchestration.doNotRetrieveText,
+        }),
       })
     )
   }
@@ -1682,12 +2213,42 @@ export async function runOpenAiFileSearchValidatedQuestion(
     )
   }
 
-  const catalogAnswer = strictUnderstanding
-    ? resolveStrictCatalogAnswer({
-        question: questionForAnswer,
+  const strictMissingSubjectClarification = strictUnderstanding
+    ? buildStrictMissingSubjectClarification({
         understanding: strictUnderstanding,
+        plan,
+        contextualAction: contextualOrchestration?.action,
+        contextualTurnType: contextualOrchestration?.turnType,
       })
     : null
+  if (strictMissingSubjectClarification) {
+    return finalize(
+      clarificationResult({
+        startedAt,
+        queryIntent: plan.intent,
+        clarification: strictMissingSubjectClarification,
+        pendingClarification: buildRagPendingClarificationState({
+          originalQuestion: effectiveQuestion,
+          clarificationQuestion: strictMissingSubjectClarification.question,
+          missingSlots: ['subject'],
+          requestedMetric: contextualRequestedMetric ?? inferRequestedMetricFromText(effectiveQuestion),
+          retrievalIntent: contextualRequestedMetric ?? inferRequestedMetricFromText(effectiveQuestion),
+        }),
+      })
+    )
+  }
+
+  const shouldUseBrochureTableBeforeCatalog =
+    plan.intent === 'brochure_table_fact' &&
+    plan.programs.length > 0 &&
+    plan.requestedFields.some((field) => field !== 'price')
+  const catalogAnswer =
+    strictUnderstanding && !shouldUseBrochureTableBeforeCatalog
+      ? resolveStrictCatalogAnswer({
+          question: questionForAnswer,
+          understanding: strictUnderstanding,
+        })
+      : null
   if (catalogAnswer) {
     return finalizeCatalog(catalogAnswer)
   }
@@ -1708,6 +2269,13 @@ export async function runOpenAiFileSearchValidatedQuestion(
         startedAt,
         queryIntent: plan.intent,
         clarification,
+        pendingClarification: buildRagPendingClarificationState({
+          originalQuestion: effectiveQuestion,
+          clarificationQuestion: clarification.question,
+          missingSlots: ['scope'],
+          requestedMetric: contextualRequestedMetric ?? inferRequestedMetricFromText(effectiveQuestion),
+          retrievalIntent: contextualRequestedMetric ?? inferRequestedMetricFromText(effectiveQuestion),
+        }),
       })
     )
   }

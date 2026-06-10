@@ -925,7 +925,17 @@ describe('demo chat API route', () => {
                         content:
                             'İsterseniz bu programlardan birinin eğitim süresi veya mezuniyet olanaklarını da kaynaklardan kontrol edebilirim.',
                         sender_type: 'bot',
-                        metadata: { demo_chat_reply_to_message_id: 'message-1' },
+                        metadata: {
+                            demo_chat_reply_to_message_id: 'message-1',
+                            rag_pending_clarification: {
+                                originalQuestion: "tip'ta burslu program var mı",
+                                clarificationQuestion:
+                                    'Eğitim süresi mi, mezuniyet olanakları mı?',
+                                requestedMetric: 'program_outcomes',
+                                retrievalIntent: 'program_outcomes',
+                                missingSlots: ['detail'],
+                            },
+                        },
                     },
                     {
                         content: "tip'ta burslu program var mı",
@@ -1011,13 +1021,31 @@ describe('demo chat API route', () => {
                 {
                     role: 'user',
                     content: "tip'ta burslu program var mı",
+                    metadata: { demo_chat_message_id: 'message-1' },
                 },
                 {
                     role: 'assistant',
                     content:
                         'İsterseniz bu programlardan birinin eğitim süresi veya mezuniyet olanaklarını da kaynaklardan kontrol edebilirim.',
+                    metadata: {
+                        demo_chat_reply_to_message_id: 'message-1',
+                        rag_pending_clarification: {
+                            originalQuestion: "tip'ta burslu program var mı",
+                            clarificationQuestion: 'Eğitim süresi mi, mezuniyet olanakları mı?',
+                            requestedMetric: 'program_outcomes',
+                            retrievalIntent: 'program_outcomes',
+                            missingSlots: ['detail'],
+                        },
+                    },
                 },
             ],
+            pendingClarification: {
+                originalQuestion: "tip'ta burslu program var mı",
+                clarificationQuestion: 'Eğitim süresi mi, mezuniyet olanakları mı?',
+                requestedMetric: 'program_outcomes',
+                retrievalIntent: 'program_outcomes',
+                missingSlots: ['detail'],
+            },
         }))
     })
 
@@ -1386,10 +1414,12 @@ describe('demo chat API route', () => {
             {
                 role: 'user',
                 content: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı?',
+                metadata: { demo_chat_message_id: 'previous-message' },
             },
             {
                 role: 'assistant',
                 content: 'Evet, Tıbbi Laboratuvar Teknikleri programında yaz stajı bulunmaktadır. Yaz stajı 20 iş günüdür.',
+                metadata: { demo_chat_reply_to_message_id: 'previous-message' },
             },
         ]
         expect(searchKnowledgeBaseMock).toHaveBeenCalledWith(

@@ -33,6 +33,18 @@ export type RagProviderCitation = {
   score?: number
 }
 
+export type RagPendingClarificationState = {
+  originalQuestion: string
+  clarificationQuestion: string
+  missingSlots?: string[]
+  requestedMetric?: string
+  requestedFacet?: string
+  retrievalIntent?: string
+  sourcePreference?: string[]
+  riskLevel?: string
+  doNotRetrieveText?: string[]
+}
+
 export type RagProviderResult = {
   provider: RagAnswerProvider
   answer: string
@@ -64,6 +76,22 @@ export type RagProviderResult = {
     contextualOrchestration?: string
     contextualReason?: string
     contextualQuestion?: string
+    contextualTurnType?: string
+    contextualResolvedIntent?: string
+    contextualOriginalQuestion?: string
+    contextualLatestClarification?: string
+    contextualShouldRetrieve?: boolean
+    contextualDoNotRetrieveText?: string[]
+    contextualRetrievalIntent?: string
+    contextualRequestedMetric?: string
+    contextualSourcePreference?: string[]
+    contextualRiskLevel?: string
+    contextualStateDecision?: string
+    contextualStateConfidence?: number
+    contextualStateReason?: string
+    contextualConsumedPendingState?: boolean
+    pendingClarification?: RagPendingClarificationState
+    pendingClarificationUsed?: boolean
     sourcePriority?: {
       primarySourceGroups: string[]
       fallbackSourceGroups?: string[]

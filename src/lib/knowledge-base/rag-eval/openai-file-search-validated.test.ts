@@ -176,6 +176,677 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
     expect(result.answer).not.toContain('Olur et hakkında')
   })
 
+  it('repairs long answers to previous clarification questions before retrieval', async () => {
+    const create = vi.fn(async () => ({
+      id: 'resp_programs',
+      output_text: 'retrieval complete',
+      output: [
+        {
+          type: 'file_search_call',
+          status: 'completed',
+          results: [
+            {
+              file_id: 'file_programs',
+              filename: 'programs.md',
+              score: 0.93,
+              text:
+                'Kayıt olunabilecek programlar arasında Tıp Fakültesi, Sağlık Bilimleri Fakültesi bölümleri ve meslek yüksekokulu programları bulunur.',
+            },
+          ],
+        },
+      ],
+      usage: { input_tokens: 90, output_tokens: 8, total_tokens: 98 },
+    }))
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              action: 'standalone',
+              reason: 'misread_clarification_answer_as_new_message',
+              rewritten_question: 'Genel olarak tüm bölümler hakkında bilgi almak istiyorum.',
+              clarification_question: '',
+              confidence: 0.88,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 180, completion_tokens: 24, total_tokens: 204 },
+    }))
+    const createCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer:
+                'Kayıt olunabilecek programlar arasında Tıp Fakültesi, Sağlık Bilimleri Fakültesi bölümleri ve meslek yüksekokulu programları bulunur.',
+              used_evidence_ids: ['ev_1'],
+              support_quotes: [
+                'Kayıt olunabilecek programlar arasında Tıp Fakültesi, Sağlık Bilimleri Fakültesi bölümleri ve meslek yüksekokulu programları bulunur.',
+              ],
+              engagement_question: '',
+              engagement_evidence_id: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 160, completion_tokens: 26, total_tokens: 186 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Genel olarak tüm bölümler hakkında bilgi almak istiyorum.',
+      qualityMode: 'strict',
+      contextualOrchestratorCreateCompletion,
+      createCompletion,
+      conversationHistory: [
+        { role: 'user', content: 'hangi bölümlere kayıt olabilirim' },
+        {
+          role: 'assistant',
+          content:
+            'Burslu programlar mı yoksa genel olarak tüm bölümler mi hakkında bilgi almak istiyorsunuz?',
+        },
+      ],
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result.diagnostics).toMatchObject({
+      contextualOrchestration: 'rewrite',
+      contextualReason: 'clarification_answer_rewrite',
+      strictVerdict: 'catalog_degree_level_listing',
+    })
+    expect(result.answer).not.toContain('Burslu programlar mı yoksa')
+    expect(result.answer).toContain('Lisans programları')
+  })
+
+  it('uses the enriched orchestration contract for clarification answers', async () => {
+    const create = vi.fn(async () => ({
+      id: 'resp_programs',
+      output_text: 'retrieval complete',
+      output: [
+        {
+          type: 'file_search_call',
+          status: 'completed',
+          results: [
+            {
+              file_id: 'file_programs',
+              filename: 'programs.md',
+              score: 0.91,
+              text:
+                'Kayıt olunabilecek tüm programlar broşürde fakülte ve meslek yüksekokulu başlıkları altında listelenir.',
+            },
+          ],
+        },
+      ],
+      usage: { input_tokens: 80, output_tokens: 7, total_tokens: 87 },
+    }))
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'clarification_answer',
+              action: 'rewrite',
+              reason: 'user_selected_general_scope_from_previous_clarification',
+              resolved_user_intent:
+                'Kullanıcı kayıt olunabilecek tüm bölümler ve programlar hakkında bilgi almak istiyor.',
+              rewritten_question:
+                'Önceki soru: hangi bölümlere kayıt olabilirim\nKullanıcının netleştirmesi: tüm bölümler hakkında bilgi almak istiyorum',
+              original_user_question_used: 'hangi bölümlere kayıt olabilirim',
+              latest_user_clarification_used: 'tüm bölümler hakkında bilgi almak istiyorum',
+              should_retrieve: true,
+              do_not_retrieve_text: [
+                'Burslu programlar mı yoksa genel olarak tüm bölümler mi hakkında bilgi almak istiyorsunuz?',
+              ],
+              retrieval_intent: 'program_list',
+              source_preference: ['primary_campaign_material', 'website_html', 'approved_pdf'],
+              risk_level: 'medium',
+              confidence: 0.95,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 230, completion_tokens: 60, total_tokens: 290 },
+    }))
+    const createCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer:
+                'Kayıt olunabilecek tüm programlar broşürde fakülte ve meslek yüksekokulu başlıkları altında listelenir.',
+              used_evidence_ids: ['ev_1'],
+              support_quotes: [
+                'Kayıt olunabilecek tüm programlar broşürde fakülte ve meslek yüksekokulu başlıkları altında listelenir.',
+              ],
+              engagement_question: '',
+              engagement_evidence_id: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 140, completion_tokens: 20, total_tokens: 160 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'tüm bölümler hakkında bilgi almak istiyorum',
+      qualityMode: 'strict',
+      contextualOrchestratorCreateCompletion,
+      createCompletion,
+      conversationHistory: [
+        { role: 'user', content: 'hangi bölümlere kayıt olabilirim' },
+        {
+          role: 'assistant',
+          content:
+            'Burslu programlar mı yoksa genel olarak tüm bölümler mi hakkında bilgi almak istiyorsunuz?',
+        },
+      ],
+    })
+
+    const orchestratorArgs = contextualOrchestratorCreateCompletion.mock.calls[0]?.[0] as {
+      messages?: Array<{ role: string; content: string }>
+    }
+    const systemPrompt = orchestratorArgs.messages?.find((message) => message.role === 'system')
+      ?.content
+    expect(systemPrompt).toContain('turn_type')
+    expect(systemPrompt).toContain('clarification_answer')
+    expect(systemPrompt).toContain('do_not_retrieve_text')
+    expect(systemPrompt).toContain('Example')
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result.diagnostics).toMatchObject({
+      contextualOrchestration: 'rewrite',
+      contextualReason: 'user_selected_general_scope_from_previous_clarification',
+      contextualTurnType: 'clarification_answer',
+      contextualResolvedIntent:
+        'Kullanıcı kayıt olunabilecek tüm bölümler ve programlar hakkında bilgi almak istiyor.',
+      contextualOriginalQuestion: 'hangi bölümlere kayıt olabilirim',
+      contextualLatestClarification: 'tüm bölümler hakkında bilgi almak istiyorum',
+      contextualDoNotRetrieveText: [
+        'Burslu programlar mı yoksa genel olarak tüm bölümler mi hakkında bilgi almak istiyorsunuz?',
+      ],
+      contextualRetrievalIntent: 'program_list',
+      contextualSourcePreference: ['primary_campaign_material', 'website_html', 'approved_pdf'],
+      contextualRiskLevel: 'medium',
+      strictVerdict: 'catalog_degree_level_listing',
+    })
+    expect(result.answer).toContain('Lisans programları')
+  })
+
+  it('uses generic pending clarification state when the LLM misreads a follow-up as standalone', async () => {
+    const create = vi.fn(async () => ({
+      id: 'resp_services',
+      output_text: 'retrieval complete',
+      output: [
+        {
+          type: 'file_search_call',
+          status: 'completed',
+          results: [
+            {
+              file_id: 'file_services',
+              filename: 'services.md',
+              score: 0.9,
+              text: 'Tüm hizmet paketleri başlangıç, profesyonel ve kurumsal seçenekler olarak listelenir.',
+            },
+          ],
+        },
+      ],
+      usage: { input_tokens: 70, output_tokens: 7, total_tokens: 77 },
+    }))
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'new_question',
+              action: 'standalone',
+              reason: 'misread_short_followup_without_state',
+              rewritten_question: 'tümü',
+              should_retrieve: true,
+              confidence: 0.91,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 210, completion_tokens: 24, total_tokens: 234 },
+    }))
+    const createCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer:
+                'Tüm hizmet paketleri başlangıç, profesyonel ve kurumsal seçenekler olarak listelenir.',
+              used_evidence_ids: ['ev_1'],
+              support_quotes: [
+                'Tüm hizmet paketleri başlangıç, profesyonel ve kurumsal seçenekler olarak listelenir.',
+              ],
+              engagement_question: '',
+              engagement_evidence_id: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 140, completion_tokens: 20, total_tokens: 160 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'tümü',
+      contextualOrchestratorCreateCompletion,
+      createCompletion,
+      pendingClarification: {
+        originalQuestion: 'hangi hizmet paketlerine kayıt olabilirim',
+        clarificationQuestion: 'Bireysel paketleri mi yoksa tüm paketleri mi görmek istersiniz?',
+        requestedMetric: 'service_list',
+        retrievalIntent: 'service_list',
+        missingSlots: ['scope'],
+        sourcePreference: ['primary_campaign_material', 'website_html'],
+        riskLevel: 'low',
+      },
+      conversationHistory: [
+        { role: 'user', content: 'hangi hizmet paketlerine kayıt olabilirim' },
+        {
+          role: 'assistant',
+          content: 'Bireysel paketleri mi yoksa tüm paketleri mi görmek istersiniz?',
+        },
+      ],
+    })
+
+    expect(contextualOrchestratorCreateCompletion).toHaveBeenCalledOnce()
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.stringContaining('hangi hizmet paketlerine kayıt olabilirim'),
+      })
+    )
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.stringContaining('Kullanıcının netleştirmesi: tümü'),
+      })
+    )
+    expect(create).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.stringContaining('Bireysel paketleri mi yoksa'),
+      })
+    )
+    expect(result.answer).toContain('Tüm hizmet paketleri')
+    expect(result.diagnostics).toMatchObject({
+      contextualOrchestration: 'rewrite',
+      contextualReason: 'pending_clarification_state_rewrite',
+      contextualTurnType: 'clarification_answer',
+      contextualOriginalQuestion: 'hangi hizmet paketlerine kayıt olabilirim',
+      contextualLatestClarification: 'tümü',
+      contextualRequestedMetric: 'service_list',
+      contextualRetrievalIntent: 'service_list',
+      contextualSourcePreference: ['primary_campaign_material', 'website_html'],
+      contextualRiskLevel: 'low',
+      pendingClarificationUsed: true,
+    })
+  })
+
+  it('does not consume pending clarification state when the latest message is a fresh question', async () => {
+    const create = vi.fn(async () => ({
+      id: 'resp_hours',
+      output_text: 'retrieval complete',
+      output: [
+        {
+          type: 'file_search_call',
+          status: 'completed',
+          results: [
+            {
+              file_id: 'file_hours',
+              filename: 'hours.md',
+              score: 0.88,
+              text: 'Çalışma saatleri hafta içi 09.00-18.00 olarak belirtilmiştir.',
+            },
+          ],
+        },
+      ],
+      usage: { input_tokens: 60, output_tokens: 6, total_tokens: 66 },
+    }))
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'new_question',
+              action: 'standalone',
+              reason: 'fresh_question_after_pending_clarification',
+              rewritten_question: 'çalışma saatleri nedir?',
+              should_retrieve: true,
+              confidence: 0.94,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 210, completion_tokens: 24, total_tokens: 234 },
+    }))
+    const createCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer: 'Çalışma saatleri hafta içi 09.00-18.00 olarak belirtilmiştir.',
+              used_evidence_ids: ['ev_1'],
+              support_quotes: ['Çalışma saatleri hafta içi 09.00-18.00 olarak belirtilmiştir.'],
+              engagement_question: '',
+              engagement_evidence_id: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 120, completion_tokens: 18, total_tokens: 138 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'çalışma saatleri nedir?',
+      contextualOrchestratorCreateCompletion,
+      createCompletion,
+      pendingClarification: {
+        originalQuestion: 'hangi hizmet paketlerine kayıt olabilirim',
+        clarificationQuestion: 'Bireysel paketleri mi yoksa tüm paketleri mi görmek istersiniz?',
+        requestedMetric: 'service_list',
+        retrievalIntent: 'service_list',
+        missingSlots: ['scope'],
+      },
+      conversationHistory: [
+        { role: 'user', content: 'hangi hizmet paketlerine kayıt olabilirim' },
+        {
+          role: 'assistant',
+          content: 'Bireysel paketleri mi yoksa tüm paketleri mi görmek istersiniz?',
+        },
+      ],
+    })
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: 'çalışma saatleri nedir?',
+      })
+    )
+    expect(result.answer).toContain('Çalışma saatleri')
+    expect(result.diagnostics).toMatchObject({
+      contextualOrchestration: 'standalone',
+      contextualReason: 'fresh_question_after_pending_clarification',
+    })
+    expect(result.diagnostics).not.toMatchObject({
+      pendingClarificationUsed: true,
+    })
+  })
+
+  it('honors LLM state_decision ignore over a stale pending clarification', async () => {
+    const create = vi.fn(async () => ({
+      id: 'resp_hours',
+      output_text: 'retrieval complete',
+      output: [
+        {
+          type: 'file_search_call',
+          status: 'completed',
+          results: [
+            {
+              file_id: 'file_hours',
+              filename: 'hours.md',
+              score: 0.89,
+              text: 'Ziyaret saatleri hafta içi 09.00-18.00 olarak duyurulmuştur.',
+            },
+          ],
+        },
+      ],
+      usage: { input_tokens: 60, output_tokens: 6, total_tokens: 66 },
+    }))
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'new_question',
+              action: 'standalone',
+              reason: 'fresh_question_after_pending_state',
+              rewritten_question: 'ziyaret saatleri nedir?',
+              state_decision: 'ignore',
+              state_confidence: 0.93,
+              state_reason: 'latest user asks a new independent question',
+              consumed_pending_state: false,
+              should_retrieve: true,
+              confidence: 0.94,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 220, completion_tokens: 32, total_tokens: 252 },
+    }))
+    const createCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer: 'Ziyaret saatleri hafta içi 09.00-18.00 olarak duyurulmuştur.',
+              used_evidence_ids: ['ev_1'],
+              support_quotes: ['Ziyaret saatleri hafta içi 09.00-18.00 olarak duyurulmuştur.'],
+              engagement_question: '',
+              engagement_evidence_id: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 120, completion_tokens: 18, total_tokens: 138 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'ziyaret saatleri nedir?',
+      contextualOrchestratorCreateCompletion,
+      createCompletion,
+      pendingClarification: {
+        originalQuestion: 'hangi hizmet paketlerine kayıt olabilirim',
+        clarificationQuestion: 'Bireysel paketleri mi yoksa tüm paketleri mi görmek istersiniz?',
+        requestedMetric: 'service_list',
+        retrievalIntent: 'service_list',
+        missingSlots: ['scope'],
+      },
+      conversationHistory: [
+        { role: 'user', content: 'hangi hizmet paketlerine kayıt olabilirim' },
+        {
+          role: 'assistant',
+          content: 'Bireysel paketleri mi yoksa tüm paketleri mi görmek istersiniz?',
+        },
+      ],
+    })
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: 'ziyaret saatleri nedir?',
+      })
+    )
+    expect(result.diagnostics).toMatchObject({
+      contextualOrchestration: 'standalone',
+      contextualStateDecision: 'ignore',
+      contextualStateConfidence: 0.93,
+      contextualStateReason: 'latest user asks a new independent question',
+      contextualConsumedPendingState: false,
+    })
+    expect(result.diagnostics).not.toMatchObject({
+      pendingClarificationUsed: true,
+    })
+  })
+
+  it('honors LLM state_decision split for a clarification answer plus a new facet', async () => {
+    const create = vi.fn(async () => ({
+      id: 'resp_split',
+      output_text: 'retrieval complete',
+      output: [
+        {
+          type: 'file_search_call',
+          status: 'completed',
+          results: [
+            {
+              file_id: 'file_programs',
+              filename: 'programs.md',
+              score: 0.9,
+              text: 'Tüm programlar ve ücret bilgileri ayrı başlıklar altında duyurulmuştur.',
+            },
+          ],
+        },
+      ],
+      usage: { input_tokens: 70, output_tokens: 7, total_tokens: 77 },
+    }))
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'multi_question',
+              action: 'rewrite',
+              reason: 'clarification_answer_with_new_related_facet',
+              rewritten_question:
+                'Önceki soru: hangi bölümlere kayıt olabilirim\nKullanıcının netleştirmesi ve ek sorusu: tümü, ücretleri de yaz',
+              state_decision: 'split',
+              state_confidence: 0.9,
+              state_reason: 'latest user fills scope and asks fees too',
+              consumed_pending_state: true,
+              retrieval_intent: 'program_list',
+              requested_metric: 'program_list',
+              should_retrieve: true,
+              confidence: 0.9,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 220, completion_tokens: 42, total_tokens: 262 },
+    }))
+    const createCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer: 'Tüm programlar ve ücret bilgileri ayrı başlıklar altında duyurulmuştur.',
+              used_evidence_ids: ['ev_1'],
+              support_quotes: [
+                'Tüm programlar ve ücret bilgileri ayrı başlıklar altında duyurulmuştur.',
+              ],
+              engagement_question: '',
+              engagement_evidence_id: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 140, completion_tokens: 20, total_tokens: 160 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'tümü, ücretleri de yaz',
+      contextualOrchestratorCreateCompletion,
+      createCompletion,
+      pendingClarification: {
+        originalQuestion: 'hangi bölümlere kayıt olabilirim',
+        clarificationQuestion:
+          'Burslu programları mı, yoksa genel olarak tüm programları mı görmek istiyorsunuz?',
+        requestedMetric: 'program_list',
+        retrievalIntent: 'program_list',
+        missingSlots: ['scope'],
+      },
+      conversationHistory: [
+        { role: 'user', content: 'hangi bölümlere kayıt olabilirim' },
+        {
+          role: 'assistant',
+          content:
+            'Burslu programları mı, yoksa genel olarak tüm programları mı görmek istiyorsunuz?',
+        },
+      ],
+    })
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.stringContaining('Kullanıcının netleştirmesi ve ek sorusu: tümü, ücretleri de yaz'),
+      })
+    )
+    expect(result.diagnostics).toMatchObject({
+      contextualOrchestration: 'rewrite',
+      contextualReason: 'pending_clarification_state_split',
+      contextualTurnType: 'multi_question',
+      contextualStateDecision: 'split',
+      contextualConsumedPendingState: true,
+      pendingClarificationUsed: true,
+    })
+  })
+
+  it('asks clarification instead of retrieval when orchestration confidence is too low', async () => {
+    const create = vi.fn()
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'scope_selection',
+              action: 'rewrite',
+              reason: 'low_confidence_scope_resolution',
+              rewritten_question: 'program detayları',
+              clarification_question: 'Hangi program veya konuyu kastettiğinizi netleştirir misiniz?',
+              should_retrieve: true,
+              confidence: 0.31,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 200, completion_tokens: 30, total_tokens: 230 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'şunu da anlatır mısın',
+      qualityMode: 'strict',
+      contextualOrchestratorCreateCompletion,
+      conversationHistory: [
+        { role: 'user', content: 'programlar hakkında bilgi verir misin' },
+        {
+          role: 'assistant',
+          content:
+            'İsterseniz programların eğitim süresi veya mezuniyet olanaklarını da kontrol edebilirim.',
+        },
+      ],
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      answer: 'Hangi program veya konuyu kastettiğinizi netleştirir misiniz?',
+      refusal: false,
+      diagnostics: {
+        contextualOrchestration: 'clarify',
+        contextualReason: 'low_confidence_contextual_orchestration',
+        contextualTurnType: 'scope_selection',
+        clarification: 'low_confidence_contextual_orchestration',
+      },
+    })
+  })
+
   it('tries configured primary source groups before the broader approved corpus', async () => {
     const create = vi
       .fn()
@@ -2149,6 +2820,129 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
       outputTokens: 35,
       totalTokens: 240,
       toolCalls: 2,
+    })
+  })
+
+  it('preserves the original table metric when a clarification answer supplies only program and variant', async () => {
+    const create = vi.fn(async () => ({
+      id: 'resp_base_score',
+      output_text: 'retrieval complete',
+      output: [
+        {
+          type: 'file_search_call',
+          status: 'completed',
+          results: [
+            {
+              file_id: 'file_tip',
+              filename: 'fees.md',
+              score: 0.96,
+              text:
+                '| Puan Kodu | Bölüm Adı | Puan Türü | 2025 Kontenjanı | 2024 Başarı Sırası | 2024 Taban Puanı | 2025 Fiyat |\n| 203510128 | Tıp Fakültesi (İngilizce Ücretli) | SAY | 41 | 767.115 | 309,532 | 720.000 |',
+            },
+          ],
+        },
+      ],
+      usage: { input_tokens: 80, output_tokens: 7, total_tokens: 87 },
+    }))
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'clarification_answer',
+              action: 'rewrite',
+              reason: 'user_supplied_table_row_scope',
+              rewritten_question:
+                'Önceki soru: taban puanlar nedir\nKullanıcının netleştirmesi: Tıp İngilizce ücretli',
+              original_user_question_used: 'taban puanlar nedir',
+              latest_user_clarification_used: 'Tıp İngilizce ücretli',
+              should_retrieve: true,
+              retrieval_intent: 'base_score',
+              confidence: 0.94,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 220, completion_tokens: 54, total_tokens: 274 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Tıp İngilizce ücretli',
+      qualityMode: 'strict',
+      contextualOrchestratorCreateCompletion,
+      conversationHistory: [
+        { role: 'user', content: 'taban puanlar nedir' },
+        {
+          role: 'assistant',
+          content:
+            'Broşürde taban puanlar program ve burs/indirim satırı bazında listelenir. Hangi programı ve hangi burs/indirim türünü sorduğunuzu belirtmeniz gerekir.',
+        },
+      ],
+    })
+
+    expect(result.answer).toContain('2024 taban puanı 309,532')
+    expect(result.answer).not.toContain('2025 fiyatı 720.000 TL')
+    expect(result.diagnostics).toMatchObject({
+      queryIntent: 'brochure_table_fact',
+      contextualTurnType: 'clarification_answer',
+      contextualRetrievalIntent: 'base_score',
+      contextualRequestedMetric: 'base_score',
+    })
+  })
+
+  it('keeps the previous internship metric when a clarification answer supplies only the program', async () => {
+    const create = vi.fn()
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'clarification_answer',
+              action: 'rewrite',
+              reason: 'user_supplied_program_for_internship_duration',
+              rewritten_question: 'Önceki soru: staj kaç gün\nKullanıcının netleştirmesi: Anestezi',
+              original_user_question_used: 'staj kaç gün',
+              latest_user_clarification_used: 'Anestezi',
+              should_retrieve: true,
+              retrieval_intent: 'internship_duration',
+              confidence: 0.93,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 210, completion_tokens: 48, total_tokens: 258 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Anestezi',
+      qualityMode: 'strict',
+      contextualOrchestratorCreateCompletion,
+      conversationHistory: [
+        { role: 'user', content: 'staj kaç gün' },
+        {
+          role: 'assistant',
+          content:
+            'Staj süresi programın niteliğine göre değişir. Hangi bölüm veya program için staj bilgisini öğrenmek istiyorsunuz?',
+        },
+      ],
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result.answer).toContain('20 iş gününden az olmamak')
+    expect(result.answer).toContain('programın niteliğine göre')
+    expect(result.answer).not.toContain('Anestezi Programı kapsamında')
+    expect(result.diagnostics).toMatchObject({
+      contextualTurnType: 'clarification_answer',
+      contextualRetrievalIntent: 'internship_duration',
+      strictVerdict: 'catalog_internship_policy_fact',
     })
   })
 })

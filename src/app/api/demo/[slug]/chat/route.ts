@@ -22,6 +22,7 @@ import { matchExactSkillTriggers } from '@/lib/skills/actions'
 import { matchSkillsWithStatus } from '@/lib/skills/match-safe'
 import type { KnowledgeSearchPlanningTurn } from '@/lib/knowledge-base/query-planner'
 import { buildRagContext, type RagChunk } from '@/lib/knowledge-base/rag'
+import { findLatestRagPendingClarificationState } from '@/lib/knowledge-base/rag-eval/pending-clarification-state'
 import { repairLinkOnlyRagAnswer } from '@/lib/knowledge-base/rag-answer-repair'
 import { microPolishDeterministicRagAnswer } from '@/lib/knowledge-base/rag-answer-micro-polish'
 import { polishGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-polish'
@@ -866,7 +867,11 @@ async function readRecentDemoChatHistory(input: {
             .map((message) => {
                 const content = message.content?.trim() ?? ''
                 const role = message.sender_type === 'bot' ? 'assistant' : 'user'
-                return { role, content } satisfies KnowledgeSearchPlanningTurn
+                return {
+                    role,
+                    content,
+                    ...(message.metadata ? { metadata: message.metadata } : {}),
+                } satisfies KnowledgeSearchPlanningTurn
             })
             .filter((turn) => turn.content && !/^\[[^\]]+\]$/.test(turn.content))
             .slice(-DEMO_CHAT_RAG_HISTORY_TURN_LIMIT)
@@ -1487,6 +1492,7 @@ async function recoverPendingDemoChatReplyExtractively(input: {
         message,
         conversationId,
         conversationHistory,
+        pendingClarification: findLatestRagPendingClarificationState(conversationHistory),
     })
     if (fileSearchReply) {
         await persistDemoChatTextReply({

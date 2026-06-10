@@ -5,8 +5,13 @@ import { getOrgAiSettings } from '@/lib/ai/settings'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { runOpenAiFileSearchValidatedQuestion } from '@/lib/knowledge-base/rag-eval/openai-file-search-validated'
 import { BROCHURE_SOURCE_PRIORITY_GROUPS } from '@/lib/knowledge-base/rag-eval/brochure-query-plan'
+import {
+    findLatestRagPendingClarificationState,
+    normalizeRagPendingClarificationState,
+} from '@/lib/knowledge-base/rag-eval/pending-clarification-state'
 import type { KnowledgeSearchPlanningTurn } from '@/lib/knowledge-base/query-planner'
 import type { DemoChatChannel } from '@/lib/demo-chat/channel'
+import type { RagPendingClarificationState } from '@/lib/knowledge-base/rag-eval/types'
 
 type SupabaseLike = Parameters<typeof recordAiUsage>[0]['supabase']
 
@@ -120,6 +125,7 @@ export async function buildOpenAiFileSearchDemoReply(input: {
     message: string
     conversationId?: string | null
     conversationHistory?: KnowledgeSearchPlanningTurn[]
+    pendingClarification?: RagPendingClarificationState | null
 }) {
     if (!shouldUseOpenAiFileSearch(input.channel)) return null
 
@@ -144,6 +150,9 @@ export async function buildOpenAiFileSearchDemoReply(input: {
         const researchPlannerModel = readResearchPlannerModel()
         const vectorStoreId = readVectorStoreId()
         const openai = new OpenAI({ apiKey })
+        const pendingClarification =
+            normalizeRagPendingClarificationState(input.pendingClarification)
+            ?? findLatestRagPendingClarificationState(input.conversationHistory ?? [])
         const result = await runOpenAiFileSearchValidatedQuestion({
             client: openai,
             model: retrievalModel,
@@ -151,6 +160,7 @@ export async function buildOpenAiFileSearchDemoReply(input: {
             vectorStoreId,
             question: input.message,
             conversationHistory: input.conversationHistory ?? [],
+            pendingClarification: pendingClarification ?? undefined,
             instructionProfile: 'qualy',
             citationSourcesByFilename: sourceManifest.sourcesByFilename,
             sourcePriorityGroups: BROCHURE_SOURCE_PRIORITY_GROUPS,
@@ -231,6 +241,9 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                     usage: result.usage,
                     conversation_history_turn_count: input.conversationHistory?.length ?? 0,
                 },
+                ...(result.diagnostics?.pendingClarification
+                    ? { rag_pending_clarification: result.diagnostics.pendingClarification }
+                    : {}),
                 source_titles: citations.map((citation) => citation.title).filter(Boolean),
                 source_urls: citations.map((citation) => citation.url).filter(Boolean),
                 sources: citations,

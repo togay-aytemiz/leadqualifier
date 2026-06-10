@@ -926,9 +926,13 @@ function renderSchools() {
 }
 
 function renderDegreeLevelPrograms() {
-  const undergraduatePrograms = FACULTIES.flatMap((unit) => unit.programs ?? [])
-  const associatePrograms = SCHOOLS.flatMap((unit) => unit.programs ?? [])
-  return `Lisans programları: ${undergraduatePrograms.join(', ')}. Ön lisans programları: ${associatePrograms.join(', ')}.`
+  const undergraduateGroups = FACULTIES.map(
+    (unit) => `${unit.name}: ${(unit.programs ?? []).join(', ')}`
+  )
+  const associateGroups = SCHOOLS.map(
+    (unit) => `${unit.name}: ${(unit.programs ?? []).join(', ')}`
+  )
+  return `Lisans programları: ${undergraduateGroups.join('; ')}. Ön lisans programları: ${associateGroups.join('; ')}.`
 }
 
 function resolveProgramDistinctionFact(search: string): StrictCatalogAnswer | null {
@@ -1779,7 +1783,10 @@ function resolveScholarshipFact(search: string): StrictCatalogAnswer | null {
 }
 
 function resolveProgramFeeFact(search: string): StrictCatalogAnswer | null {
-  const asksPrice = /(?:ucret|kac para|kac tl|fiyat|(?:^|\s)tl(?:\s|$)|₺)/.test(search)
+  const asksPrice =
+    /(?:ucret(?:i|ler|leri)?\b|kac para|kac tl|ne kadar|fiyat(?:i|lar|lari)?\b|(?:^|\s)tl(?:\s|$)|₺)/.test(
+      search
+    )
   if (!asksPrice) return null
 
   const asksBroadProgramFees =
@@ -1808,6 +1815,35 @@ function resolveProgramFeeFact(search: string): StrictCatalogAnswer | null {
     citations: [PROGRAM_FEE_CITATION],
     refusal: false,
     reason: 'catalog_program_fee_fact',
+  }
+}
+
+function resolvePreparationScopeFact(search: string): StrictCatalogAnswer | null {
+  const asksPreparation = /hazirlik/.test(search)
+  if (!asksPreparation) return null
+
+  const asksSpecificProgram =
+    /(?:tip|ingilizce tip|turkce tip|tıp|anestezi|hemsirelik|ebelik|dil ve konusma|dkt|ftr|fizyoterapi|beslenme|ergoterapi|saglik yonetimi)/.test(
+      search
+    )
+  if (!asksSpecificProgram) return null
+
+  if (/(?:tip|ingilizce tip|turkce tip|tıp)/.test(search)) {
+    return {
+      answer:
+        'İngilizce Tıp için hazırlık konusu program dili ve resmi hazırlık yönergesine bağlıdır. Broşürde Tıp Fakültesi (Hazırlık) satırı ayrı olarak yer alır ve 2025 fiyatı 410.000 TL olarak gösterilir; hazırlığın zorunluluğu, muafiyet veya geçme koşulları güncel resmi hazırlık duyurusuyla doğrulanmalıdır.',
+      citations: [PROGRAM_FEE_CITATION, ACADEMIC_PROCESS_SCOPE_CITATION],
+      refusal: false,
+      reason: 'catalog_academic_process_scope_guard',
+    }
+  }
+
+  return {
+    answer:
+      'Hazırlık bilgisi program dili, kayıt statüsü ve resmi hazırlık yönergesine göre değişebilir. Onaylı aday öğrenci kaynaklarında bu program için hazırlık zorunluluğu veya muafiyet koşulu kesin bir genel kural olarak yer almamaktadır; hedef program ve güncel hazırlık duyurusu birlikte doğrulanmalıdır.',
+    citations: [ACADEMIC_PROCESS_SCOPE_CITATION],
+    refusal: false,
+    reason: 'catalog_academic_process_scope_guard',
   }
 }
 
@@ -2352,6 +2388,8 @@ export function resolveStrictCatalogAnswer(input: {
   if (admissionsMetricScopeFact) return admissionsMetricScopeFact
   const admissionsPointTypeFact = resolveAdmissionsPointTypeFact(understanding.normalizedSearch)
   if (admissionsPointTypeFact) return admissionsPointTypeFact
+  const preparationScopeFact = resolvePreparationScopeFact(understanding.normalizedSearch)
+  if (preparationScopeFact) return preparationScopeFact
   const academicProcessScopeFact = resolveAcademicProcessScopeFact(understanding.normalizedSearch)
   if (academicProcessScopeFact) return academicProcessScopeFact
   const accreditationScopeFact = resolveAccreditationScopeFact(understanding.normalizedSearch)
@@ -2406,6 +2444,20 @@ export function resolveStrictCatalogAnswer(input: {
     asksListing &&
     /(?:^|\s)lisans(?:\s|$)/.test(understanding.normalizedSearch) &&
     /(?:on lisans|onlisans)/.test(understanding.normalizedSearch)
+  ) {
+    return {
+      answer: renderDegreeLevelPrograms(),
+      citations: [CATALOG_CITATION],
+      refusal: false,
+      reason: 'catalog_degree_level_listing',
+    }
+  }
+
+  if (
+    asksListing &&
+    /(?:program listesi|bolumlere kayit|programlara kayit|kayit olabilecegim|tum lisans|tum bolum|tumu|genel olarak tum)/.test(
+      understanding.normalizedSearch
+    )
   ) {
     return {
       answer: renderDegreeLevelPrograms(),
