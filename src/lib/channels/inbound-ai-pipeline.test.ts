@@ -21,6 +21,7 @@ const {
     resolveOrganizationUsageEntitlementMock,
     resolveBotModeActionMock,
     resolveLeadExtractionAllowanceMock,
+    runInternalAgentTurnShadowMock,
     runLeadExtractionMock,
     searchKnowledgeBaseMock
 } = vi.hoisted(() => ({
@@ -46,6 +47,7 @@ const {
     resolveOrganizationUsageEntitlementMock: vi.fn(),
     resolveBotModeActionMock: vi.fn(),
     resolveLeadExtractionAllowanceMock: vi.fn(),
+    runInternalAgentTurnShadowMock: vi.fn(),
     runLeadExtractionMock: vi.fn(),
     searchKnowledgeBaseMock: vi.fn()
 }))
@@ -147,6 +149,10 @@ vi.mock('@/lib/ai/fallback', () => ({
 
 vi.mock('@/lib/ai/booking', () => ({
     maybeHandleSchedulingRequest: maybeHandleSchedulingRequestMock
+}))
+
+vi.mock('@/lib/ai/agent/runtime-shadow', () => ({
+    runInternalAgentTurnShadow: runInternalAgentTurnShadowMock
 }))
 
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
@@ -367,6 +373,8 @@ describe('processInboundAiPipeline guardrails', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         delete process.env.OPENAI_RAG_MODEL
+        delete process.env.INTERNAL_AGENT_SHADOW
+        delete process.env.INTERNAL_AGENT_SHADOW_ORG_IDS
         afterCallbacks.length = 0
         afterMock.mockImplementation((callback: () => void | Promise<void>) => {
             afterCallbacks.push(callback)
@@ -447,6 +455,15 @@ describe('processInboundAiPipeline guardrails', () => {
         recordAiUsageMock.mockResolvedValue(undefined)
         decideHumanEscalationMock.mockReturnValue({ shouldEscalate: false })
         buildFallbackResponseMock.mockResolvedValue('Fallback response')
+        runInternalAgentTurnShadowMock.mockResolvedValue({
+            status: 'completed',
+            plannedTools: ['internal.skill'],
+            observedTools: ['internal.skill'],
+            missingPlannedTools: [],
+            extraObservedTools: [],
+            claimCount: 1,
+            durationMs: 1
+        })
     })
 
     it('skips processing when inbound message id already exists', async () => {
@@ -1321,6 +1338,61 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })
 
+    it('attaches internal agent shadow diagnostics to persisted text bot messages when enabled', async () => {
+        process.env.INTERNAL_AGENT_SHADOW = '1'
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: false })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            skills: [skillDetails.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-1',
+                title: 'Bilgi',
+                response_text: 'Skill response'
+            }
+        ])
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound))
+
+        expect(runInternalAgentTurnShadowMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                organizationId: 'org-1',
+                conversationId: 'conv-1',
+                channel: 'whatsapp',
+                latestUserMessage: 'Merhaba',
+                observedResult: expect.objectContaining({
+                    answer: 'Skill response\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.',
+                    diagnostics: expect.objectContaining({
+                        skill_id: 'skill-1',
+                        matched_skill_title: 'Bilgi'
+                    })
+                })
+            })
+        )
+        expect(botInsert.insertMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                metadata: expect.objectContaining({
+                    skill_id: 'skill-1',
+                    internal_agent_shadow: expect.objectContaining({
+                        status: 'completed',
+                        plannedTools: ['internal.skill']
+                    })
+                })
+            })
+        )
+    })
+
     it('answers matched skills before scheduling, intake, or RAG work starts', async () => {
         const sendOutbound = vi.fn(async () => undefined)
         const dedupe = createDedupeBuilder(null)
@@ -1421,6 +1493,61 @@ describe('processInboundAiPipeline guardrails', () => {
                 })
             })
         )
+    })
+
+    it('does not attach internal agent shadow metadata to skill image placeholder rows', async () => {
+        process.env.INTERNAL_AGENT_SHADOW = '1'
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const botTextInsert = createInsertBuilder()
+        const botImageInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotText = createUpdateBuilder()
+        const conversationUpdateAfterBotImage = createUpdateBuilder()
+        const skillDetails = createSkillDetailsBuilder({
+            requires_human_handover: false,
+            title: 'Bilgi',
+            skill_actions: [],
+            image_public_url: 'https://cdn.example.com/skill-image.webp',
+            image_mime_type: 'image/webp',
+            image_original_filename: 'offer.webp'
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, botTextInsert.builder, botImageInsert.builder],
+            conversations: [
+                lookup.builder,
+                conversationUpdateAfterInbound.builder,
+                conversationUpdateAfterBotText.builder,
+                conversationUpdateAfterBotImage.builder
+            ],
+            skills: [skillDetails.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-1',
+                title: 'Bilgi',
+                response_text: 'Skill response'
+            }
+        ])
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound))
+
+        expect(runInternalAgentTurnShadowMock).toHaveBeenCalledTimes(1)
+        expect(botTextInsert.insertMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                metadata: expect.objectContaining({
+                    internal_agent_shadow: expect.any(Object)
+                })
+            })
+        )
+        const imageInsert = botImageInsert.insertMock.mock.calls[0]?.[0] as {
+            metadata?: Record<string, unknown>
+        }
+        expect(imageInsert.metadata?.internal_agent_shadow).toBeUndefined()
     })
 
     it('persists instagram provider message ids for skill text and image replies', async () => {

@@ -7,7 +7,8 @@ const {
     getOrgAiSettingsMock,
     getRequiredIntakeFieldsMock,
     matchSkillsSafelyMock,
-    resolveOrganizationUsageEntitlementMock
+    resolveOrganizationUsageEntitlementMock,
+    runInternalAgentTurnShadowMock
 } = vi.hoisted(() => ({
     buildFallbackResponseMock: vi.fn(),
     decideKnowledgeBaseRouteMock: vi.fn(),
@@ -15,7 +16,8 @@ const {
     getOrgAiSettingsMock: vi.fn(),
     getRequiredIntakeFieldsMock: vi.fn(),
     matchSkillsSafelyMock: vi.fn(),
-    resolveOrganizationUsageEntitlementMock: vi.fn()
+    resolveOrganizationUsageEntitlementMock: vi.fn(),
+    runInternalAgentTurnShadowMock: vi.fn()
 }))
 
 vi.mock('@/lib/ai/fallback', () => ({
@@ -61,11 +63,17 @@ vi.mock('@/lib/skills/match-safe', () => ({
     matchSkillsSafely: matchSkillsSafelyMock
 }))
 
+vi.mock('@/lib/ai/agent/runtime-shadow', () => ({
+    runInternalAgentTurnShadow: runInternalAgentTurnShadowMock
+}))
+
 import { simulateChat } from '@/lib/chat/actions'
 
 describe('simulateChat', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        delete process.env.INTERNAL_AGENT_SHADOW
+        delete process.env.INTERNAL_AGENT_SHADOW_ORG_IDS
         resolveOrganizationUsageEntitlementMock.mockResolvedValue({
             isUsageAllowed: true
         })
@@ -86,6 +94,15 @@ describe('simulateChat', () => {
             }
         })
         buildFallbackResponseMock.mockResolvedValue('Simülatör cevabı')
+        runInternalAgentTurnShadowMock.mockResolvedValue({
+            status: 'completed',
+            plannedTools: ['internal.skill'],
+            observedTools: ['internal.skill'],
+            missingPlannedTools: [],
+            extraObservedTools: [],
+            claimCount: 1,
+            durationMs: 1
+        })
     })
 
     it('loads organization AI settings with the resolved response language', async () => {
@@ -115,5 +132,46 @@ describe('simulateChat', () => {
         expect(result.response).toBe(skillResponse)
         expect(decideKnowledgeBaseRouteMock).not.toHaveBeenCalled()
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
+    it('adds agent shadow diagnostics to simulator responses when enabled', async () => {
+        process.env.INTERNAL_AGENT_SHADOW = '1'
+        const skillResponse = 'Operatörün yazdığı net cevap.'
+        matchSkillsSafelyMock.mockResolvedValueOnce([{
+            skill_id: 'skill-1',
+            title: 'Karşılama',
+            similarity: 0.95,
+            response_text: skillResponse
+        }])
+        getSkillMock.mockResolvedValueOnce({
+            id: 'skill-1',
+            title: 'Karşılama',
+            image_public_url: null
+        })
+
+        const result = await simulateChat('Selam', 'org-1')
+
+        expect(runInternalAgentTurnShadowMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                organizationId: 'org-1',
+                channel: 'simulator',
+                latestUserMessage: 'Selam',
+                settings: expect.objectContaining({
+                    prompt: 'Türkçe davranış talimatları',
+                    bot_name: 'Qualy'
+                }),
+                observedResult: expect.objectContaining({
+                    answer: skillResponse,
+                    diagnostics: expect.objectContaining({
+                        source: 'simulator_skill',
+                        skill_id: 'skill-1'
+                    })
+                })
+            })
+        )
+        expect(result.agentShadow).toEqual(expect.objectContaining({
+            status: 'completed',
+            plannedTools: ['internal.skill']
+        }))
     })
 })
