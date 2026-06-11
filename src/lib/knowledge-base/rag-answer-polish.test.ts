@@ -194,6 +194,43 @@ describe('polishGroundedRagAnswer', () => {
         expect(result.usedPolish).toBe(false)
     })
 
+    it('retries polish once when the first request fails', async () => {
+        const createCompletion = vi.fn()
+            .mockRejectedValueOnce(new Error('temporary request failure'))
+            .mockResolvedValueOnce({
+                choices: [{
+                    message: {
+                        content: JSON.stringify({
+                            answer: 'Evet, Tıbbi Laboratuvar Teknikleri programında yaz stajı var; staj süresi 20 iş günü.',
+                            engagement_question: 'İstersen stajın dönem ve başvuru koşullarını da kısaca çıkarabilirim.',
+                            engagement_evidence: 'Staj uygulamasına ilişkin dönem ve başvuru koşulları program dokümanında açıklanır.'
+                        })
+                    }
+                }],
+                usage: { prompt_tokens: 120, completion_tokens: 45, total_tokens: 165 }
+            })
+
+        const result = await polishGroundedRagAnswer({
+            answer: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.',
+            userMessage: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı?',
+            responseLanguage: 'tr',
+            chunks,
+            settings: {
+                prompt: 'Samimi, canlı ve güven veren bir dil kullan.',
+                bot_name: 'Qualy'
+            },
+            createCompletion
+        })
+
+        expect(createCompletion).toHaveBeenCalledTimes(2)
+        expect(result.answer).toBe(
+            'Evet, Tıbbi Laboratuvar Teknikleri programında yaz stajı var; staj süresi 20 iş günü.\n\nİstersen stajın dönem ve başvuru koşullarını da kısaca çıkarabilirim.'
+        )
+        expect(result.usedPolish).toBe(true)
+        expect(result.addedEngagement).toBe(true)
+        expect(result.usage).toEqual({ inputTokens: 120, outputTokens: 45, totalTokens: 165 })
+    })
+
     it('aborts timed-out polish calls before falling back to the original answer', async () => {
         vi.stubEnv('AI_REQUEST_TIMEOUT_MS', '5')
         let aborted = false

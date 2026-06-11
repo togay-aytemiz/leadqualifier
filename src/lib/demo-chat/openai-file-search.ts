@@ -258,24 +258,13 @@ export async function buildOpenAiFileSearchDemoReply(input: {
             enableLlmResearchPlanner: researchPlannerEnabled,
             researchPlannerModel,
         })
-        const providerPresentationPolish = result.diagnostics?.presentationPolish
-        const finalPolish = providerPresentationPolish
-            ? {
-                answer: result.answer.trim(),
-                polish: {
-                    usedPolish: providerPresentationPolish.usedPolish,
-                    addedEngagement: providerPresentationPolish.addedEngagement,
-                    model: providerPresentationPolish.model,
-                    usage: null,
-                },
-            }
-            : await polishDemoFileSearchFinalAnswer({
-                answer: result.answer,
-                userMessage: input.message,
-                settings,
-                answerModel,
-                citations: result.citations,
-            })
+        const finalPolish = await polishDemoFileSearchFinalAnswer({
+            answer: result.answer,
+            userMessage: input.message,
+            settings,
+            answerModel,
+            citations: result.citations,
+        })
         const answer = finalPolish.answer.trim()
         if (!answer) return null
 

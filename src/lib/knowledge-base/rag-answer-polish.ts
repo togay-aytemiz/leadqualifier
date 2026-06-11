@@ -1,6 +1,7 @@
 import { DEFAULT_FLEXIBLE_PROMPT, withBotNamePrompt } from '@/lib/ai/prompts'
 import { AiTimeoutError, resolveAiTimeoutMs } from '@/lib/ai/deadline'
 import type { MvpResponseLanguage } from '@/lib/ai/language'
+import { createOpenAiClient } from '@/lib/ai/openai-client'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { buildRagContext, type RagChunk } from '@/lib/knowledge-base/rag'
 
@@ -56,6 +57,7 @@ type PolishPayload = {
 const DEFAULT_RAG_POLISH_MODEL = 'gpt-4o-mini'
 const RAG_POLISH_MAX_CONTEXT_TOKENS = 900
 const RAG_POLISH_MAX_OUTPUT_TOKENS = 260
+const RAG_POLISH_MAX_ATTEMPTS = 2
 
 const TURKISH_CHAR_MAP: Record<string, string> = {
     ı: 'i',
@@ -219,8 +221,7 @@ async function createDefaultCompletion(args: Record<string, unknown>, options?: 
         throw new Error('Missing OPENAI_API_KEY for RAG answer polish')
     }
 
-    const { default: OpenAI } = await import('openai')
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    const openai = createOpenAiClient(process.env.OPENAI_API_KEY)
     return openai.chat.completions.create(args as never, options?.signal ? { signal: options.signal } : undefined) as Promise<CompletionResponse>
 }
 
@@ -427,20 +428,38 @@ export async function polishGroundedRagAnswer(input: {
         `Original grounded answer: ${originalAnswer}`
     ].join('\n')
 
-    let completion: CompletionResponse
-    try {
-        const createCompletion = input.createCompletion ?? createDefaultCompletion
-        completion = await createCompletionWithTimeout(createCompletion, {
-            model,
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt }
-            ],
-            response_format: { type: 'json_object' },
-            ...buildRagPolishCompletionParameters(model)
-        }, 'rag_polish', input.timeoutMs)
-    } catch (error) {
-        console.error('RAG answer polish failed; using original extractive answer', error)
+    const createCompletion = input.createCompletion ?? createDefaultCompletion
+    const completionArgs = {
+        model,
+        messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+        ],
+        response_format: { type: 'json_object' },
+        ...buildRagPolishCompletionParameters(model)
+    }
+    let completion: CompletionResponse | null = null
+    let lastError: unknown = null
+
+    for (let attempt = 1; attempt <= RAG_POLISH_MAX_ATTEMPTS; attempt += 1) {
+        try {
+            completion = await createCompletionWithTimeout(
+                createCompletion,
+                completionArgs,
+                'rag_polish',
+                input.timeoutMs
+            )
+            break
+        } catch (error) {
+            lastError = error
+            if (attempt < RAG_POLISH_MAX_ATTEMPTS) {
+                console.warn('RAG answer polish attempt failed; retrying once', error)
+            }
+        }
+    }
+
+    if (!completion) {
+        console.error('RAG answer polish failed after retry; using original extractive answer', lastError)
         return fallbackResult(originalAnswer, model)
     }
 

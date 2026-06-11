@@ -74,7 +74,14 @@ describe('buildOpenAiFileSearchDemoReply', () => {
             refusal: false,
             timingsMs: { total: 10, retrieval: 0, generation: 0, validation: 0 },
             usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120, toolCalls: 0 },
-            diagnostics: { strictVerdict: 'catalog_program_fee_fact' },
+            diagnostics: {
+                strictVerdict: 'catalog_program_fee_fact',
+                presentationPolish: {
+                    usedPolish: false,
+                    addedEngagement: false,
+                    model: 'gpt-4o-mini',
+                },
+            },
         })
         polishGroundedRagAnswerMock.mockResolvedValue({
             answer:
