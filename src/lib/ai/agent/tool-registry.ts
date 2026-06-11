@@ -29,10 +29,13 @@ function descriptorOf(tool: InternalAgentTool): InternalAgentToolDescriptor {
 
 export function validateSourceGroups(
   request: AgentRequest,
-  tool: InternalAgentToolDescriptor
+  tool: InternalAgentToolDescriptor,
+  requestedSourceGroups: string[] = []
 ): void {
   const allowedSourceGroups = new Set(request.sourcePolicy.allowedSourceGroups)
-  const disallowedSourceGroups = tool.sourceGroups.filter(
+  const disallowedSourceGroups = Array.from(
+    new Set([...tool.sourceGroups, ...requestedSourceGroups])
+  ).filter(
     (sourceGroup) => !allowedSourceGroups.has(sourceGroup)
   )
 
@@ -75,7 +78,19 @@ export function createInternalAgentToolRegistry(tools: InternalAgentTool[]) {
       const tool = registeredTools.get(name)
       if (!tool) throw new Error(`Agent tool is not registered: ${name}`)
 
-      validateSourceGroups(input.request, descriptorOf(tool))
+      const rawRequestedSourceGroups = input.args.sourceGroups ?? input.args.source_groups
+      if (
+        rawRequestedSourceGroups !== undefined &&
+        (!Array.isArray(rawRequestedSourceGroups) ||
+          rawRequestedSourceGroups.some((value) => typeof value !== 'string' || !value.trim()))
+      ) {
+        throw new Error(`Agent tool requested invalid source groups: ${name}`)
+      }
+      const requestedSourceGroups = Array.isArray(rawRequestedSourceGroups)
+        ? rawRequestedSourceGroups.map((value) => value.trim())
+        : []
+
+      validateSourceGroups(input.request, descriptorOf(tool), requestedSourceGroups)
       return tool.execute(input)
     },
   }

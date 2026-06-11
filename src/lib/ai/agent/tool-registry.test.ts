@@ -151,6 +151,34 @@ describe('internal agent tool registry', () => {
     )
   })
 
+  it('rejects a planner-requested source group outside the request policy', async () => {
+    const registry = createInternalAgentToolRegistry([internalTool()])
+
+    await expect(
+      registry.execute('internal.catalog', {
+        request: request(['structured_catalog']),
+        args: { source_groups: ['external_web'] },
+        claimIds: ['claim-1'],
+        signal: new AbortController().signal,
+      })
+    ).rejects.toThrow(
+      'Agent tool source groups are not allowed: internal.catalog (external_web)'
+    )
+  })
+
+  it('rejects malformed planner-requested source groups', async () => {
+    const registry = createInternalAgentToolRegistry([internalTool()])
+
+    await expect(
+      registry.execute('internal.catalog', {
+        request: request(['structured_catalog']),
+        args: { sourceGroups: ['structured_catalog', 42] },
+        claimIds: ['claim-1'],
+        signal: new AbortController().signal,
+      })
+    ).rejects.toThrow('Agent tool requested invalid source groups: internal.catalog')
+  })
+
   it('rejects execution for an unregistered tool name', async () => {
     const registry = createInternalAgentToolRegistry([])
 
