@@ -1,7 +1,11 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { runOpenAiFileSearchValidatedQuestion } from './openai-file-search-validated'
 
 describe('runOpenAiFileSearchValidatedQuestion', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
   it('retrieves File Search results, generates from evidence, and cites selected sources', async () => {
     const create = vi.fn(async () => ({
       id: 'resp_1',
@@ -115,6 +119,114 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
         totalTokens: 23,
         toolCalls: 1,
       },
+    })
+  })
+
+  it('keeps validated answers unchanged when shadow mode is disabled', async () => {
+    vi.stubEnv('INTERNAL_AGENT_SHADOW', '0')
+    const create = vi.fn(async () => ({
+      id: 'resp_1',
+      output_text: 'retrieval complete',
+      output: [{ type: 'file_search_call', status: 'completed', results: [] }],
+      usage: { input_tokens: 20, output_tokens: 3, total_tokens: 23 },
+    }))
+    const internalAgentPlannerCreateCompletion = vi.fn()
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      organizationId: 'org-1',
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'BİDB e-postası nedir?',
+      internalAgentPlannerCreateCompletion,
+    })
+
+    expect(internalAgentPlannerCreateCompletion).not.toHaveBeenCalled()
+    expect(result.answer).toBe('Yüklenen belgelerde bu konuda net bir bilgi bulunmamaktadır.')
+    expect(result.usage).toMatchObject({
+      inputTokens: 20,
+      outputTokens: 3,
+      totalTokens: 23,
+      toolCalls: 1,
+    })
+    expect(result.diagnostics?.internalAgentShadow).toBeUndefined()
+  })
+
+  it('adds fail-open shadow diagnostics without changing answer, citations, refusal, or usage', async () => {
+    vi.stubEnv('INTERNAL_AGENT_SHADOW', '1')
+    const create = vi.fn(async () => ({
+      id: 'resp_1',
+      output_text: 'retrieval complete',
+      output: [{ type: 'file_search_call', status: 'completed', results: [] }],
+      usage: { input_tokens: 20, output_tokens: 3, total_tokens: 23 },
+    }))
+    const internalAgentPlannerCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              decision: 'research',
+              claims: [
+                {
+                  id: 'claim-1',
+                  question: 'What is the official email?',
+                  required_evidence: 'Direct official contact evidence',
+                  risk: 'medium',
+                },
+              ],
+              steps: [
+                {
+                  id: 'step-1',
+                  tool: 'internal.file_search',
+                  claim_ids: ['claim-1'],
+                  args: { source_groups: ['knowledge_base'], query: 'BİDB e-postası' },
+                  depends_on: [],
+                },
+              ],
+              stop_conditions: ['direct evidence found'],
+              reason: 'Need approved corpus evidence.',
+              confidence: 0.74,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 90, completion_tokens: 30, total_tokens: 120 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      organizationId: 'org-1',
+      conversationId: 'conversation-1',
+      channel: 'demo_chat',
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'BİDB e-postası nedir?',
+      internalAgentPlannerCreateCompletion,
+    })
+
+    expect(internalAgentPlannerCreateCompletion).toHaveBeenCalledOnce()
+    expect(result.answer).toBe('Yüklenen belgelerde bu konuda net bir bilgi bulunmamaktadır.')
+    expect(result.citations).toEqual([])
+    expect(result.refusal).toBe(true)
+    expect(result.usage).toMatchObject({
+      inputTokens: 20,
+      outputTokens: 3,
+      totalTokens: 23,
+      toolCalls: 1,
+    })
+    expect(result.diagnostics?.internalAgentShadow).toMatchObject({
+      status: 'completed',
+      reason: 'Need approved corpus evidence.',
+      plannedDecision: 'research',
+      observedDecision: 'no_info',
+      plannedTools: ['internal.file_search'],
+      observedTools: ['internal.typed_state'],
+      missingPlannedTools: ['internal.file_search'],
+      extraObservedTools: ['internal.typed_state'],
+      claimCount: 1,
+      plannerConfidence: 0.74,
+      inputTokens: 90,
+      outputTokens: 30,
     })
   })
 

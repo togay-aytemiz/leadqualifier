@@ -1,6 +1,20 @@
 import { calculateUsageCreditCost } from '@/lib/billing/credit-cost'
 import { resolveMvpResponseLanguage } from '@/lib/ai/language'
 import {
+  DEFAULT_AGENT_BUDGET,
+  type AgentChannel,
+  type AgentRequest,
+} from '@/lib/ai/agent/contracts'
+import {
+  appendInternalAgentShadowDiagnostics,
+  isInternalAgentShadowEnabled,
+} from '@/lib/ai/agent/shadow'
+import {
+  planInternalAgentTurn,
+  type AgentPlannerCreateCompletion,
+} from '@/lib/ai/agent/planner'
+import type { InternalAgentToolDescriptor } from '@/lib/ai/agent/tool-registry'
+import {
   compileBehaviorPolicyFromSettings,
   formatBehaviorPolicyForPrompt,
   summarizeBehaviorPolicy,
@@ -117,6 +131,9 @@ export type OpenAiFileSearchValidatedQuestionInput = {
   client: OpenAiFileSearchClient
   model: string
   answerModel?: string
+  organizationId?: string
+  conversationId?: string
+  channel?: AgentChannel
   vectorStoreId: string
   question: string
   maxResults?: number
@@ -142,6 +159,8 @@ export type OpenAiFileSearchValidatedQuestionInput = {
   enableLlmResearchPlanner?: boolean
   researchPlannerModel?: string
   researchPlannerCreateCompletion?: StrictLlmResearchPlannerCreateCompletion
+  internalAgentPlannerModel?: string
+  internalAgentPlannerCreateCompletion?: AgentPlannerCreateCompletion
 }
 
 const NO_CLEAR_INFORMATION_ANSWER = 'Yüklenen belgelerde bu konuda net bir bilgi bulunmamaktadır.'
@@ -149,6 +168,157 @@ const DEFAULT_CONTEXTUAL_ORCHESTRATOR_MODEL = 'gpt-4o-mini'
 const CONTEXTUAL_ORCHESTRATOR_MAX_OUTPUT_TOKENS = 260
 const CONTEXTUAL_ORCHESTRATOR_MIN_CONFIDENCE = 0.62
 const MAX_CONTEXTUAL_HISTORY_TURNS = 10
+
+const INTERNAL_AGENT_SOURCE_GROUPS = [
+  'brochure',
+  'website_html',
+  'approved_pdf',
+  'structured_catalog',
+  'official_channel',
+  'knowledge_base',
+  'conversation_state',
+  'behavior_policy',
+  'skills',
+] as const
+
+const INTERNAL_AGENT_TOOL_DESCRIPTORS: InternalAgentToolDescriptor[] = [
+  {
+    name: 'internal.catalog',
+    description: 'Read approved structured facts and catalog entries.',
+    capability: 'structured_fact_lookup',
+    sourceGroups: ['structured_catalog', 'knowledge_base'],
+    costClass: 'free',
+    canRunInParallel: true,
+  },
+  {
+    name: 'internal.table',
+    description: 'Read approved table facts such as fees, quotas, discounts, and locations.',
+    capability: 'table_fact_lookup',
+    sourceGroups: ['brochure', 'structured_catalog', 'knowledge_base'],
+    costClass: 'free',
+    canRunInParallel: true,
+  },
+  {
+    name: 'internal.file_search',
+    description: 'Search approved uploaded PDFs, brochure text, and crawled website corpus.',
+    capability: 'approved_corpus_retrieval',
+    sourceGroups: ['brochure', 'website_html', 'approved_pdf', 'knowledge_base'],
+    costClass: 'medium',
+    canRunInParallel: true,
+  },
+  {
+    name: 'internal.hybrid_retrieval',
+    description: 'Use the existing hybrid retrieval path over the approved knowledge base.',
+    capability: 'hybrid_retrieval',
+    sourceGroups: ['knowledge_base', 'website_html', 'approved_pdf'],
+    costClass: 'low',
+    canRunInParallel: true,
+  },
+  {
+    name: 'internal.claim_verifier',
+    description: 'Verify answer claims against gathered evidence before customer presentation.',
+    capability: 'claim_verification',
+    sourceGroups: ['brochure', 'website_html', 'approved_pdf', 'structured_catalog', 'knowledge_base'],
+    costClass: 'low',
+    canRunInParallel: false,
+  },
+  {
+    name: 'internal.typed_state',
+    description: 'Resolve follow-up turns and pending clarifications using conversation state.',
+    capability: 'conversation_state_resolution',
+    sourceGroups: ['conversation_state'],
+    costClass: 'free',
+    canRunInParallel: false,
+  },
+  {
+    name: 'internal.presenter',
+    description: 'Apply organization behavior policy and customer-facing answer style.',
+    capability: 'answer_presentation',
+    sourceGroups: ['behavior_policy'],
+    costClass: 'low',
+    canRunInParallel: false,
+  },
+  {
+    name: 'internal.skill',
+    description: 'Use approved skill answers when a configured skill exactly matches the turn.',
+    capability: 'skill_response',
+    sourceGroups: ['skills'],
+    costClass: 'free',
+    canRunInParallel: true,
+  },
+]
+
+function uniqueNonEmptyStrings(values: Array<string | undefined | null>): string[] {
+  return Array.from(new Set(values.map((value) => value?.trim()).filter(Boolean) as string[]))
+}
+
+function readTypedConversationStateFromDiagnostics(
+  diagnostics: RagProviderResult['diagnostics'] | undefined
+): RagTypedConversationState | null {
+  const state = diagnostics?.typedConversationState
+  return state && typeof state === 'object' ? (state as RagTypedConversationState) : null
+}
+
+function buildInternalAgentShadowRequest(input: {
+  questionInput: OpenAiFileSearchValidatedQuestionInput
+  currentResult: RagProviderResult
+}): AgentRequest {
+  const behaviorPolicy = compileBehaviorPolicyFromSettings(input.questionInput.settings)
+  const behaviorPriority = behaviorPolicy.sourcePriority.map((sourceGroup) => sourceGroup)
+  const configuredPriority = input.questionInput.sourcePriorityGroups ?? []
+  const priority = uniqueNonEmptyStrings([
+    ...configuredPriority,
+    ...behaviorPriority,
+    'brochure',
+    'website_html',
+    'approved_pdf',
+    'structured_catalog',
+    'knowledge_base',
+  ])
+  const allowedSourceGroups = uniqueNonEmptyStrings([
+    ...INTERNAL_AGENT_SOURCE_GROUPS,
+    ...priority,
+  ])
+
+  return {
+    organizationId: input.questionInput.organizationId ?? 'unknown',
+    conversationId: input.questionInput.conversationId,
+    channel: input.questionInput.channel ?? 'demo_chat',
+    locale: resolveMvpResponseLanguage(input.questionInput.question, undefined, 'tr'),
+    latestUserMessage: input.questionInput.question,
+    recentMessages: input.questionInput.conversationHistory?.slice(-10) ?? [],
+    conversationState: readTypedConversationStateFromDiagnostics(input.currentResult.diagnostics),
+    behaviorPolicy,
+    sourcePolicy: {
+      allowedSourceGroups,
+      priority,
+    },
+    budget: DEFAULT_AGENT_BUDGET,
+  }
+}
+
+async function runValidatedFileSearchAgentShadow(input: {
+  questionInput: OpenAiFileSearchValidatedQuestionInput
+  currentResult: RagProviderResult
+}) {
+  const request = buildInternalAgentShadowRequest(input)
+  const planned = await planInternalAgentTurn({
+    request,
+    toolDescriptors: INTERNAL_AGENT_TOOL_DESCRIPTORS,
+    model: input.questionInput.internalAgentPlannerModel,
+    createCompletion: input.questionInput.internalAgentPlannerCreateCompletion,
+  })
+
+  return {
+    plan: planned.plan,
+    reason: planned.reason,
+    usage: {
+      inputTokens: planned.usage.inputTokens,
+      outputTokens: planned.usage.outputTokens,
+      estimatedCredits: planned.usage.estimatedCredits,
+    },
+  }
+}
 
 const TURKISH_CHAR_MAP: Record<string, string> = {
   ı: 'i',
@@ -1956,7 +2126,7 @@ async function strictDirectResult(input: {
   }
 }
 
-export async function runOpenAiFileSearchValidatedQuestion(
+async function runOpenAiFileSearchValidatedQuestionCurrent(
   input: OpenAiFileSearchValidatedQuestionInput
 ): Promise<RagProviderResult> {
   const startedAt = Date.now()
@@ -3339,5 +3509,23 @@ export async function runOpenAiFileSearchValidatedQuestion(
       retryCount: retrievalAttempts.length - 1,
       followup: followup || undefined,
     },
+  })
+}
+
+export async function runOpenAiFileSearchValidatedQuestion(
+  input: OpenAiFileSearchValidatedQuestionInput
+): Promise<RagProviderResult> {
+  const currentResult = await runOpenAiFileSearchValidatedQuestionCurrent(input)
+  if (!input.organizationId || !isInternalAgentShadowEnabled(input.organizationId)) {
+    return currentResult
+  }
+
+  return appendInternalAgentShadowDiagnostics(currentResult, {
+    organizationId: input.organizationId,
+    run: () =>
+      runValidatedFileSearchAgentShadow({
+        questionInput: input,
+        currentResult,
+      }),
   })
 }
