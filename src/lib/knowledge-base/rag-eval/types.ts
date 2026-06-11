@@ -72,6 +72,11 @@ export type RagProviderResult = {
     queryIntent?: string
     retryCount?: number
     followup?: string
+    presentationPolish?: {
+      usedPolish: boolean
+      addedEngagement: boolean
+      model: string
+    }
     clarification?: string
     contextualOrchestration?: string
     contextualReason?: string

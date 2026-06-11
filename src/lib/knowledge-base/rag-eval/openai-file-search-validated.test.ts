@@ -1289,32 +1289,47 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
       ],
       usage: { input_tokens: 100, output_tokens: 10, total_tokens: 110 },
     }))
-    const createCompletion = vi.fn(async () => ({
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              answer: 'Evet, ücretlere KDV dahildir.',
-              used_evidence_ids: ['ev_1'],
-              support_quotes: [
-                '2025-2026 eğitim öğretim yılı program ücretleri tabloda listelenmiştir.',
-              ],
-              engagement_question: '',
-              engagement_evidence_id: '',
-              engagement_evidence: '',
-            }),
+    const createCompletion = vi.fn()
+    const presentationCreateCompletion = vi.fn(async (args: Record<string, unknown>) => {
+      const messages = args.messages as Array<{ role: string; content: string }>
+      const systemPrompt = messages.find((message) => message.role === 'system')?.content ?? ''
+      const userPrompt = messages.find((message) => message.role === 'user')?.content ?? ''
+
+      expect(systemPrompt).toContain('Do not expose internal retrieval or source mechanics')
+      expect(systemPrompt).toContain('brochure, document, PDF, website, table, row, field, citation')
+      expect(systemPrompt).toContain('Bol emoji kullan, Gen-Z gibi konuş.')
+      expect(userPrompt).toContain(
+        'Tıp Fakültesi (Ücretli) için 2025 fiyatı 720.000 TL olarak broşürde gösterilmiştir.'
+      )
+
+      return {
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                answer: 'Tıp Fakültesi ücretli programının 2025 ücreti 720.000 TL.',
+                engagement_question: '',
+                engagement_evidence: '',
+              }),
+            },
           },
-        },
-      ],
-      usage: { prompt_tokens: 70, completion_tokens: 10, total_tokens: 80 },
-    }))
+        ],
+        usage: { prompt_tokens: 70, completion_tokens: 10, total_tokens: 80 },
+      }
+    })
 
     const result = await runOpenAiFileSearchValidatedQuestion({
       client: { responses: { create } },
       model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
       vectorStoreId: 'vs_123',
       question: 'Tıp kaç para?',
       createCompletion,
+      presentationCreateCompletion,
+      settings: {
+        bot_name: 'Qualy',
+        prompt: 'Bol emoji kullan, Gen-Z gibi konuş.',
+      },
       citationSourcesByFilename: {
         'brochure-01-tip.md': {
           title: 'YİÜ Tanıtım Broşürü - Tıp Fakültesi Kontenjan ve Ücretler',
@@ -1325,9 +1340,20 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
 
     expect(create).toHaveBeenCalledOnce()
     expect(createCompletion).not.toHaveBeenCalled()
+    expect(presentationCreateCompletion).toHaveBeenCalledOnce()
     expect(result.refusal).toBe(false)
-    expect(result.answer).toContain('Tıp Fakültesi (Ücretli) için 2025 fiyatı 720.000 TL')
+    expect(result.answer).toContain('Tıp Fakültesi ücretli programının 2025 ücreti 720.000 TL.')
+    expect(result.answer).not.toContain('broşür')
+    expect(result.answer).not.toContain('fiyat alanı')
+    expect(result.answer).not.toContain('satır')
     expect(result.answer).toContain('https://example.edu.tr/brochure.pdf')
+    expect(result.diagnostics).toMatchObject({
+      presentationPolish: {
+        usedPolish: true,
+        addedEngagement: false,
+        model: 'gpt-4o-mini',
+      },
+    })
   })
 
   it('uses a raw File Search answer only when retrieved evidence supports it', async () => {

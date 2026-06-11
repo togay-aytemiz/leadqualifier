@@ -2,6 +2,7 @@ import { calculateUsageCreditCost } from '@/lib/billing/credit-cost'
 import { resolveMvpResponseLanguage } from '@/lib/ai/language'
 import { buildClarificationGateResult } from '@/lib/knowledge-base/rag-clarification'
 import { generateGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-generate'
+import { polishGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-polish'
 import type { KnowledgeSearchPlanningTurn } from '@/lib/knowledge-base/query-planner'
 import type { RagChunk } from '@/lib/knowledge-base/rag'
 import { buildRagEvidencePack } from '@/lib/knowledge-base/evidence-pack'
@@ -109,6 +110,7 @@ export type OpenAiFileSearchValidatedQuestionInput = {
   instructionProfile?: OpenAiFileSearchInstructionProfile
   citationSourcesByFilename?: Record<string, CitationSource>
   createCompletion?: CreateCompletion
+  presentationCreateCompletion?: CreateCompletion
   settings?: {
     bot_name?: string | null
     prompt?: string | null
@@ -404,6 +406,76 @@ function appendSourceUrls(answer: string, citations: RagProviderCitation[]) {
   return [answer.trim(), ...urls].join('\n')
 }
 
+async function polishValidatedPresentation(input: {
+  answer: string
+  question: string
+  citations: RagProviderCitation[]
+  settings?: OpenAiFileSearchValidatedQuestionInput['settings']
+  model?: string
+  createCompletion?: CreateCompletion
+}): Promise<{
+  answer: string
+  usage: RagProviderResult['usage'] | null
+  timingsMs: number
+  usedPolish: boolean
+  addedEngagement: boolean
+  model: string | null
+}> {
+  const answer = input.answer.trim()
+  const chunks = citationsToChunks(input.citations)
+  if (!answer || chunks.length === 0) {
+    return {
+      answer,
+      usage: null,
+      timingsMs: 0,
+      usedPolish: false,
+      addedEngagement: false,
+      model: null,
+    }
+  }
+  if (!input.createCompletion && !process.env.OPENAI_API_KEY) {
+    return {
+      answer,
+      usage: null,
+      timingsMs: 0,
+      usedPolish: false,
+      addedEngagement: false,
+      model: null,
+    }
+  }
+
+  const startedAt = Date.now()
+  const polished = await polishGroundedRagAnswer({
+    answer,
+    userMessage: input.question,
+    responseLanguage: resolveMvpResponseLanguage(input.question),
+    chunks,
+    settings: input.settings,
+    model: input.model,
+    createCompletion: input.createCompletion,
+  })
+
+  return {
+    answer: polished.answer.trim() || answer,
+    usage: polished.usage
+      ? {
+          inputTokens: polished.usage.inputTokens,
+          outputTokens: polished.usage.outputTokens,
+          totalTokens: polished.usage.totalTokens,
+          toolCalls: 0,
+          estimatedCredits: calculateUsageCreditCost({
+            inputTokens: polished.usage.inputTokens,
+            outputTokens: polished.usage.outputTokens,
+          }),
+        }
+      : null,
+    timingsMs: Date.now() - startedAt,
+    usedPolish: polished.usedPolish,
+    addedEngagement: polished.addedEngagement,
+    model: polished.model,
+  }
+}
+
 function combinedUsage(
   retrieval: RagProviderResult['usage'],
   generation: NonNullable<Awaited<ReturnType<typeof generateGroundedRagAnswer>>['usage']> | null
@@ -690,7 +762,7 @@ function documentRouterAnswer(question: string, citations: RagProviderCitation[]
   return `İlgili belge: ${titles[0]}.`
 }
 
-function directValidatedResult(input: {
+async function directValidatedResult(input: {
   startedAt: number
   retrieval: RagProviderResult
   retrievalMs: number
@@ -699,7 +771,10 @@ function directValidatedResult(input: {
   retryCount: number
   answer: string
   citations: RagProviderCitation[]
-}): RagProviderResult {
+  settings?: OpenAiFileSearchValidatedQuestionInput['settings']
+  answerModel?: string
+  presentationCreateCompletion?: CreateCompletion
+}): Promise<RagProviderResult> {
   const followup = buildValidatedFollowup({
     question: input.question,
     answer: input.answer,
@@ -708,22 +783,38 @@ function directValidatedResult(input: {
     refusal: false,
   })
   const answer = followup ? `${input.answer.trim()}\n\n${followup}` : input.answer
+  const presentation = await polishValidatedPresentation({
+    answer,
+    question: input.question,
+    citations: input.citations,
+    settings: input.settings,
+    model: input.answerModel,
+    createCompletion: input.presentationCreateCompletion,
+  })
+  const usage = usageWithExtra(input.retrieval.usage, presentation.usage)
   return {
     provider: 'openai_file_search_validated',
-    answer: appendSourceUrls(answer, input.citations),
+    answer: appendSourceUrls(presentation.answer, input.citations),
     citations: input.citations,
     refusal: false,
     timingsMs: {
       total: Date.now() - input.startedAt,
       retrieval: input.retrievalMs,
-      generation: 0,
+      generation: presentation.timingsMs,
       validation: 0,
     },
-    usage: input.retrieval.usage,
+    usage,
     diagnostics: {
       queryIntent: input.plan.intent,
       retryCount: input.retryCount,
       followup: followup || undefined,
+      presentationPolish: presentation.model
+        ? {
+            usedPolish: presentation.usedPolish,
+            addedEngagement: presentation.addedEngagement,
+            model: presentation.model,
+          }
+        : undefined,
     },
   }
 }
@@ -2664,7 +2755,7 @@ export async function runOpenAiFileSearchValidatedQuestion(
       retrieval = retrievalWithCombinedUsage(retrieval, retrievalAttempts)
       const retrievalMs = Date.now() - retrievalStartedAt
       return finalizeWithCritic(
-        directValidatedResult({
+        await directValidatedResult({
           startedAt,
           retrieval,
           retrievalMs,
@@ -2673,6 +2764,9 @@ export async function runOpenAiFileSearchValidatedQuestion(
           retryCount: retrievalAttempts.length - 1,
           answer: tableFact.answer,
           citations: [tableFact.citation],
+          settings: input.settings,
+          answerModel: input.answerModel,
+          presentationCreateCompletion: input.presentationCreateCompletion,
         })
       )
     }
@@ -2715,7 +2809,7 @@ export async function runOpenAiFileSearchValidatedQuestion(
   const retrievalMs = Date.now() - retrievalStartedAt
   if (approvedSourceFact) {
     return finalizeWithCritic(
-      directValidatedResult({
+      await directValidatedResult({
         startedAt,
         retrieval,
         retrievalMs,
@@ -2724,6 +2818,9 @@ export async function runOpenAiFileSearchValidatedQuestion(
         retryCount: retrievalAttempts.length - 1,
         answer: approvedSourceFact.answer,
         citations: approvedSourceFact.citations,
+        settings: input.settings,
+        answerModel: input.answerModel,
+        presentationCreateCompletion: input.presentationCreateCompletion,
       })
     )
   }
@@ -2738,7 +2835,7 @@ export async function runOpenAiFileSearchValidatedQuestion(
     )
     if (citations.length > 0) {
       return finalizeWithCritic(
-        directValidatedResult({
+        await directValidatedResult({
           startedAt,
           retrieval,
           retrievalMs,
@@ -2747,6 +2844,9 @@ export async function runOpenAiFileSearchValidatedQuestion(
           retryCount: retrievalAttempts.length - 1,
           answer: documentRouterAnswer(effectiveQuestion, citations),
           citations,
+          settings: input.settings,
+          answerModel: input.answerModel,
+          presentationCreateCompletion: input.presentationCreateCompletion,
         })
       )
     }
