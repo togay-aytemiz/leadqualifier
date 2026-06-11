@@ -193,6 +193,37 @@ describe('agent evidence graph', () => {
     expect(graph.summary().attemptCount).toBe(3)
   })
 
+  it('rejects claim resolution from a non-successful tool result', () => {
+    const graph = createAgentEvidenceGraph([claim('claim-1')])
+
+    expect(() =>
+      graph.addToolResult(
+        'step-empty',
+        toolResult({ status: 'empty', supportedClaimIds: ['claim-1'] })
+      )
+    ).toThrow('Non-successful tool result cannot resolve claims: internal.knowledge')
+    expect(graph.snapshot().attempts).toEqual([])
+  })
+
+  it('rejects reuse of one evidence id for different content', () => {
+    const graph = createAgentEvidenceGraph([claim('claim-1')])
+    graph.addToolResult(
+      'step-1',
+      toolResult({ evidence: [evidence('evidence-1')], supportedClaimIds: ['claim-1'] })
+    )
+
+    expect(() =>
+      graph.addToolResult(
+        'step-2',
+        toolResult({
+          evidence: [evidence('evidence-1', { sourceId: 'different-source' })],
+          supportedClaimIds: ['claim-1'],
+        })
+      )
+    ).toThrow('Evidence id is already used for different content: evidence-1')
+    expect(graph.snapshot().attempts).toHaveLength(1)
+  })
+
   it('marks claims unsupported explicitly without overwriting conflicts', () => {
     const graph = createAgentEvidenceGraph([
       claim('claim-1'),

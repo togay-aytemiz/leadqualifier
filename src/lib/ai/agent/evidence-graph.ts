@@ -158,6 +158,7 @@ export function createAgentEvidenceGraph(
 
   const evidence: AgentEvidence[] = []
   const evidenceByKey = new Map<string, AgentEvidence>()
+  const evidenceKeyById = new Map<string, string>()
   const supportEdges: AgentEvidenceEdge[] = []
   const supportEdgeKeys = new Set<string>()
   const conflictEdges: AgentEvidenceEdge[] = []
@@ -210,6 +211,12 @@ export function createAgentEvidenceGraph(
       const supportedClaimIds = unique(result.supportedClaimIds)
       const conflictedClaimIds = unique(result.conflictedClaimIds ?? [])
       assertKnownClaims([...supportedClaimIds, ...conflictedClaimIds])
+      if (
+        result.status !== 'success' &&
+        (supportedClaimIds.length > 0 || conflictedClaimIds.length > 0)
+      ) {
+        throw new Error(`Non-successful tool result cannot resolve claims: ${result.tool}`)
+      }
 
       const stagedEvidence: AgentEvidence[] = []
       const stagedEvidenceByKey = new Map<string, AgentEvidence>()
@@ -217,6 +224,14 @@ export function createAgentEvidenceGraph(
 
       for (const candidate of result.evidence) {
         const key = evidenceKey(candidate)
+        const existingKeyForId =
+          evidenceKeyById.get(candidate.id) ??
+          Array.from(stagedEvidenceByKey.entries()).find(
+            ([, staged]) => staged.id === candidate.id
+          )?.[0]
+        if (existingKeyForId && existingKeyForId !== key) {
+          throw new Error(`Evidence id is already used for different content: ${candidate.id}`)
+        }
         let canonicalEvidence = evidenceByKey.get(key) ?? stagedEvidenceByKey.get(key)
 
         if (!canonicalEvidence) {
@@ -244,7 +259,9 @@ export function createAgentEvidenceGraph(
 
       for (const node of stagedEvidence) {
         evidence.push(node)
-        evidenceByKey.set(evidenceKey(node), node)
+        const key = evidenceKey(node)
+        evidenceByKey.set(key, node)
+        evidenceKeyById.set(node.id, key)
       }
 
       addEdges(supportEdges, supportEdgeKeys, attemptEvidenceIds, supportedClaimIds)
