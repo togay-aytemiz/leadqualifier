@@ -103,7 +103,7 @@ describe('DemoChatClient source guards', () => {
         const source = fs.readFileSync(SOURCE_PATH, 'utf8')
         const textareaMatch = source.match(/<textarea[\s\S]*?className={`([\s\S]*?)`}/)
 
-        expect(textareaMatch?.[1]).toContain('text-base')
+        expect(textareaMatch?.[1]).toContain('text-[16px]')
         expect(textareaMatch?.[1]).not.toContain('text-sm')
     })
 

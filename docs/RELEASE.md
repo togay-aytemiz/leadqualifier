@@ -218,6 +218,7 @@
 
 ### Fixed
 
+- Fixed the Public Demo Chat mobile composer against iOS input-focus auto zoom by pinning the textarea to an explicit `16px` font size and tightening the source guard so future theme token changes cannot regress the demo input (`src/components/demo-chat/DemoChatClient.tsx`, `src/components/demo-chat/DemoChatClient.source.test.ts`).
 - Fixed the post-onboarding bot-mode choice overlay so selecting `Aktif`, `Dinleyici`, or `Kapalı` shows a saving state, exposes retryable error copy, and verifies membership against the selected organization id instead of the user's first membership row. This prevents multi-organization/demo-only workspaces from leaving users on an apparently inert completion modal while the action fails or refreshes slowly (`src/components/onboarding/OnboardingCompletionModal.tsx`, `src/lib/onboarding/actions.ts`, `messages/en.json`, `messages/tr.json`, related tests).
 - Fixed the YİÜ PDF download helper lint error by removing an unused `readFile` import, letting `npm run lint` complete with only the existing image-optimization warnings (`scripts/knowledge/rag-download-yiu-link-pdfs.ts`).
 - Fixed AI behavior setting drift in simulator and standalone fallback paths: both now load organization AI settings with the resolved response language, matching the live WhatsApp/Instagram/Telegram/Demo Chat LLM reply contract. Deterministic Skill replies remain exact operator-authored responses and are not polished, rewritten, or extended by behavior settings (`src/lib/chat/actions.ts`, `src/lib/ai/fallback.ts`, related tests).

@@ -492,7 +492,7 @@ export function DemoChatClient({ slug, displayName, accessToken, logoUrl }: Demo
                             onChange={handleInputChange}
                             placeholder={t('placeholder')}
                             disabled={!sessionId || isSending}
-                            className={`scrollbar-none max-h-[156px] min-h-10 flex-1 resize-none bg-transparent py-2 text-base leading-6 outline-none transition-colors placeholder:text-slate-400 ${
+                            className={`scrollbar-none max-h-[156px] min-h-10 flex-1 resize-none bg-transparent py-2 text-[16px] leading-6 outline-none transition-colors placeholder:text-slate-400 ${
                                 isDark
                                     ? 'text-slate-100'
                                     : 'text-slate-950'
