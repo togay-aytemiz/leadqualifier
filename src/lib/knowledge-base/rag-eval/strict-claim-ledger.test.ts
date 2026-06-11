@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { compileBehaviorPolicyFromSettings } from '@/lib/ai/behavior-policy'
 import { buildStrictClaimLedger } from './strict-claim-ledger'
 import { understandStrictQuestion } from './strict-question-understanding'
 
@@ -68,5 +69,34 @@ describe('buildStrictClaimLedger', () => {
 
     expect(result.claims).toHaveLength(0)
     expect(result.unsupportedClaims).toHaveLength(0)
+  })
+
+  it('merges universal behavior-policy claims into the strict ledger', () => {
+    const result = buildStrictClaimLedger({
+      question: 'Resmi telefon numaranız nedir?',
+      understanding: understandStrictQuestion('Resmi telefon numaranız nedir?'),
+      answer: 'Aday öğrenci birimi için 0552 994 0541 numarasını arayabilirsiniz.',
+      citations: [
+        {
+          providerSourceId: 'source-1',
+          title: 'İletişim',
+          quote: 'Aday öğrenci iletişim bilgileri resmi duyurulardan kontrol edilmelidir.',
+        },
+      ],
+      behaviorPolicy: compileBehaviorPolicyFromSettings({
+        prompt: 'Belgeye dayanması gereken bilgiler: resmi iletişim kanalları, telefon, e-posta ve ödeme bilgileri.',
+      }),
+    })
+
+    expect(result.requiresDirectEvidence).toBe(true)
+    expect(result.unsupportedClaims).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'contact_value',
+          text: '0552 994 0541',
+          support: 'unsupported',
+        }),
+      ])
+    )
   })
 })

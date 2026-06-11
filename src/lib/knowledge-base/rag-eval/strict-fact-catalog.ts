@@ -1791,7 +1791,7 @@ function resolveProgramFeeFact(search: string): StrictCatalogAnswer | null {
 
   const asksBroadProgramFees =
     /(?:2025|ucretleri|ucretler|fiyatlari|fiyatlar)/.test(search) &&
-    !/(?:yurt|servis|yemek|staj|basvuru|kimlik|onluk|yaz okulu|tek ders|ek sinav|yatay gecis)/.test(
+    !/(?:yurt|servis|yemek|staj|basvuru|kimlik|onluk|yaz okulu|tek ders|ek sinav|yatay gecis|kira|kiralar|kiralik ev|konaklama)/.test(
       search
     ) &&
     !/(?:kdv|taksit|pesin|peşin|online|iban|kredi kart|kayit sirasinda|kayıt sırasında|hazirlik|hazırlık|her yil|her yıl|kesin mi|web sitesi|website|brosur|broşür)/.test(
@@ -2302,7 +2302,8 @@ function resolveOffTopicScopeFact(
     .replace(/\s+/g, ' ')
     .trim()
   return {
-    answer: `${topic} üniversitenin onaylı aday öğrenci dokümanlarında yer alan bir başlık değildir. Yüksek İhtisas Üniversitesi'nin programları, ücretleri, bursları, kontenjanları, kampüsleri veya kayıt süreciyle ilgili sorularınızı yanıtlayabilirim.`,
+    answer:
+      `${topic} konusunda yardımcı olamam. Yüksek İhtisas Üniversitesi'nin programları, ücretleri, bursları, kontenjanları, kampüsleri veya kayıt süreciyle ilgili sorularınızı yanıtlayabilirim. Örneğin belirli bir program, ücret, kontenjan, kampüs ya da kayıt adımı sorabilirsiniz.`,
     citations: [OFF_TOPIC_SCOPE_CITATION],
     refusal: true,
     reason: 'catalog_off_topic_scope_guard',
@@ -2378,6 +2379,8 @@ export function resolveStrictCatalogAnswer(input: {
   if (doubleMajorFact) return doubleMajorFact
   const scholarshipFact = resolveScholarshipFact(understanding.normalizedSearch)
   if (scholarshipFact) return scholarshipFact
+  const earlyOffTopicScopeFact = resolveOffTopicScopeFact(input.question, understanding)
+  if (earlyOffTopicScopeFact) return earlyOffTopicScopeFact
   const programFeeFact = resolveProgramFeeFact(understanding.normalizedSearch)
   if (programFeeFact) return programFeeFact
   const paymentPolicyScopeFact = resolvePaymentPolicyScopeFact(understanding.normalizedSearch)

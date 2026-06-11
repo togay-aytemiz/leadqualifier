@@ -91,4 +91,47 @@ describe('runStrictLlmResearchPlanner', () => {
       ],
     })
   })
+
+  it('returns an off-topic boundary plan without retrieval hops', async () => {
+    const createCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              route: 'off_topic_boundary',
+              reason: 'The user asks for general advice outside the approved business scope.',
+              required_evidence: ['safe_refusal_boundary'],
+              confidence: 0.92,
+              hops: [],
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 60, completion_tokens: 18, total_tokens: 78 },
+    }))
+
+    const result = await runStrictLlmResearchPlanner({
+      question: 'vergi nasıl verilir',
+      normalizedQuestion: 'vergi nasıl verilir?',
+      deterministicPlan: {
+        route: 'general_file_search',
+        tools: ['file_search', 'claim_ledger', 'strict_answer_critic'],
+        requiredEvidence: ['general_grounded_evidence'],
+        sourceGroups: [],
+        expectedClaims: ['general'],
+        riskLevel: 'medium',
+      },
+      brochureSourceGroups: [],
+      model: 'gpt-4o-mini',
+      createCompletion,
+    })
+
+    expect(result).toMatchObject({
+      route: 'off_topic_boundary',
+      reason: 'The user asks for general advice outside the approved business scope.',
+      requiredEvidence: ['safe_refusal_boundary'],
+      confidence: 0.92,
+      hops: [],
+    })
+  })
 })

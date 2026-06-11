@@ -92,6 +92,14 @@ describe('buildOpenAiFileSearchDemoReply', () => {
             message: 'tip kaç para',
         })
 
+        expect(runOpenAiFileSearchValidatedQuestionMock).toHaveBeenCalledWith(expect.objectContaining({
+            question: 'tip kaç para',
+            contextualOrchestratorMode: 'always',
+            settings: {
+                bot_name: 'Qualy',
+                prompt: 'Bol emoji kullan, Gen-Z gibi konuş.',
+            },
+        }))
         expect(polishGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
             answer: expect.stringContaining('2025 broşüründe Ücretli fiyat 720.000 TL'),
             userMessage: 'tip kaç para',

@@ -1,10 +1,16 @@
 import type { StrictQuestionUnderstanding } from './strict-question-understanding'
 import { normalizeStrictQuestionSearch } from './strict-question-understanding'
 import type { RagProviderCitation } from './types'
+import type { BehaviorPolicy } from '@/lib/ai/behavior-policy'
+import { buildUniversalClaimLedger } from './universal-claim-ledger'
 
 export type StrictClaimSupport = 'supported' | 'unsupported'
 
-export type StrictClaimKind = 'policy_marker' | 'critical_value'
+export type StrictClaimKind =
+  | 'policy_marker'
+  | 'critical_value'
+  | 'official_identifier'
+  | 'contact_value'
 
 export type StrictClaim = {
   kind: StrictClaimKind
@@ -18,6 +24,7 @@ export type StrictClaimLedger = {
   claims: StrictClaim[]
   supportedClaims: StrictClaim[]
   unsupportedClaims: StrictClaim[]
+  universal?: ReturnType<typeof buildUniversalClaimLedger>
 }
 
 export type StrictClaimLedgerDiagnostics = {
@@ -120,13 +127,25 @@ export function buildStrictClaimLedger(input: {
   understanding: StrictQuestionUnderstanding
   answer: string
   citations: RagProviderCitation[]
+  behaviorPolicy?: BehaviorPolicy
 }): StrictClaimLedger {
+  const universal = input.behaviorPolicy
+    ? buildUniversalClaimLedger({
+        question: input.question,
+        answer: input.answer,
+        citations: input.citations,
+        behaviorPolicy: input.behaviorPolicy,
+      })
+    : null
+
   if (!input.answer.trim() || answerLooksLikeNoInfo(input.answer)) {
     return {
-      requiresDirectEvidence: directEvidenceRequired(input.understanding),
+      requiresDirectEvidence:
+        directEvidenceRequired(input.understanding) || Boolean(universal?.requiresDirectEvidence),
       claims: [],
       supportedClaims: [],
       unsupportedClaims: [],
+      ...(universal ? { universal } : {}),
     }
   }
 
@@ -154,11 +173,21 @@ export function buildStrictClaimLedger(input: {
     })
   }
 
+  const universalClaims = (universal?.claims ?? []).map((claim): StrictClaim => ({
+    kind: claim.kind,
+    text: claim.text,
+    terms: [claim.text],
+    support: claim.support,
+  }))
+  const allClaims = [...claims, ...universalClaims]
+
   return {
-    requiresDirectEvidence: directEvidenceRequired(input.understanding),
-    claims,
-    supportedClaims: claims.filter((claim) => claim.support === 'supported'),
-    unsupportedClaims: claims.filter((claim) => claim.support === 'unsupported'),
+    requiresDirectEvidence:
+      directEvidenceRequired(input.understanding) || Boolean(universal?.requiresDirectEvidence),
+    claims: allClaims,
+    supportedClaims: allClaims.filter((claim) => claim.support === 'supported'),
+    unsupportedClaims: allClaims.filter((claim) => claim.support === 'unsupported'),
+    ...(universal ? { universal } : {}),
   }
 }
 

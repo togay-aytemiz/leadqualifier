@@ -181,10 +181,11 @@ describe('resolveStrictCatalogAnswer', () => {
     const rent = catalogAnswer('Ankara’da kiralar ne kadar?')
     expect(rent).toMatchObject({
       refusal: true,
-      reason: 'catalog_campus_life_scope_guard',
+      reason: 'catalog_off_topic_scope_guard',
     })
-    expect(rent?.answer).toContain('Ankara kira')
-    expect(rent?.answer).toContain('üniversitenin onaylı aday öğrenci kaynaklarında')
+    expect(rent?.answer).toContain('yardımcı olamam')
+    expect(rent?.answer).toContain('programları, ücretleri, bursları')
+    expect(rent?.answer).not.toContain('net bilgi bulunmamaktadır')
   })
 
   it('guards Turkish-inflected facility resource questions such as mikroskobu', () => {
@@ -876,9 +877,23 @@ describe('resolveStrictCatalogAnswer', () => {
       refusal: true,
       reason: 'catalog_off_topic_scope_guard',
     })
-    expect(answer?.answer).toContain('onaylı aday öğrenci dokümanlarında')
+    expect(answer?.answer).toContain('yardımcı olamam')
     expect(answer?.answer).toContain('programları, ücretleri, bursları')
+    expect(answer?.answer).not.toContain('doküman')
+    expect(answer?.answer).not.toContain('kaynak')
     expect(answer?.answer).not.toContain('konu anlatımı')
+  })
+
+  it('routes external local market price questions to off-topic boundaries before program fee facts', () => {
+    const answer = catalogAnswer('Ankara kira fiyatları ne kadar?')
+
+    expect(answer).toMatchObject({
+      refusal: true,
+      reason: 'catalog_off_topic_scope_guard',
+    })
+    expect(answer?.answer).toContain('yardımcı olamam')
+    expect(answer?.answer).toContain('programları, ücretleri, bursları')
+    expect(answer?.answer).not.toContain('Tıp Fakültesi 720.000 TL')
   })
 
   it('answers bot identity questions directly instead of returning document no-info', () => {

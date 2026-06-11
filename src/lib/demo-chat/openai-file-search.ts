@@ -245,6 +245,7 @@ export async function buildOpenAiFileSearchDemoReply(input: {
             question: input.message,
             conversationHistory: input.conversationHistory ?? [],
             pendingClarification: pendingClarification ?? undefined,
+            contextualOrchestratorMode: 'always',
             instructionProfile: 'qualy',
             citationSourcesByFilename: sourceManifest.sourcesByFilename,
             sourcePriorityGroups: BROCHURE_SOURCE_PRIORITY_GROUPS,

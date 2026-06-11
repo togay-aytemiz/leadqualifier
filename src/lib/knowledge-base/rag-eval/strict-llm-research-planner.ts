@@ -151,14 +151,21 @@ function parsePlannerResult(
 ): StrictLlmResearchPlanResult | null {
   const parsed = parseJsonObject(content)
   if (!parsed) return null
+  const route = readString(parsed.route) || 'multi_hop_file_search'
   const hops = (Array.isArray(parsed.hops) ? parsed.hops : [])
     .map(normalizeHop)
     .filter((hop): hop is StrictLlmResearchHop => Boolean(hop))
     .slice(0, MAX_RESEARCH_HOPS)
-  if (hops.length === 0) return null
+  const allowsNoRetrieval = [
+    'off_topic_boundary',
+    'safety_refusal',
+    'impossible_boundary',
+    'no_retrieval',
+  ].includes(route)
+  if (hops.length === 0 && !allowsNoRetrieval) return null
 
   return {
-    route: readString(parsed.route) || 'multi_hop_file_search',
+    route,
     reason: readString(parsed.reason) || 'llm_research_plan',
     requiredEvidence: uniqueStrings(
       readStringArray(parsed.required_evidence ?? parsed.requiredEvidence)
@@ -182,6 +189,9 @@ function buildPlannerMessages(input: {
     'You are a bounded research planner for a grounded RAG assistant.',
     'Do not answer the user.',
     'Choose 1 to 3 File Search hops that can gather direct evidence for the question.',
+    'You are not a general web assistant. Plan File Search only for questions that are in the configured business/organization scope.',
+    'If the user asks for external general advice, recipes, weather, market data, taxes, unrelated tutoring, private/system data, fraud, or impossible/manipulative actions, return a boundary route with zero hops.',
+    'Boundary routes are: off_topic_boundary, safety_refusal, impossible_boundary, no_retrieval.',
     'Prefer authoritative primary sources already indicated by policy or deterministic routing.',
     'Separate independent facts into separate hops, for example program variant rows and duration/policy evidence.',
     'Do not invent organization facts. Do not request tools other than File Search.',
@@ -197,6 +207,7 @@ function buildPlannerMessages(input: {
       'Planning rules:',
       '- Use source_groups only when a known source family is clearly useful.',
       '- Leave source_groups empty for broad approved-corpus hops.',
+      '- For boundary routes, set hops to [] and required_evidence to ["safe_refusal_boundary"].',
       '- Keep queries short and evidence-seeking.',
       '- Turkish questions should keep Turkish search terms.',
     ].join('\n'),

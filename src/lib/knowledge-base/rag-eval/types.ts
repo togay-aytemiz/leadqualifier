@@ -83,20 +83,54 @@ export type RagProviderResult = {
     contextualQuestion?: string
     contextualTurnType?: string
     contextualResolvedIntent?: string
+    contextualRoute?: string
+    contextualDomainRelevance?: string
     contextualOriginalQuestion?: string
     contextualLatestClarification?: string
     contextualShouldRetrieve?: boolean
     contextualDoNotRetrieveText?: string[]
+    contextualMissingSlots?: string[]
     contextualRetrievalIntent?: string
     contextualRequestedMetric?: string
     contextualSourcePreference?: string[]
     contextualRiskLevel?: string
+    contextualSafetyClass?: string
+    contextualAnswerPolicy?: string
     contextualStateDecision?: string
     contextualStateConfidence?: number
     contextualStateReason?: string
     contextualConsumedPendingState?: boolean
     pendingClarification?: RagPendingClarificationState
     pendingClarificationUsed?: boolean
+    behaviorPolicy?: {
+      businessScopeHints: string[]
+      outOfScopeHints: string[]
+      evidenceRequiredFor: string[]
+      sourcePriority: string[]
+      refusalClasses: string[]
+      tone: string[]
+      botName?: string
+    }
+    typedConversationState?: {
+      status: string
+      activeIntent?: string
+      activeEntity?: string
+      requestedMetric?: string
+      requestedFacet?: string
+      missingSlots?: string[]
+      sourcePreference?: string[]
+      originalQuestion?: string
+      latestUserClarification?: string
+      lastUserMessage?: string
+      lastAssistantOffer?: string
+    }
+    universalClaimLedger?: {
+      requiresDirectEvidence: boolean
+      evidenceRequiredFor: string[]
+      claims: string[]
+      supportedClaims: string[]
+      unsupportedClaims: string[]
+    }
     sourcePriority?: {
       primarySourceGroups: string[]
       fallbackSourceGroups?: string[]

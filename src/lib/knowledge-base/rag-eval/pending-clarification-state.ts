@@ -213,6 +213,32 @@ function looksLikeStillAmbiguousReply(value: string) {
   )
 }
 
+function looksLikeExternalTaskReply(value: string) {
+  const normalized = normalizeForPending(value)
+  return /(?:\btarif(?:i|ler)?\b|\bnasil yapilir\b|\bpisir|\byemek yap|\bmenemen\b|\bmakarna\b|\bkahve\b|\bdiyet\b|\bhava\b|\bdolar\b|\beuro\b|\bkur\b|\bkripto\b|\bvergi\b|\bkira(?:lar)?\b|\bburc\b|\bfal\b|\bsiir\b|\bkod yaz|\bprompt\b|\bveritabani)/.test(
+    normalized
+  )
+}
+
+function shouldTrustLlmSlotUseDecision(input: {
+  latestUserMessage: string
+  llmTurnType?: string
+}) {
+  if (
+    input.llmTurnType &&
+    input.llmTurnType !== 'clarification_answer' &&
+    input.llmTurnType !== 'scope_selection' &&
+    input.llmTurnType !== 'multi_question'
+  ) {
+    return false
+  }
+  if (looksLikeExternalTaskReply(input.latestUserMessage)) return false
+  if (messageLooksLikeFreshQuestion(input.latestUserMessage)) return false
+
+  const tokenCount = normalizeForPending(input.latestUserMessage).split(/\s+/).filter(Boolean).length
+  return tokenCount > 0 && tokenCount <= 5
+}
+
 function hasSlotFillingSignal(input: {
   latestUserMessage: string
   pending: RagPendingClarificationState
@@ -306,8 +332,18 @@ function shouldTreatAsClarificationAnswer(input: {
   const latest = input.latestUserMessage.trim()
   if (!latest) return false
 
+  if (looksLikeExternalTaskReply(latest)) return false
+
   if (input.llmTurnType === 'clarification_answer' || input.llmTurnType === 'scope_selection') {
     return true
+  }
+
+  if (
+    input.llmTurnType === 'off_topic' ||
+    input.llmTurnType === 'unsafe_or_private_action' ||
+    input.llmTurnType === 'nonsense_or_impossible'
+  ) {
+    return false
   }
 
   if (input.llmAction === 'clarify' || input.llmAction === 'refuse') return false
@@ -325,6 +361,8 @@ function correctedPendingStateDecision(input: {
   latestUserMessage: string
   pending: RagPendingClarificationState
   stateDecision: RagPendingClarificationStateDecision | null
+  llmTurnType?: string
+  llmAction?: string
 }) {
   if (
     looksLikeNoProgressReply(input.latestUserMessage) ||
@@ -337,8 +375,21 @@ function correctedPendingStateDecision(input: {
     return input.stateDecision
   }
 
+  if (
+    input.llmTurnType === 'off_topic' ||
+    input.llmTurnType === 'unsafe_or_private_action' ||
+    input.llmTurnType === 'nonsense_or_impossible' ||
+    input.llmAction === 'refuse'
+  ) {
+    return 'ignore' as const
+  }
+
   if (hasSplitSignal(input)) return 'split' as const
-  if (input.stateDecision === 'use' || input.stateDecision === 'split') return input.stateDecision
+  if (input.stateDecision === 'use' || input.stateDecision === 'split') {
+    if (hasSlotFillingSignal(input)) return input.stateDecision
+    if (shouldTrustLlmSlotUseDecision(input)) return input.stateDecision
+    return null
+  }
 
   if (hasSlotFillingSignal(input)) return 'use' as const
 
@@ -363,6 +414,8 @@ export function resolveRagPendingClarificationFollowup(input: {
     latestUserMessage,
     pending,
     stateDecision: readStateDecision(input.llmStateDecision),
+    llmTurnType: input.llmTurnType,
+    llmAction: input.llmAction,
   })
   const stateReason = readString(input.llmStateReason, 240)
   const stateConfidence =

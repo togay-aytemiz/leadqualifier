@@ -314,7 +314,7 @@ function detectIntents(search: string, safety: StrictQuestionSafety) {
   }
   if (safety !== 'none') pushIntent(intents, 'safety')
   if (
-    /(?:bugun hava|kahve tarifi|burcuma gore|fali|sevgilimden ayrildim|sevgili|tyt matematik|matematik calistir|ders calistir|soru coz|konu anlatim|test coz|chatgpt|gercek insan|ogrenci misin|sen kimsin|yapay zeka misin|ai misin|asistan misin)/.test(
+    /(?:bugun hava|\bhava nasil|\btarif(?:i|ler)?\b|\bnasil yapilir\b|\bmenemen\b|\bmakarna\b|\bkahve\b|\bdiyet listesi\b|\bvergi nasil|\bvergi odeme|\bdolar\b|\beuro\b|\bkripto\b|ankara.*kira fiyat|kira fiyatlari|kiralar ne kadar|burcuma gore|fali|sevgilimden ayrildim|sevgili|tyt matematik|matematik calistir|ders calistir|soru coz|konu anlatim|test coz|chatgpt|gercek insan|ogrenci misin|sen kimsin|yapay zeka misin|ai misin|asistan misin)/.test(
       search
     )
   ) {

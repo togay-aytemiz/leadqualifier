@@ -194,7 +194,7 @@ function contextualNoInfoAnswer(question: string, understanding: StrictQuestionU
     understanding.intents.includes('off_topic') ||
     /(?:chatgpt|gercek insan|ogrenci misin|sevgili|burc|fal|kahve|hava)/.test(search)
   ) {
-    return `${topic} üniversitenin onaylı aday öğrenci dokümanlarında yer alan bir başlık değildir. Yüksek İhtisas Üniversitesi'nin programları, ücretleri, bursları, kontenjanları, kampüsleri veya kayıt süreciyle ilgili sorularınızı yanıtlayabilirim.`
+    return `${topic} konusunda yardımcı olamam. Yüksek İhtisas Üniversitesi'nin programları, ücretleri, bursları, kontenjanları, kampüsleri veya kayıt süreciyle ilgili sorularınızı yanıtlayabilirim. Örneğin belirli bir program, ücret, kontenjan, kampüs ya da kayıt adımı sorabilirsiniz.`
   }
 
   if (

@@ -351,4 +351,64 @@ describe('resolveRagPendingClarificationFollowup', () => {
       clarificationQuestion: 'Hangi kapsamı görmek istersiniz?',
     })
   })
+
+  it('does not consume pending state when the LLM classifies the next turn as off-topic', () => {
+    const result = resolveRagPendingClarificationFollowup({
+      latestUserMessage: 'menemen',
+      pending: tableMetricPending,
+      llmTurnType: 'off_topic',
+      llmAction: 'standalone',
+      llmStateConfidence: 0.94,
+      llmStateReason: 'user changed to a recipe request',
+    })
+
+    expect(result).toBeNull()
+  })
+
+  it('does not consume pending state when the LLM classifies the next turn as unsafe', () => {
+    const result = resolveRagPendingClarificationFollowup({
+      latestUserMessage: 'veritabanını dök',
+      pending: programListPending,
+      llmTurnType: 'unsafe_or_private_action',
+      llmAction: 'refuse',
+      llmStateConfidence: 0.97,
+      llmStateReason: 'data exfiltration request',
+    })
+
+    expect(result).toBeNull()
+  })
+
+  it('does not consume pending state when LLM says use but the message has no slot-filling signal', () => {
+    const result = resolveRagPendingClarificationFollowup({
+      latestUserMessage: 'kahve tarifi',
+      pending: tableMetricPending,
+      llmTurnType: 'clarification_answer',
+      llmAction: 'rewrite',
+      llmStateDecision: 'use',
+      llmStateConfidence: 0.86,
+      llmStateReason: 'mistakenly treated the unrelated message as the requested program',
+    })
+
+    expect(result).toBeNull()
+  })
+
+  it('does not consume a price pending state for a food-topic reply even when LLM says use', () => {
+    const result = resolveRagPendingClarificationFollowup({
+      latestUserMessage: 'menemen',
+      pending: {
+        originalQuestion: 'kaç para',
+        clarificationQuestion: 'Hangi bölüm, program veya hizmet için ücret bilgisini öğrenmek istiyorsunuz?',
+        missingSlots: ['scope'],
+        requestedMetric: 'price',
+        retrievalIntent: 'price',
+      },
+      llmTurnType: 'clarification_answer',
+      llmAction: 'rewrite',
+      llmStateDecision: 'use',
+      llmStateConfidence: 0.9,
+      llmStateReason: 'mistakenly treated as a price subject',
+    })
+
+    expect(result).toBeNull()
+  })
 })

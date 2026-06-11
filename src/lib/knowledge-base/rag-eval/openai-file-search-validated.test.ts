@@ -176,6 +176,329 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
     expect(result.answer).not.toContain('Olur et hakkında')
   })
 
+  it('runs global intake before retrieval for standalone off-topic messages', async () => {
+    const create = vi.fn()
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'off_topic',
+              action: 'refuse',
+              route: 'off_topic_boundary',
+              domain_relevance: 'out_of_scope',
+              reason: 'latest message asks for a recipe outside the organization scope',
+              resolved_user_intent: 'makarna tarifi',
+              should_retrieve: false,
+              safety_class: 'off_topic',
+              answer_policy: 'redirect_to_supported_scope',
+              refusal_answer:
+                'Bu konuda yardımcı olamam; ancak üniversitenin programları, ücretleri, bursları, kontenjanları, kampüsleri veya kayıt süreci hakkında yardımcı olabilirim.',
+              confidence: 0.96,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 150, completion_tokens: 38, total_tokens: 188 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'makarna nasıl yapılır',
+      qualityMode: 'strict',
+      contextualOrchestratorMode: 'always',
+      contextualOrchestratorCreateCompletion,
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(contextualOrchestratorCreateCompletion).toHaveBeenCalledOnce()
+    expect(result).toMatchObject({
+      provider: 'openai_file_search_validated',
+      answer:
+        'Bu konuda yardımcı olamam; ancak üniversitenin programları, ücretleri, bursları, kontenjanları, kampüsleri veya kayıt süreci hakkında yardımcı olabilirim.',
+      citations: [],
+      refusal: true,
+      diagnostics: {
+        queryIntent: 'contextual_followup',
+        contextualOrchestration: 'refuse',
+        contextualTurnType: 'off_topic',
+        contextualRoute: 'off_topic_boundary',
+        contextualDomainRelevance: 'out_of_scope',
+        contextualShouldRetrieve: false,
+        contextualSafetyClass: 'off_topic',
+        contextualAnswerPolicy: 'redirect_to_supported_scope',
+      },
+    })
+  })
+
+  it('passes compiled behavior policy into orchestration and exposes it in diagnostics', async () => {
+    const create = vi.fn()
+    const contextualOrchestratorCreateCompletion = vi.fn(async (args: Record<string, unknown>) => {
+      const messages = args.messages as Array<{ role: string; content: string }>
+      expect(messages.map((message) => message.content).join('\n')).toContain(
+        'Compiled behavior policy'
+      )
+      expect(messages.map((message) => message.content).join('\n')).toContain(
+        '"source_priority": ['
+      )
+      return {
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                turn_type: 'off_topic',
+                action: 'refuse',
+                route: 'off_topic_boundary',
+                domain_relevance: 'out_of_scope',
+                reason: 'recipe outside business scope',
+                should_retrieve: false,
+                answer_policy: 'redirect_to_supported_scope',
+                refusal_answer: 'Bu konuda yardımcı olamam. Kurumla ilgili sorularınızı yanıtlayabilirim.',
+                confidence: 0.95,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 120, completion_tokens: 20, total_tokens: 140 },
+      }
+    })
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'kahve tarifi verir misin',
+      qualityMode: 'strict',
+      contextualOrchestratorMode: 'always',
+      contextualOrchestratorCreateCompletion,
+      settings: {
+        bot_name: 'YİÜ Tanıtım Asistanı',
+        prompt:
+          'Öncelik sırası: önce tanıtım broşürü, sonra web sitesi HTML, sonra PDF. Belgeye dayanması gereken bilgiler: ücretler, kontenjanlar, ödeme ve resmi iletişim kanalları. Ton sıcak ve kısa olsun.',
+      },
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result.diagnostics?.behaviorPolicy).toMatchObject({
+      sourcePriority: ['brochure', 'website_html', 'approved_pdf'],
+      evidenceRequiredFor: expect.arrayContaining(['pricing', 'payments', 'contacts']),
+      tone: expect.arrayContaining(['warm', 'concise']),
+    })
+  })
+
+  it('emits typed conversation state for contextual clarification turns', async () => {
+    const create = vi.fn()
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'new_question',
+              action: 'clarify',
+              route: 'clarify_missing_slots',
+              domain_relevance: 'in_scope',
+              reason: 'program missing for price question',
+              should_retrieve: false,
+              missing_slots: ['program'],
+              retrieval_intent: 'price',
+              requested_metric: 'price',
+              source_preference: ['primary_campaign_material'],
+              answer_policy: 'ask_one_slot_clarification',
+              clarification_question: 'Hangi programın ücretini öğrenmek istiyorsunuz?',
+              confidence: 0.92,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'kaç para',
+      qualityMode: 'strict',
+      contextualOrchestratorMode: 'always',
+      contextualOrchestratorCreateCompletion,
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result.diagnostics?.typedConversationState).toMatchObject({
+      status: 'pending_clarification',
+      activeIntent: 'price',
+      requestedMetric: 'price',
+      missingSlots: ['program'],
+      sourcePreference: ['primary_campaign_material'],
+    })
+  })
+
+  it('turns contextual boundary classifications into safe refusals even without refusal text', async () => {
+    const create = vi.fn()
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'off_topic',
+              action: 'refuse',
+              route: 'off_topic_boundary',
+              domain_relevance: 'out_of_scope',
+              reason: 'latest message asks for a recipe outside the business scope',
+              should_retrieve: false,
+              confidence: 0.94,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 150, completion_tokens: 22, total_tokens: 172 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'makarna nasıl yapılır',
+      qualityMode: 'strict',
+      contextualOrchestratorMode: 'always',
+      contextualOrchestratorCreateCompletion,
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      provider: 'openai_file_search_validated',
+      citations: [],
+      refusal: true,
+      diagnostics: {
+        contextualOrchestration: 'refuse',
+        contextualTurnType: 'off_topic',
+        contextualRoute: 'off_topic_boundary',
+        contextualDomainRelevance: 'out_of_scope',
+        contextualShouldRetrieve: false,
+      },
+    })
+    expect(result.answer).toContain('yardımcı olamam')
+  })
+
+  it('does not treat unrelated non-question follow-ups as clarification answers', async () => {
+    const create = vi.fn()
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'off_topic',
+              action: 'refuse',
+              route: 'off_topic_boundary',
+              domain_relevance: 'out_of_scope',
+              reason: 'latest message is an unrelated recipe request after a clarification question',
+              should_retrieve: false,
+              confidence: 0.95,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 210, completion_tokens: 30, total_tokens: 240 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'kahve tarifi',
+      qualityMode: 'strict',
+      contextualOrchestratorMode: 'always',
+      contextualOrchestratorCreateCompletion,
+      conversationHistory: [
+        { role: 'user', content: 'taban puan' },
+        {
+          role: 'assistant',
+          content: 'Hangi program ve burs/indirim türü için taban puanı öğrenmek istiyorsunuz?',
+        },
+      ],
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      provider: 'openai_file_search_validated',
+      citations: [],
+      refusal: true,
+      diagnostics: {
+        contextualOrchestration: 'refuse',
+        contextualTurnType: 'off_topic',
+        contextualRoute: 'off_topic_boundary',
+        contextualDomainRelevance: 'out_of_scope',
+      },
+    })
+    expect(result.answer).not.toContain('taban puan')
+    expect(result.answer).not.toContain('kahve tarifi hakkında')
+  })
+
+  it('runs global intake before retrieval for standalone under-specified messages', async () => {
+    const create = vi.fn()
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'new_question',
+              action: 'clarify',
+              route: 'clarify_missing_slots',
+              domain_relevance: 'in_scope',
+              reason: 'fee question is missing the program name',
+              resolved_user_intent: 'program fee',
+              should_retrieve: false,
+              missing_slots: ['program'],
+              retrieval_intent: 'price',
+              requested_metric: 'price',
+              answer_policy: 'ask_one_slot_clarification',
+              clarification_question: 'Hangi bölüm veya programın ücretini öğrenmek istiyorsunuz?',
+              confidence: 0.94,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 144, completion_tokens: 34, total_tokens: 178 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'kaç para',
+      qualityMode: 'strict',
+      contextualOrchestratorMode: 'always',
+      contextualOrchestratorCreateCompletion,
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      provider: 'openai_file_search_validated',
+      answer: 'Hangi bölüm veya programın ücretini öğrenmek istiyorsunuz?',
+      citations: [],
+      refusal: false,
+      diagnostics: {
+        contextualOrchestration: 'clarify',
+        contextualTurnType: 'new_question',
+        contextualRoute: 'clarify_missing_slots',
+        contextualDomainRelevance: 'in_scope',
+        contextualMissingSlots: ['program'],
+        contextualRequestedMetric: 'price',
+        contextualShouldRetrieve: false,
+        contextualAnswerPolicy: 'ask_one_slot_clarification',
+        pendingClarification: {
+          originalQuestion: 'kaç para',
+          clarificationQuestion: 'Hangi bölüm veya programın ücretini öğrenmek istiyorsunuz?',
+          missingSlots: ['program'],
+          requestedMetric: 'price',
+          retrievalIntent: 'price',
+        },
+      },
+    })
+  })
+
   it('repairs long answers to previous clarification questions before retrieval', async () => {
     const create = vi.fn(async () => ({
       id: 'resp_programs',
@@ -1236,6 +1559,153 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
         clarification: 'missing_price_subject',
       },
     })
+  })
+
+  it('asks for the target program before retrieving table metrics that require a row subject', async () => {
+    const create = vi.fn()
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Taban puan nedir?',
+      qualityMode: 'strict',
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      provider: 'openai_file_search_validated',
+      answer: 'Hangi program ve burs/indirim türü için taban puanını öğrenmek istiyorsunuz?',
+      citations: [],
+      refusal: false,
+      diagnostics: {
+        queryIntent: 'brochure_table_fact',
+        clarification: 'missing_base_score_program',
+        pendingClarification: {
+          originalQuestion: 'Taban puan nedir?',
+          clarificationQuestion:
+            'Hangi program ve burs/indirim türü için taban puanını öğrenmek istiyorsunuz?',
+          missingSlots: ['program', 'row_variant'],
+          requestedMetric: 'base_score',
+          retrievalIntent: 'base_score',
+        },
+      },
+    })
+  })
+
+  it('asks what process or program is meant for bare day-count questions', async () => {
+    const create = vi.fn()
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'kaç gün',
+      qualityMode: 'strict',
+      contextualOrchestratorMode: 'disabled',
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      provider: 'openai_file_search_validated',
+      answer: 'Hangi süreç, bölüm veya program için kaç gün olduğunu öğrenmek istiyorsunuz?',
+      citations: [],
+      refusal: false,
+      diagnostics: {
+        queryIntent: 'general_approved_corpus',
+        clarification: 'missing_day_count_subject',
+        pendingClarification: {
+          originalQuestion: 'kaç gün?',
+          clarificationQuestion:
+            'Hangi süreç, bölüm veya program için kaç gün olduğunu öğrenmek istiyorsunuz?',
+          missingSlots: ['subject'],
+        },
+      },
+    })
+  })
+
+  it('asks for the target program when a bare score question is underspecified', async () => {
+    const create = vi.fn()
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'puan kaç',
+      qualityMode: 'strict',
+      contextualOrchestratorMode: 'disabled',
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      provider: 'openai_file_search_validated',
+      answer: 'Hangi program ve burs/indirim türü için taban puanını öğrenmek istiyorsunuz?',
+      citations: [],
+      refusal: false,
+      diagnostics: {
+        queryIntent: 'general_approved_corpus',
+        clarification: 'missing_base_score_program',
+        pendingClarification: {
+          originalQuestion: 'puan kaç?',
+          clarificationQuestion:
+            'Hangi program ve burs/indirim türü için taban puanını öğrenmek istiyorsunuz?',
+          missingSlots: ['program', 'row_variant'],
+          requestedMetric: 'base_score',
+          retrievalIntent: 'base_score',
+        },
+      },
+    })
+  })
+
+  it('uses the LLM research planner boundary route to stop off-topic retrieval', async () => {
+    const create = vi.fn()
+    const researchPlannerCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              route: 'off_topic_boundary',
+              reason: 'The user asks for general advice outside the approved business scope.',
+              required_evidence: ['safe_refusal_boundary'],
+              confidence: 0.91,
+              hops: [],
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 90, completion_tokens: 22, total_tokens: 112 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'borsada nasıl para kazanılır',
+      qualityMode: 'strict',
+      contextualOrchestratorMode: 'disabled',
+      enableLlmResearchPlanner: true,
+      researchPlannerCreateCompletion,
+    })
+
+    expect(researchPlannerCreateCompletion).toHaveBeenCalledOnce()
+    expect(create).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      provider: 'openai_file_search_validated',
+      citations: [],
+      refusal: true,
+      diagnostics: {
+        strictVerdict: 'llm_research_boundary',
+        llmResearchPlan: {
+          route: 'off_topic_boundary',
+          reason: 'The user asks for general advice outside the approved business scope.',
+          requiredEvidence: ['safe_refusal_boundary'],
+          used: true,
+          hopCount: 0,
+          confidence: 0.91,
+        },
+      },
+    })
+    expect(result.answer).toContain('yardımcı olamam')
   })
 
   it('asks for clarification without retrieval when a non-price question lacks the target subject', async () => {
