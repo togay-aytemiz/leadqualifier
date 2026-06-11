@@ -179,6 +179,125 @@ function messageLooksLikeFreshQuestion(value: string) {
   )
 }
 
+function pendingTokens(value: string) {
+  return normalizeForPending(value)
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 3)
+}
+
+function tokensOverlap(left: string, right: string) {
+  const leftTokens = pendingTokens(left)
+  const rightTokens = pendingTokens(right)
+
+  return leftTokens.some((leftToken) =>
+    rightTokens.some(
+      (rightToken) =>
+        leftToken === rightToken ||
+        (Math.min(leftToken.length, rightToken.length) >= 4 &&
+          (leftToken.startsWith(rightToken) || rightToken.startsWith(leftToken)))
+    )
+  )
+}
+
+function looksLikeNoProgressReply(value: string) {
+  const normalized = normalizeForPending(value)
+  return /^(?:bilmiyorum|bilmem|emin degilim|bilemedim|hic fikrim yok|fikrim yok|anlamadim|o degil(?: ya)?|yanlis oldu|kararsizim)$/.test(
+    normalized
+  )
+}
+
+function looksLikeStillAmbiguousReply(value: string) {
+  const normalized = normalizeForPending(value)
+  return /^(?:hangisi|hangileri)(?: daha)? (?:iyi|mantikli|uygun|avantajli)(?: olur| sizce)?$/.test(
+    normalized
+  )
+}
+
+function hasSlotFillingSignal(input: {
+  latestUserMessage: string
+  pending: RagPendingClarificationState
+}) {
+  const normalized = normalizeForPending(input.latestUserMessage)
+  const pendingText = [
+    input.pending.originalQuestion,
+    input.pending.clarificationQuestion,
+    input.pending.requestedMetric,
+    input.pending.requestedFacet,
+    input.pending.retrievalIntent,
+    ...(input.pending.missingSlots ?? []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const scopeSignal =
+    /(?:\btum\b|\btumu\b|\bhepsi\b|\btamami\b|\bgenel\b|\bfark etmez\b|\bburslu\b|\bucretli\b|\blisans\b|\bon lisans\b|\bingilizce\b|\bturkce\b|\bbireysel\b|\bkurumsal\b|\bprogram\b|\bbolum\b|\bsecenek)/.test(
+      normalized
+    )
+  const intentPhrase =
+    /(?:gormek ist|bilgi almak ist|listele|soyle|goster|yaz|olur)/.test(normalized)
+
+  return (
+    tokensOverlap(input.latestUserMessage, pendingText) ||
+    (scopeSignal && (tokensOverlap(normalized, pendingText) || intentPhrase))
+  )
+}
+
+function metricKey(value: string | undefined) {
+  const normalized = normalizeForPending(value ?? '')
+  if (!normalized) return ''
+  if (/(?:fee|price|ucret|fiyat|odeme|payment)/.test(normalized)) return 'fee'
+  if (/(?:quota|kontenjan)/.test(normalized)) return 'quota'
+  if (/(?:base.*score|taban.*puan)/.test(normalized)) return 'base_score'
+  if (/(?:success.*rank|basari.*sira)/.test(normalized)) return 'success_rank'
+  if (/(?:location|kampus|yer|adres|ulasim|transport)/.test(normalized)) return 'location'
+  if (/(?:duration|sure|kac yil|program_duration)/.test(normalized)) return 'duration'
+  if (/(?:internship|staj)/.test(normalized)) return 'internship'
+  if (/(?:program.*list|service.*list|liste)/.test(normalized)) return 'list'
+  return normalized
+}
+
+function extraFacetKeys(value: string) {
+  const normalized = normalizeForPending(value)
+  const facets = new Set<string>()
+  if (/(?:ucretleri|ucreti|ucret nedir|fiyat|kac para|\btl\b|odeme|taksit)/.test(normalized)) {
+    facets.add('fee')
+  }
+  if (/(?:kontenjan)/.test(normalized)) facets.add('quota')
+  if (/(?:basari sir|siralama|sirasi)/.test(normalized)) facets.add('success_rank')
+  if (/(?:taban puan|puan kac|puan nedir)/.test(normalized)) facets.add('base_score')
+  if (/(?:kampus|kampuste|yerleske|nerede|nerde|adres|ulasim|servis)/.test(normalized)) {
+    facets.add('location')
+  }
+  if (/(?:kac yil|sure|hazirlik)/.test(normalized)) facets.add('duration')
+  if (/(?:staj)/.test(normalized)) facets.add('internship')
+  if (/(?:telefon|whatsapp|iletisim|mail|email)/.test(normalized)) facets.add('contact')
+  return facets
+}
+
+function hasSplitSignal(input: {
+  latestUserMessage: string
+  pending: RagPendingClarificationState
+}) {
+  const normalized = normalizeForPending(input.latestUserMessage)
+  const hasConnector = /[,;]|(?:\bve\b|\bayrica\b|\bde\b|\bda\b|\balso\b|\band\b)/.test(
+    normalized
+  )
+  if (!hasConnector) return false
+
+  const requested = new Set([
+    metricKey(input.pending.requestedMetric),
+    metricKey(input.pending.requestedFacet),
+    metricKey(input.pending.retrievalIntent),
+  ])
+  requested.delete('')
+  const extraFacets = extraFacetKeys(input.latestUserMessage)
+  for (const facet of extraFacets) {
+    if (!requested.has(facet)) return true
+  }
+
+  return false
+}
+
 function shouldTreatAsClarificationAnswer(input: {
   latestUserMessage: string
   llmTurnType?: string
@@ -202,6 +321,30 @@ function shouldTreatAsClarificationAnswer(input: {
   )
 }
 
+function correctedPendingStateDecision(input: {
+  latestUserMessage: string
+  pending: RagPendingClarificationState
+  stateDecision: RagPendingClarificationStateDecision | null
+}) {
+  if (
+    looksLikeNoProgressReply(input.latestUserMessage) ||
+    looksLikeStillAmbiguousReply(input.latestUserMessage)
+  ) {
+    return 'clarify' as const
+  }
+
+  if (input.stateDecision === 'ignore' || input.stateDecision === 'clarify') {
+    return input.stateDecision
+  }
+
+  if (hasSplitSignal(input)) return 'split' as const
+  if (input.stateDecision === 'use' || input.stateDecision === 'split') return input.stateDecision
+
+  if (hasSlotFillingSignal(input)) return 'use' as const
+
+  return null
+}
+
 export function resolveRagPendingClarificationFollowup(input: {
   latestUserMessage: string
   pending: RagPendingClarificationState | null | undefined
@@ -216,7 +359,11 @@ export function resolveRagPendingClarificationFollowup(input: {
   if (!pending) return null
   const latestUserMessage = readString(input.latestUserMessage)
   if (!latestUserMessage) return null
-  const stateDecision = readStateDecision(input.llmStateDecision)
+  const stateDecision = correctedPendingStateDecision({
+    latestUserMessage,
+    pending,
+    stateDecision: readStateDecision(input.llmStateDecision),
+  })
   const stateReason = readString(input.llmStateReason, 240)
   const stateConfidence =
     typeof input.llmStateConfidence === 'number' && Number.isFinite(input.llmStateConfidence)

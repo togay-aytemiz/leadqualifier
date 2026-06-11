@@ -691,6 +691,63 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
     })
   })
 
+  it('marks unsafe fresh follow-ups as ignored pending state when the LLM refuses without state fields', async () => {
+    const create = vi.fn()
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'unsafe_or_private_action',
+              action: 'refuse',
+              reason: 'latest user asks to share private payment data',
+              refusal_answer: 'Kredi kartı bilgilerinizi burada paylaşmayın.',
+              confidence: 0.95,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 220, completion_tokens: 28, total_tokens: 248 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'kredi kartımı yazsam ödeme alır mısın',
+      contextualOrchestratorCreateCompletion,
+      pendingClarification: {
+        originalQuestion: 'hangi hizmet paketlerine kayıt olabilirim',
+        clarificationQuestion: 'Bireysel paketleri mi yoksa tüm paketleri mi görmek istersiniz?',
+        requestedMetric: 'service_list',
+        retrievalIntent: 'service_list',
+        missingSlots: ['scope'],
+      },
+      conversationHistory: [
+        { role: 'user', content: 'hangi hizmet paketlerine kayıt olabilirim' },
+        {
+          role: 'assistant',
+          content: 'Bireysel paketleri mi yoksa tüm paketleri mi görmek istersiniz?',
+        },
+      ],
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      answer: 'Kredi kartı bilgilerinizi burada paylaşmayın.',
+      refusal: true,
+    })
+    expect(result.diagnostics).toMatchObject({
+      contextualOrchestration: 'refuse',
+      contextualStateDecision: 'ignore',
+      contextualConsumedPendingState: false,
+    })
+    expect(result.diagnostics).not.toMatchObject({
+      pendingClarificationUsed: true,
+    })
+  })
+
   it('honors LLM state_decision split for a clarification answer plus a new facet', async () => {
     const create = vi.fn(async () => ({
       id: 'resp_split',

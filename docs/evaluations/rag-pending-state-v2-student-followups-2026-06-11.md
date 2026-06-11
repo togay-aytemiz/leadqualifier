@@ -53,6 +53,23 @@ Findings:
 - Safety refusal was user-safe, but it bypassed `state_decision=ignore`, leaving a diagnostics gap for fresh unsafe questions.
 - Ambiguous follow-ups need a stronger state boundary: `hangisi daha iyi` and `bilmiyorum` did not consistently become one more clarification.
 
+Low-score rerun after generic pending-state fallback/split guards:
+
+- Command: `npm run rag:pending-followups:live -- --out tmp/rag-evals --case-ids pending-followup-11,pending-followup-20,pending-followup-21,pending-followup-22,pending-followup-23,pending-followup-24,pending-followup-28,pending-followup-30,pending-followup-32`
+- Markdown: `tmp/rag-evals/rag-pending-followup-live-eval-2026-06-10T22-10-13-850Z.md`
+- JSON: `tmp/rag-evals/rag-pending-followup-live-eval-2026-06-10T22-10-13-850Z.json`
+- Average orchestration-contract score: `10.00/10`
+- Score distribution: `9` x `10`
+- State-decision distribution: `use` x `1`, `split` x `5`, `ignore` x `1`, `clarify` x `2`
+- Estimated credits: `8.6000`
+
+Fix summary:
+
+- Question-like slot answers now consume pending state when they overlap the original clarification scope.
+- Mixed replies with an added facet are promoted from `use` to `split` even if the LLM under-classifies them.
+- No-progress or still-vague replies such as `bilmiyorum` and `hangisi daha iyi` ask one more clarification instead of consuming the state.
+- Unsafe fresh questions can still refuse safely while recording `state_decision=ignore` and `consumed_pending_state=false`.
+
 ## Case Table
 
 | # | Original user question | Bot clarification | Student follow-up | Expected decision | Expected behavior |

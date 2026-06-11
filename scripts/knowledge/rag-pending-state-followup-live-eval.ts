@@ -25,6 +25,7 @@ type Args = {
   model?: string
   answerModel?: string
   maxResults?: string
+  caseIds?: string
 }
 
 type ScoredRun = {
@@ -337,6 +338,7 @@ function parseArgs(argv: string[]): Args {
     else if (key === 'model') args.model = value
     else if (key === 'answer-model') args.answerModel = value
     else if (key === 'max-results') args.maxResults = value
+    else if (key === 'case-ids') args.caseIds = value
     else throw new Error(`Unknown argument --${key}`)
   }
   return args
@@ -583,8 +585,23 @@ async function main() {
   const maxResults = Number.parseInt(args.maxResults ?? '8', 10)
   const client = new OpenAI({ apiKey: requireEnv('OPENAI_API_KEY') })
   const runs: ScoredRun[] = []
+  const selectedCaseIds = new Set(
+    (args.caseIds ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean)
+  )
+  const selectedScenarios =
+    selectedCaseIds.size > 0
+      ? scenarios.filter((scenario) => selectedCaseIds.has(scenario.id))
+      : scenarios
+  if (selectedCaseIds.size > 0 && selectedScenarios.length !== selectedCaseIds.size) {
+    const found = new Set(selectedScenarios.map((scenario) => scenario.id))
+    const missing = Array.from(selectedCaseIds).filter((id) => !found.has(id))
+    throw new Error(`Unknown case id(s): ${missing.join(', ')}`)
+  }
 
-  for (const [index, scenario] of scenarios.entries()) {
+  for (const [index, scenario] of selectedScenarios.entries()) {
     const result = await runOpenAiFileSearchValidatedQuestion({
       client,
       model: retrievalModel,
@@ -611,7 +628,7 @@ async function main() {
     const run = { scenario, result, score: scored.score, notes: scored.notes }
     runs.push(run)
     console.log(
-      `${index + 1}/${scenarios.length} ${scenario.id} score=${run.score} expected=${scenario.expectedDecision} actual=${result.diagnostics?.contextualStateDecision ?? '-'} action=${result.diagnostics?.contextualOrchestration ?? '-'}`
+      `${index + 1}/${selectedScenarios.length} ${scenario.id} score=${run.score} expected=${scenario.expectedDecision} actual=${result.diagnostics?.contextualStateDecision ?? '-'} action=${result.diagnostics?.contextualOrchestration ?? '-'}`
     )
   }
 

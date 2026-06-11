@@ -1296,6 +1296,18 @@ function fallbackContextualOrchestration(input: {
     }
   }
 
+  if (input.pendingClarification && messageLooksLikeFreshQuestion(input.question)) {
+    return {
+      action: 'standalone',
+      question: input.question,
+      reason: input.reason ?? 'pending_clarification_state_ignore',
+      usage: input.usage,
+      stateDecision: 'ignore',
+      consumedPendingState: false,
+      pendingClarificationUsed: false,
+    }
+  }
+
   if (input.history.length === 0) return null
 
   const clarificationAnswer = resolveClarificationAnswerFromHistory({
@@ -1414,7 +1426,7 @@ async function runContextualOrchestrator(input: {
     const content = completion.choices?.[0]?.message?.content ?? ''
     const parsed = parseContextualJson(content)
     const action = readContextualAction(parsed?.action)
-    const metadata = readContextualMetadata(parsed)
+    let metadata = readContextualMetadata(parsed)
     const reason = readContextualString(parsed?.reason)
     const confidence = readContextualNumber(parsed?.confidence)
     const rewrittenQuestion = readContextualString(parsed?.rewritten_question)
@@ -1431,6 +1443,19 @@ async function runContextualOrchestrator(input: {
       llmStateReason: metadata.stateReason,
       llmClarificationQuestion: clarificationQuestion,
     })
+    if (
+      input.pendingClarification &&
+      !metadata.stateDecision &&
+      !pendingClarificationRepair &&
+      (action === 'standalone' || action === 'refuse')
+    ) {
+      metadata = {
+        ...metadata,
+        stateDecision: 'ignore',
+        consumedPendingState: false,
+        stateReason: 'latest turn handled independently from pending clarification state',
+      }
+    }
     const clarificationAnswerRepair = resolveClarificationAnswerFromHistory({
       question: input.question,
       history: input.history,

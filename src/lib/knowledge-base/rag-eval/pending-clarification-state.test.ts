@@ -295,4 +295,60 @@ describe('resolveRagPendingClarificationFollowup', () => {
     expect(result?.requestedMetric).toBe(scenario.expectedMetric)
     expect(result?.retrievalIntent).toBe(scenario.expectedMetric)
   })
+
+  it('uses pending state for question-like replies that still fill the requested scope', () => {
+    const result = resolveRagPendingClarificationFollowup({
+      latestUserMessage: 'tüm bölümler var mı acaba',
+      pending: programListPending,
+    })
+
+    expect(result).toMatchObject({
+      action: 'rewrite',
+      stateDecision: 'use',
+      pendingClarificationUsed: true,
+      consumedPendingState: true,
+      requestedMetric: 'program_list',
+    })
+    expect(result?.question).toContain('hangi bölümlere kayıt olabilirim')
+    expect(result?.question).toContain('tüm bölümler var mı acaba')
+  })
+
+  it('promotes LLM use decisions to split when the reply also asks a new facet', () => {
+    const result = resolveRagPendingClarificationFollowup({
+      latestUserMessage: 'tümü, ücretleri de yaz',
+      pending: programListPending,
+      llmStateDecision: 'use',
+      llmStateConfidence: 0.91,
+      llmStateReason: 'scope answer',
+    })
+
+    expect(result).toMatchObject({
+      action: 'rewrite',
+      stateDecision: 'split',
+      reason: 'pending_clarification_state_split',
+      turnType: 'multi_question',
+      pendingClarificationUsed: true,
+      consumedPendingState: true,
+    })
+    expect(result?.question).toContain('Kullanıcının netleştirmesi ve ek sorusu')
+  })
+
+  it('asks one more clarification for no-progress replies even when LLM says use', () => {
+    const result = resolveRagPendingClarificationFollowup({
+      latestUserMessage: 'bilmiyorum',
+      pending: programListPending,
+      llmStateDecision: 'use',
+      llmStateConfidence: 0.88,
+      llmStateReason: 'mistakenly treated as scope answer',
+      llmClarificationQuestion: 'Hangi kapsamı görmek istersiniz?',
+    })
+
+    expect(result).toMatchObject({
+      action: 'clarify',
+      stateDecision: 'clarify',
+      pendingClarificationUsed: false,
+      consumedPendingState: false,
+      clarificationQuestion: 'Hangi kapsamı görmek istersiniz?',
+    })
+  })
 })
