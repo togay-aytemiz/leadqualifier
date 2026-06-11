@@ -229,6 +229,28 @@ describe('internal agent contracts', () => {
     ).toBeNull()
   })
 
+  it('validates every step reference without imposing an unrelated item cap', () => {
+    const claims = Array.from({ length: 17 }, (_, index) =>
+      claim({ id: `claim-${index + 1}`, question: `Question ${index + 1}` })
+    )
+
+    expect(
+      normalizeAgentPlan({
+        decision: 'research',
+        claims,
+        steps: [
+          {
+            id: 'step-1',
+            tool: 'lookup',
+            claimIds: claims.map((item) => item.id),
+            args: {},
+            dependsOn: [],
+          },
+        ],
+      })
+    ).not.toBeNull()
+  })
+
   it('rejects invalid claims and steps instead of dropping them', () => {
     expect(
       normalizeAgentPlan({

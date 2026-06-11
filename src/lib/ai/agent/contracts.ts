@@ -98,7 +98,6 @@ export type AgentToolResult = {
   diagnostics?: Record<string, unknown>
 }
 
-const MAX_REFERENCE_IDS = 16
 const MAX_ID_CHARS = 80
 const MAX_TOOL_CHARS = 120
 const MAX_QUESTION_CHARS = 400
@@ -130,8 +129,8 @@ function readStringArray(value: unknown, maxItems: number, maxChars: number) {
     .filter(Boolean)
 }
 
-function readStrictStringArray(value: unknown, maxItems: number, maxChars: number) {
-  if (!Array.isArray(value) || value.length > maxItems) return null
+function readStrictStringArray(value: unknown, maxChars: number) {
+  if (!Array.isArray(value)) return null
 
   const normalized = value.map((item) => readString(item, maxChars))
   return normalized.some((item) => !item) ? null : normalized
@@ -194,8 +193,8 @@ function normalizeStep(value: unknown): AgentPlanStep | null {
     return null
   }
 
-  const claimIds = readStrictStringArray(rawClaimIds, MAX_REFERENCE_IDS, MAX_ID_CHARS)
-  const dependsOn = readStrictStringArray(rawDependsOn, MAX_REFERENCE_IDS, MAX_ID_CHARS)
+  const claimIds = readStrictStringArray(rawClaimIds, MAX_ID_CHARS)
+  const dependsOn = readStrictStringArray(rawDependsOn, MAX_ID_CHARS)
   if (!claimIds?.length || !dependsOn) return null
 
   return { id, tool, claimIds, args, dependsOn }
