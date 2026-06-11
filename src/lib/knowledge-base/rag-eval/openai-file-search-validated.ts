@@ -25,7 +25,6 @@ import {
 import {
   planBrochureQuery,
   type BrochureQueryPlan,
-  type BrochureTableField,
 } from './brochure-query-plan'
 import { resolveBrochureTableFact } from './brochure-table'
 import { resolveApprovedSourceFact } from './approved-source-facts'
@@ -1436,14 +1435,6 @@ function inferRequestedMetricFromText(value: string): string | undefined {
   return undefined
 }
 
-function requestedMetricToTableFields(metric: string | undefined): BrochureTableField[] {
-  if (metric === 'base_score') return ['base_score']
-  if (metric === 'success_rank') return ['success_rank']
-  if (metric === 'quota') return ['quota']
-  if (metric === 'price') return ['price']
-  return []
-}
-
 function requestedMetricSearchPhrase(metric: string | undefined) {
   if (metric === 'base_score') return '2024 taban puanı'
   if (metric === 'success_rank') return '2024 başarı sırası'
@@ -1904,7 +1895,7 @@ async function runContextualOrchestrator(input: {
       reason: confidence !== undefined ? 'invalid_contextual_orchestrator_output' : reason,
       usage,
     })
-  } catch (error) {
+  } catch {
     return fallbackContextualOrchestration({
       question: input.question,
       history: input.history,
@@ -3370,7 +3361,7 @@ export async function runOpenAiFileSearchValidatedQuestion(
     organizationId: input.organizationId,
     conversationId: input.conversationId,
     channel: input.channel ?? 'demo_chat',
-    locale: resolveMvpResponseLanguage(input.question, undefined, 'tr'),
+    locale: resolveMvpResponseLanguage(input.question),
     latestUserMessage: input.question,
     recentMessages: input.conversationHistory,
     conversationState: readTypedConversationStateFromDiagnostics(currentResult.diagnostics),

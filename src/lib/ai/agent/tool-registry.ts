@@ -20,10 +20,13 @@ export type InternalAgentTool = {
 export type InternalAgentToolDescriptor = Omit<InternalAgentTool, 'execute'>
 
 function descriptorOf(tool: InternalAgentTool): InternalAgentToolDescriptor {
-  const { execute: _execute, ...descriptor } = tool
   return {
-    ...descriptor,
-    sourceGroups: [...descriptor.sourceGroups],
+    name: tool.name,
+    description: tool.description,
+    capability: tool.capability,
+    sourceGroups: [...tool.sourceGroups],
+    ...(tool.costClass === undefined ? {} : { costClass: tool.costClass }),
+    ...(tool.canRunInParallel === undefined ? {} : { canRunInParallel: tool.canRunInParallel }),
   }
 }
 

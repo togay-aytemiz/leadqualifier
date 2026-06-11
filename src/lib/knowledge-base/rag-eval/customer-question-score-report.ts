@@ -151,9 +151,11 @@ export function applyRetestArtifacts(
   rows: CustomerEvaluationRow[],
   artifacts: RetestArtifact[]
 ): CustomerEvaluationRow[] {
-  return buildEffectiveEvaluationRows(rows, artifacts).map(
-    ({ latestRetest: _latestRetest, ...row }) => row
-  )
+  return buildEffectiveEvaluationRows(rows, artifacts).map((row) => {
+    const rowWithoutRetest = { ...row }
+    delete rowWithoutRetest.latestRetest
+    return rowWithoutRetest
+  })
 }
 
 export function summarizeScoreDistribution(rows: CustomerEvaluationRow[]) {
