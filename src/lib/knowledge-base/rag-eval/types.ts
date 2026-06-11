@@ -1,3 +1,5 @@
+import type { InternalAgentShadowDiagnostics } from '@/lib/ai/agent/shadow'
+
 export type RagAnswerProvider =
   | 'current_rag'
   | 'openai_file_search'
@@ -188,6 +190,7 @@ export type RagProviderResult = {
       }>
       finalVerdict?: string
     }
+    internalAgentShadow?: InternalAgentShadowDiagnostics
   }
 }
 
