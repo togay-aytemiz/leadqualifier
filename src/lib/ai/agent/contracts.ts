@@ -98,8 +98,6 @@ export type AgentToolResult = {
   diagnostics?: Record<string, unknown>
 }
 
-const MAX_CLAIMS = 16
-const MAX_STEPS = 16
 const MAX_REFERENCE_IDS = 16
 const MAX_ID_CHARS = 80
 const MAX_TOOL_CHARS = 120
@@ -130,6 +128,13 @@ function readStringArray(value: unknown, maxItems: number, maxChars: number) {
     .slice(0, maxItems)
     .map((item) => readString(item, maxChars))
     .filter(Boolean)
+}
+
+function readStrictStringArray(value: unknown, maxItems: number, maxChars: number) {
+  if (!Array.isArray(value) || value.length > maxItems) return null
+
+  const normalized = value.map((item) => readString(item, maxChars))
+  return normalized.some((item) => !item) ? null : normalized
 }
 
 function readDecision(value: unknown): AgentDecision | null {
@@ -189,9 +194,9 @@ function normalizeStep(value: unknown): AgentPlanStep | null {
     return null
   }
 
-  const claimIds = readStringArray(rawClaimIds, MAX_REFERENCE_IDS, MAX_ID_CHARS)
-  const dependsOn = readStringArray(rawDependsOn, MAX_REFERENCE_IDS, MAX_ID_CHARS)
-  if (claimIds.length === 0) return null
+  const claimIds = readStrictStringArray(rawClaimIds, MAX_REFERENCE_IDS, MAX_ID_CHARS)
+  const dependsOn = readStrictStringArray(rawDependsOn, MAX_REFERENCE_IDS, MAX_ID_CHARS)
+  if (!claimIds?.length || !dependsOn) return null
 
   return { id, tool, claimIds, args, dependsOn }
 }
@@ -241,16 +246,14 @@ export function normalizeAgentPlan(value: unknown): AgentPlan | null {
   const decision = readDecision(record.decision)
   if (!decision || !Array.isArray(record.claims) || record.claims.length === 0) return null
 
-  const rawClaims = record.claims.slice(0, MAX_CLAIMS)
-  const claims = rawClaims.map(normalizeClaim)
+  const claims = record.claims.map(normalizeClaim)
   if (claims.some((claim) => !claim)) return null
 
   const normalizedClaims = claims as AtomicAgentClaim[]
   const claimIds = new Set(normalizedClaims.map((claim) => claim.id))
   if (claimIds.size !== normalizedClaims.length) return null
 
-  const rawSteps = Array.isArray(record.steps) ? record.steps.slice(0, MAX_STEPS) : []
-  const steps = rawSteps.map(normalizeStep)
+  const steps = (Array.isArray(record.steps) ? record.steps : []).map(normalizeStep)
   if (steps.some((step) => !step)) return null
 
   const normalizedSteps = steps as AgentPlanStep[]

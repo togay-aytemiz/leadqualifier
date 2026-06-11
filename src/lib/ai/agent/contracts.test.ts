@@ -138,6 +138,40 @@ describe('internal agent contracts', () => {
     ).toBeNull()
   })
 
+  it('validates claims after item 16', () => {
+    const claims = Array.from({ length: 17 }, (_, index) =>
+      claim({ id: `claim-${index + 1}`, question: `Question ${index + 1}` })
+    )
+    claims[16] = claim({ id: 'claim-1', question: 'Duplicate after the previous limit' })
+
+    expect(
+      normalizeAgentPlan({
+        decision: 'direct',
+        claims,
+        steps: [],
+      })
+    ).toBeNull()
+  })
+
+  it('validates steps after item 16', () => {
+    const steps = Array.from({ length: 17 }, (_, index) => ({
+      id: `step-${index + 1}`,
+      tool: 'lookup',
+      claimIds: ['claim-1'],
+      args: {},
+      dependsOn: [],
+    }))
+    steps[16] = { ...steps[16], tool: '' }
+
+    expect(
+      normalizeAgentPlan({
+        decision: 'research',
+        claims: [claim()],
+        steps,
+      })
+    ).toBeNull()
+  })
+
   it('rejects steps that reference missing claim ids', () => {
     expect(
       normalizeAgentPlan({
@@ -168,6 +202,27 @@ describe('internal agent contracts', () => {
             claimIds: ['claim-1'],
             args: {},
             dependsOn: ['missing-step'],
+          },
+        ],
+      })
+    ).toBeNull()
+  })
+
+  it.each([
+    { claimIds: ['claim-1', 42], dependsOn: [] },
+    { claimIds: ['claim-1'], dependsOn: [false] },
+  ])('rejects non-string step reference entries %#', ({ claimIds, dependsOn }) => {
+    expect(
+      normalizeAgentPlan({
+        decision: 'research',
+        claims: [claim()],
+        steps: [
+          {
+            id: 'step-1',
+            tool: 'lookup',
+            claimIds,
+            args: {},
+            dependsOn,
           },
         ],
       })
