@@ -4,14 +4,16 @@ import { resolveMvpResponseLanguage } from '@/lib/ai/language'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { runOpenAiFileSearchValidatedQuestion } from '@/lib/knowledge-base/rag-eval/openai-file-search-validated'
+import { polishGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-polish'
 import { BROCHURE_SOURCE_PRIORITY_GROUPS } from '@/lib/knowledge-base/rag-eval/brochure-query-plan'
 import {
     findLatestRagPendingClarificationState,
     normalizeRagPendingClarificationState,
 } from '@/lib/knowledge-base/rag-eval/pending-clarification-state'
 import type { KnowledgeSearchPlanningTurn } from '@/lib/knowledge-base/query-planner'
+import type { RagChunk } from '@/lib/knowledge-base/rag'
 import type { DemoChatChannel } from '@/lib/demo-chat/channel'
-import type { RagPendingClarificationState } from '@/lib/knowledge-base/rag-eval/types'
+import type { RagPendingClarificationState, RagProviderCitation } from '@/lib/knowledge-base/rag-eval/types'
 
 type SupabaseLike = Parameters<typeof recordAiUsage>[0]['supabase']
 
@@ -119,6 +121,88 @@ function mapCitationMetadata(citations: Array<{
     }))
 }
 
+function splitStandaloneSourceUrls(answer: string) {
+    const sourceUrls: string[] = []
+    const proseLines: string[] = []
+
+    for (const line of answer.split(/\r?\n/)) {
+        const trimmed = line.trim()
+        if (/^https?:\/\/\S+$/i.test(trimmed)) {
+            sourceUrls.push(trimmed)
+        } else {
+            proseLines.push(line)
+        }
+    }
+
+    return {
+        prose: proseLines.join('\n').trim(),
+        sourceUrls: Array.from(new Set(sourceUrls)),
+    }
+}
+
+function citationsToPolishChunks(citations: RagProviderCitation[], fallbackContent: string): RagChunk[] {
+    const chunks = citations
+        .map((citation): RagChunk | null => {
+            const content = [citation.quote, citation.title].filter(Boolean).join('\n').trim()
+            if (!content) return null
+            return {
+                content,
+                similarity: citation.score,
+                document_id: citation.providerSourceId,
+                document_title: citation.title,
+                chunk_id: citation.providerSourceId,
+                source_url: citation.url ?? null,
+            }
+        })
+        .filter((chunk): chunk is RagChunk => Boolean(chunk))
+
+    if (chunks.length > 0) return chunks
+
+    return [{
+        content: fallbackContent,
+        document_id: 'demo-file-search-final-answer',
+        document_title: 'Validated final answer',
+        chunk_id: 'demo-file-search-final-answer',
+        source_url: null,
+    }]
+}
+
+async function polishDemoFileSearchFinalAnswer(input: {
+    answer: string
+    userMessage: string
+    settings: Awaited<ReturnType<typeof getOrgAiSettings>>
+    answerModel: string
+    citations: RagProviderCitation[]
+}) {
+    const { prose, sourceUrls } = splitStandaloneSourceUrls(input.answer)
+    if (!prose) {
+        return {
+            answer: input.answer.trim(),
+            polish: null,
+        }
+    }
+
+    const polished = await polishGroundedRagAnswer({
+        answer: prose,
+        userMessage: input.userMessage,
+        responseLanguage: resolveMvpResponseLanguage(input.userMessage),
+        chunks: citationsToPolishChunks(input.citations, prose),
+        settings: input.settings,
+        model: input.answerModel,
+    })
+    const polishedProse = polished.answer.trim() || prose
+
+    return {
+        answer: [polishedProse, ...sourceUrls].join('\n').trim(),
+        polish: {
+            usedPolish: polished.usedPolish,
+            addedEngagement: polished.addedEngagement,
+            model: polished.model,
+            usage: polished.usage,
+        },
+    }
+}
+
 export async function buildOpenAiFileSearchDemoReply(input: {
     supabase: SupabaseLike
     channel: DemoChatChannel
@@ -173,7 +257,25 @@ export async function buildOpenAiFileSearchDemoReply(input: {
             enableLlmResearchPlanner: researchPlannerEnabled,
             researchPlannerModel,
         })
-        const answer = result.answer.trim()
+        const providerPresentationPolish = result.diagnostics?.presentationPolish
+        const finalPolish = providerPresentationPolish
+            ? {
+                answer: result.answer.trim(),
+                polish: {
+                    usedPolish: providerPresentationPolish.usedPolish,
+                    addedEngagement: providerPresentationPolish.addedEngagement,
+                    model: providerPresentationPolish.model,
+                    usage: null,
+                },
+            }
+            : await polishDemoFileSearchFinalAnswer({
+                answer: result.answer,
+                userMessage: input.message,
+                settings,
+                answerModel,
+                citations: result.citations,
+            })
+        const answer = finalPolish.answer.trim()
         if (!answer) return null
 
         if (result.usage?.totalTokens || result.usage?.inputTokens || result.usage?.outputTokens) {
@@ -215,6 +317,28 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                 console.error('Demo Chat: OpenAI File Search usage recording failed; continuing reply flow', error)
             }
         }
+        if (finalPolish.polish?.usage) {
+            try {
+                await recordAiUsage({
+                    organizationId: input.channel.organizationId,
+                    category: 'rag',
+                    model: finalPolish.polish.model,
+                    inputTokens: finalPolish.polish.usage.inputTokens,
+                    outputTokens: finalPolish.polish.usage.outputTokens,
+                    totalTokens: finalPolish.polish.usage.totalTokens,
+                    metadata: {
+                        source: 'demo_chat_openai_file_search_final_polish',
+                        response_kind: 'rag_openai_file_search_final_polish',
+                        demo_chat_channel_id: input.channel.id,
+                        ...(input.conversationId ? { conversation_id: input.conversationId } : {}),
+                        vector_store_id: vectorStoreId,
+                    },
+                    supabase: input.supabase,
+                })
+            } catch (error) {
+                console.error('Demo Chat: OpenAI File Search final polish usage recording failed; continuing reply flow', error)
+            }
+        }
 
         const citations = mapCitationMetadata(result.citations)
 
@@ -239,6 +363,13 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                     timings_ms: result.timingsMs,
                     diagnostics: result.diagnostics,
                     usage: result.usage,
+                    final_polish: finalPolish.polish
+                        ? {
+                            usedPolish: finalPolish.polish.usedPolish,
+                            addedEngagement: finalPolish.polish.addedEngagement,
+                            model: finalPolish.polish.model,
+                        }
+                        : null,
                     conversation_history_turn_count: input.conversationHistory?.length ?? 0,
                 },
                 ...(result.diagnostics?.pendingClarification

@@ -2409,14 +2409,45 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
       usage: { input_tokens: 100, output_tokens: 10, total_tokens: 110 },
     }))
     const createCompletion = vi.fn()
+    const presentationCreateCompletion = vi.fn(async (args: Record<string, unknown>) => {
+      const messages = args.messages as Array<{ role: string; content: string }>
+      const systemPrompt = messages.find((message) => message.role === 'system')?.content ?? ''
+      const userPrompt = messages.find((message) => message.role === 'user')?.content ?? ''
+
+      expect(systemPrompt).toContain('Do not expose internal retrieval or source mechanics')
+      expect(systemPrompt).toContain('Daha samimi ve kısa konuş.')
+      expect(userPrompt).toContain('2025 broşüründe Ücretli fiyat 490.000 TL')
+
+      return {
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                answer:
+                  'Dil ve Konuşma Terapisi için 2025 ücretli program ücreti 490.000 TL, %50 indirimli ücret 245.000 TL.',
+                engagement_question: '',
+                engagement_evidence: '',
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 90, completion_tokens: 24, total_tokens: 114 },
+      }
+    })
 
     const result = await runOpenAiFileSearchValidatedQuestion({
       client: { responses: { create } },
       model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
       vectorStoreId: 'vs_123',
       question: 'dkt kaç tl',
       qualityMode: 'strict',
       createCompletion,
+      presentationCreateCompletion,
+      settings: {
+        bot_name: 'Qualy',
+        prompt: 'Daha samimi ve kısa konuş.',
+      },
       citationSourcesByFilename: {
         'brochure-02-saglik-bilimleri.md': {
           title: 'YİÜ Tanıtım Broşürü - Sağlık Bilimleri Fakültesi Kontenjan ve Ücretler',
@@ -2426,13 +2457,22 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
 
     expect(create).not.toHaveBeenCalled()
     expect(createCompletion).not.toHaveBeenCalled()
+    expect(presentationCreateCompletion).toHaveBeenCalledOnce()
     expect(result.answer).toContain('Dil ve Konuşma Terapisi')
     expect(result.answer).toContain('490.000 TL')
     expect(result.answer).toContain('245.000 TL')
+    expect(result.answer).not.toContain('broşür')
+    expect(result.answer).not.toContain('fiyat alanı')
+    expect(result.answer).not.toContain('satır')
     expect(result.diagnostics).toMatchObject({
       qualityMode: 'strict',
       normalizedQuestion: 'Dil ve Konuşma Terapisi ücreti ne kadar?',
       strictVerdict: 'catalog_program_fee_fact',
+      presentationPolish: {
+        usedPolish: true,
+        addedEngagement: false,
+        model: 'gpt-4o-mini',
+      },
       strictQuality: {
         suggestedScore: 9,
         tier: 'grounded_direct_fact',

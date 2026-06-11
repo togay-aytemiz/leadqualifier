@@ -1657,35 +1657,56 @@ async function runContextualOrchestrator(input: {
   }
 }
 
-function strictDirectResult(input: {
+async function strictDirectResult(input: {
   startedAt: number
+  question: string
   answer: string
   citations: RagProviderCitation[]
   refusal: boolean
   strictVerdict: string
   normalizedQuestion?: string
   researchPlan?: StrictResearchPlanDiagnostics
-}): RagProviderResult {
+  settings?: OpenAiFileSearchValidatedQuestionInput['settings']
+  answerModel?: string
+  presentationCreateCompletion?: CreateCompletion
+}): Promise<RagProviderResult> {
+  const presentation = await polishValidatedPresentation({
+    answer: input.answer,
+    question: input.question,
+    citations: input.citations,
+    settings: input.settings,
+    model: input.answerModel,
+    createCompletion: input.presentationCreateCompletion,
+  })
+  const usage = usageWithExtra(zeroUsage(), presentation.usage)
+
   return {
     provider: 'openai_file_search_validated',
-    answer: appendSourceUrls(input.answer, input.citations),
+    answer: appendSourceUrls(presentation.answer, input.citations),
     citations: input.citations,
     refusal: input.refusal,
     timingsMs: {
       total: Date.now() - input.startedAt,
       retrieval: 0,
-      generation: 0,
+      generation: presentation.timingsMs,
       validation: 0,
     },
-    usage: zeroUsage(),
+    usage,
     diagnostics: {
       retryCount: 0,
       qualityMode: 'strict',
       ...(input.normalizedQuestion ? { normalizedQuestion: input.normalizedQuestion } : {}),
       strictVerdict: input.strictVerdict,
+      presentationPolish: presentation.model
+        ? {
+            usedPolish: presentation.usedPolish,
+            addedEngagement: presentation.addedEngagement,
+            model: presentation.model,
+          }
+        : undefined,
       strictQuality: classifyStrictDirectAnswerQuality({
         reason: input.strictVerdict,
-        answer: input.answer,
+        answer: presentation.answer,
         citations: input.citations,
         refusal: input.refusal,
       }),
@@ -1979,16 +2000,20 @@ export async function runOpenAiFileSearchValidatedQuestion(
       },
     },
   })
-  const finalizeCatalog = (catalogAnswer: StrictCatalogAnswer) =>
+  const finalizeCatalog = async (catalogAnswer: StrictCatalogAnswer) =>
     applyContextualOrchestration(
-      strictDirectResult({
+      await strictDirectResult({
         startedAt,
+        question: effectiveQuestion,
         answer: catalogAnswer.answer,
         citations: catalogAnswer.citations,
         refusal: catalogAnswer.refusal,
         strictVerdict: catalogAnswer.reason,
         normalizedQuestion: effectiveQuestion,
         researchPlan: researchPlanDiagnostics(catalogAnswer),
+        settings: input.settings,
+        answerModel: input.answerModel,
+        presentationCreateCompletion: input.presentationCreateCompletion,
       })
     )
   const applyStrictLlmEvaluator = async (
@@ -2317,14 +2342,18 @@ export async function runOpenAiFileSearchValidatedQuestion(
 
   if (strictUnderstanding?.safety && strictUnderstanding.safety !== 'none') {
     return applyContextualOrchestration(
-      strictDirectResult({
+      await strictDirectResult({
         startedAt,
+        question: effectiveQuestion,
         answer: strictSafetyAnswer(strictUnderstanding.safety),
         citations: [],
         refusal: true,
         strictVerdict: 'unsafe_sensitive_data',
         normalizedQuestion: effectiveQuestion,
         researchPlan: researchPlanDiagnostics(null),
+        settings: input.settings,
+        answerModel: input.answerModel,
+        presentationCreateCompletion: input.presentationCreateCompletion,
       })
     )
   }
