@@ -1,5 +1,14 @@
 import { calculateUsageCreditCost } from '@/lib/billing/credit-cost'
 import { resolveMvpResponseLanguage } from '@/lib/ai/language'
+import type { AgentChannel } from '@/lib/ai/agent/contracts'
+import { isInternalAgentShadowEnabled } from '@/lib/ai/agent/shadow'
+import { runInternalAgentTurnShadow } from '@/lib/ai/agent/runtime-shadow'
+import type { AgentPlannerCreateCompletion } from '@/lib/ai/agent/planner'
+import {
+  buildInternalAgentActivationRequest,
+  isInternalAgentActivationEnabled,
+  runInternalAgentActivatedTurn,
+} from '@/lib/ai/agent/activation'
 import {
   compileBehaviorPolicyFromSettings,
   formatBehaviorPolicyForPrompt,
@@ -21,7 +30,6 @@ import {
 import {
   planBrochureQuery,
   type BrochureQueryPlan,
-  type BrochureTableField,
 } from './brochure-query-plan'
 import { resolveBrochureTableFact } from './brochure-table'
 import { resolveApprovedSourceFact } from './approved-source-facts'
@@ -117,6 +125,9 @@ export type OpenAiFileSearchValidatedQuestionInput = {
   client: OpenAiFileSearchClient
   model: string
   answerModel?: string
+  organizationId?: string
+  conversationId?: string
+  channel?: AgentChannel
   vectorStoreId: string
   question: string
   maxResults?: number
@@ -142,6 +153,8 @@ export type OpenAiFileSearchValidatedQuestionInput = {
   enableLlmResearchPlanner?: boolean
   researchPlannerModel?: string
   researchPlannerCreateCompletion?: StrictLlmResearchPlannerCreateCompletion
+  internalAgentPlannerModel?: string
+  internalAgentPlannerCreateCompletion?: AgentPlannerCreateCompletion
 }
 
 const NO_CLEAR_INFORMATION_ANSWER = 'Yüklenen belgelerde bu konuda net bir bilgi bulunmamaktadır.'
@@ -149,6 +162,13 @@ const DEFAULT_CONTEXTUAL_ORCHESTRATOR_MODEL = 'gpt-4o-mini'
 const CONTEXTUAL_ORCHESTRATOR_MAX_OUTPUT_TOKENS = 260
 const CONTEXTUAL_ORCHESTRATOR_MIN_CONFIDENCE = 0.62
 const MAX_CONTEXTUAL_HISTORY_TURNS = 10
+
+function readTypedConversationStateFromDiagnostics(
+  diagnostics: RagProviderResult['diagnostics'] | undefined
+): RagTypedConversationState | null {
+  const state = diagnostics?.typedConversationState
+  return state && typeof state === 'object' ? (state as RagTypedConversationState) : null
+}
 
 const TURKISH_CHAR_MAP: Record<string, string> = {
   ı: 'i',
@@ -1420,14 +1440,6 @@ function inferRequestedMetricFromText(value: string): string | undefined {
   return undefined
 }
 
-function requestedMetricToTableFields(metric: string | undefined): BrochureTableField[] {
-  if (metric === 'base_score') return ['base_score']
-  if (metric === 'success_rank') return ['success_rank']
-  if (metric === 'quota') return ['quota']
-  if (metric === 'price') return ['price']
-  return []
-}
-
 function requestedMetricSearchPhrase(metric: string | undefined) {
   if (metric === 'base_score') return '2024 taban puanı'
   if (metric === 'success_rank') return '2024 başarı sırası'
@@ -1888,7 +1900,7 @@ async function runContextualOrchestrator(input: {
       reason: confidence !== undefined ? 'invalid_contextual_orchestrator_output' : reason,
       usage,
     })
-  } catch (error) {
+  } catch {
     return fallbackContextualOrchestration({
       question: input.question,
       history: input.history,
@@ -1956,7 +1968,7 @@ async function strictDirectResult(input: {
   }
 }
 
-export async function runOpenAiFileSearchValidatedQuestion(
+export async function runOpenAiFileSearchValidatedQuestionCurrent(
   input: OpenAiFileSearchValidatedQuestionInput
 ): Promise<RagProviderResult> {
   const startedAt = Date.now()
@@ -3340,4 +3352,59 @@ export async function runOpenAiFileSearchValidatedQuestion(
       followup: followup || undefined,
     },
   })
+}
+
+export async function runOpenAiFileSearchValidatedQuestion(
+  input: OpenAiFileSearchValidatedQuestionInput
+): Promise<RagProviderResult> {
+  const runCurrent = () => runOpenAiFileSearchValidatedQuestionCurrent(input)
+  const currentResult = input.organizationId && isInternalAgentActivationEnabled(input.organizationId)
+    ? (
+      await runInternalAgentActivatedTurn<RagProviderResult>({
+        request: buildInternalAgentActivationRequest({
+          organizationId: input.organizationId,
+          conversationId: input.conversationId,
+          channel: input.channel ?? 'demo_chat',
+          locale: resolveMvpResponseLanguage(input.question),
+          latestUserMessage: input.question,
+          recentMessages: input.conversationHistory,
+          conversationState: findLatestRagTypedConversationState(input.conversationHistory ?? []),
+          settings: input.settings,
+          sourcePriorityGroups: input.sourcePriorityGroups,
+        }),
+        executeCurrent: runCurrent,
+        createPlannerCompletion: input.internalAgentPlannerCreateCompletion,
+        createPresenterCompletion: input.presentationCreateCompletion,
+        plannerModel: input.internalAgentPlannerModel,
+        presenterModel: input.answerModel,
+      })
+    ).result
+    : await runCurrent()
+
+  if (!input.organizationId || !isInternalAgentShadowEnabled(input.organizationId)) {
+    return currentResult
+  }
+
+  const internalAgentShadow = await runInternalAgentTurnShadow({
+    organizationId: input.organizationId,
+    conversationId: input.conversationId,
+    channel: input.channel ?? 'demo_chat',
+    locale: resolveMvpResponseLanguage(input.question),
+    latestUserMessage: input.question,
+    recentMessages: input.conversationHistory,
+    conversationState: readTypedConversationStateFromDiagnostics(currentResult.diagnostics),
+    settings: input.settings,
+    sourcePriorityGroups: input.sourcePriorityGroups,
+    observedResult: currentResult,
+    plannerModel: input.internalAgentPlannerModel,
+    createCompletion: input.internalAgentPlannerCreateCompletion,
+  })
+
+  return {
+    ...currentResult,
+    diagnostics: {
+      ...currentResult.diagnostics,
+      internalAgentShadow,
+    },
+  }
 }

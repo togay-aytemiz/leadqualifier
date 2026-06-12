@@ -21,6 +21,20 @@ import {
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { resolveMvpResponseLanguage, resolveMvpResponseLanguageName } from '@/lib/ai/language'
+import {
+    runInternalAgentTurnShadow,
+    type InternalAgentTurnShadowInput
+} from '@/lib/ai/agent/runtime-shadow'
+import {
+    isInternalAgentShadowEnabled,
+    type InternalAgentShadowDiagnostics
+} from '@/lib/ai/agent/shadow'
+import {
+    buildInternalAgentActivationRequest,
+    isInternalAgentActivationEnabled,
+    runInternalAgentActivatedTurn,
+    type InternalAgentActivationDiagnostics
+} from '@/lib/ai/agent/activation'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 
@@ -73,6 +87,8 @@ export interface ChatMessage {
 
 export interface SimulationResponse {
     response: string
+    agentActivation?: InternalAgentActivationDiagnostics
+    agentShadow?: InternalAgentShadowDiagnostics
     matchedSkill?: {
         id: string
         title: string
@@ -138,6 +154,68 @@ export async function simulateChat(
     }
 
     const aiSettings = await getOrgAiSettings(organizationId, { locale: responseLanguage })
+    const withAgentBoundary = async (
+        response: SimulationResponse,
+        diagnostics: Record<string, unknown>
+    ): Promise<SimulationResponse> => {
+        let finalResponse = response
+
+        if (isInternalAgentActivationEnabled(organizationId)) {
+            try {
+                const currentResult = {
+                    answer: finalResponse.response,
+                    refusal: false,
+                    citations: [],
+                    diagnostics,
+                }
+                const activated = await runInternalAgentActivatedTurn({
+                    request: buildInternalAgentActivationRequest({
+                        organizationId,
+                        channel: 'simulator',
+                        locale: responseLanguage,
+                        latestUserMessage: message,
+                        recentMessages: history,
+                        settings: aiSettings,
+                        observedResult: currentResult,
+                    }),
+                    currentResult,
+                    executeCurrent: async () => currentResult,
+                })
+                finalResponse = {
+                    ...finalResponse,
+                    response: activated.result.answer,
+                    agentActivation: activated.diagnostics,
+                }
+            } catch {
+                finalResponse = response
+            }
+        }
+
+        if (!isInternalAgentShadowEnabled(organizationId)) return finalResponse
+
+        try {
+            const shadowInput: InternalAgentTurnShadowInput = {
+                organizationId,
+                channel: 'simulator',
+                locale: responseLanguage,
+                latestUserMessage: message,
+                recentMessages: history,
+                settings: aiSettings,
+                observedResult: {
+                    answer: finalResponse.response,
+                    refusal: false,
+                    diagnostics
+                }
+            }
+            const agentShadow = await runInternalAgentTurnShadow(shadowInput)
+            return {
+                ...finalResponse,
+                agentShadow
+            }
+        } catch {
+            return finalResponse
+        }
+    }
     const matchThreshold = typeof threshold === 'number' ? threshold : aiSettings.match_threshold
     const kbThreshold = matchThreshold
     const requiredIntakeFields = await getRequiredIntakeFields({ organizationId })
@@ -191,7 +269,7 @@ export async function simulateChat(
     // 2. Determine response
     if (bestMatch && bestMatch.similarity >= activeThreshold) {
         const matchedSkillDetails = await getSkill(bestMatch.skill_id)
-        return {
+        return await withAgentBoundary({
             response: bestMatch.response_text,
             matchedSkill: {
                 id: bestMatch.skill_id,
@@ -222,7 +300,11 @@ export async function simulateChat(
                     totalTokens: 0
                 }
             }
-        }
+        }, {
+            source: 'simulator_skill',
+            matchedSkill: bestMatch.title,
+            skill_id: bestMatch.skill_id
+        })
     }
 
     // 3. Fallback: Decide if Knowledge Base should be used
@@ -248,7 +330,7 @@ export async function simulateChat(
             })
             totalInputTokens += routerInputTokens
             totalOutputTokens += routerOutputTokens
-            return {
+            return await withAgentBoundary({
                 response: fallbackResponse,
                 matchedSkill: bestMatch ? {
                     id: bestMatch.skill_id,
@@ -270,7 +352,11 @@ export async function simulateChat(
                         totalTokens: 0
                     }
                 }
-            }
+            }, {
+                source: 'simulator_fallback',
+                response_kind: 'fallback',
+                route_to_kb: false
+            })
         }
 
         const query = decision.rewritten_query || message
@@ -353,7 +439,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                 const topResult = kbResults[0]
                 totalInputTokens += routerInputTokens + ragInputTokens
                 totalOutputTokens += routerOutputTokens + ragOutputTokens
-                return {
+                return await withAgentBoundary({
                     response: guardedResponse,
                     matchedSkill: {
                         id: 'rag-knowledge-base',
@@ -375,7 +461,11 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                             totalTokens: ragInputTokens + ragOutputTokens
                         }
                     }
-                }
+                }, {
+                    source: 'simulator_rag',
+                    response_kind: 'rag',
+                    document_count: kbResults.length
+                })
             }
         }
     } catch (error) {
@@ -398,7 +488,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
     })
     totalInputTokens += routerInputTokens + ragInputTokens
     totalOutputTokens += routerOutputTokens + ragOutputTokens
-    return {
+    return await withAgentBoundary({
         response: fallbackResponse,
         matchedSkill: bestMatch ? {
             id: bestMatch.skill_id,
@@ -420,5 +510,8 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                 totalTokens: ragInputTokens + ragOutputTokens
             }
         }
-    }
+    }, {
+        source: 'simulator_fallback',
+        response_kind: 'final_fallback'
+    })
 }

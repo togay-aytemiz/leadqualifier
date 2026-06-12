@@ -47,6 +47,13 @@ import {
 import { repairLinkOnlyRagAnswer } from '@/lib/knowledge-base/rag-answer-repair'
 import { polishGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-polish'
 import { generateGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-generate'
+import { isInternalAgentShadowEnabled } from '@/lib/ai/agent/shadow'
+import { runInternalAgentTurnShadow } from '@/lib/ai/agent/runtime-shadow'
+import {
+    buildInternalAgentActivationRequest,
+    isInternalAgentActivationEnabled,
+    runInternalAgentActivatedTurn
+} from '@/lib/ai/agent/activation'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 const RAG_REASONING_MAX_COMPLETION_TOKENS = 1024
@@ -418,6 +425,23 @@ function buildSkillImageMetadata(
         whatsapp_is_media_placeholder: true,
         whatsapp_media: baseMedia
     }
+}
+
+function shouldAttachInternalAgentShadowMetadata(content: string, metadata: Record<string, unknown>) {
+    const trimmed = content.trim()
+    if (!trimmed) return false
+    if (metadata.internal_agent_shadow) return false
+    if (metadata.message_type === 'image' || metadata.type === 'image') return false
+
+    const isSkillImagePlaceholder = metadata.skill_has_image === true
+        && (
+            trimmed === buildSkillImagePlaceholder('tr') ||
+            trimmed === buildSkillImagePlaceholder('en') ||
+            trimmed === buildSkillImageFailureNotice('tr') ||
+            trimmed === buildSkillImageFailureNotice('en')
+        )
+
+    return !isSkillImagePlaceholder
 }
 
 function buildOutboundProviderMetadata(
@@ -834,6 +858,16 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         allowDuringOperator
     })
 
+    let customerHistoryForFollowup = [options.text.trim()].filter(Boolean)
+    let assistantHistoryForFollowup: string[] = []
+    let conversationHistoryForReply: ConversationTurn[] = []
+    let leadSnapshotForReply: {
+        service_type?: string | null
+        extracted_fields?: Record<string, unknown> | null
+    } | null = null
+    let fallbackKnowledgeContext: string | null = null
+    let fallbackKnowledgeChunks: RagChunk[] | null = null
+
     const persistBotMessage = async (content: string, metadata: Record<string, unknown>) => {
         const demoChatReplyToMessageId = readTrimmedString(metadata.demo_chat_reply_to_message_id)
         const demoChatReplyKind = readTrimmedString(metadata.demo_chat_reply_kind)
@@ -867,6 +901,43 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             }
         }
 
+        let metadataForInsert = metadata
+        if (
+            isInternalAgentShadowEnabled(orgId)
+            && shouldAttachInternalAgentShadowMetadata(content, metadata)
+        ) {
+            try {
+                const internalAgentShadow = await runInternalAgentTurnShadow({
+                    organizationId: orgId,
+                    conversationId: conversation.id,
+                    channel: options.platform,
+                    locale: responseLanguage,
+                    latestUserMessage: options.text,
+                    recentMessages: conversationHistoryForReply,
+                    settings: aiSettings,
+                    observedResult: {
+                        answer: content,
+                        refusal: isRagNoAnswerResponse(content),
+                        diagnostics: metadata
+                    }
+                })
+
+                metadataForInsert = {
+                    ...metadata,
+                    internal_agent_shadow: internalAgentShadow
+                }
+            } catch (error) {
+                console.warn(`${options.logPrefix}: Internal agent shadow failed; continuing bot reply`, {
+                    organization_id: orgId,
+                    conversation_id: conversation.id,
+                    error: error instanceof Error ? error.message : String(error)
+                })
+            }
+        }
+
+        const activatedContent = readTrimmedString(metadataForInsert.internal_agent_activated_content)
+        const contentForInsert = activatedContent || content
+
         await options.supabase
             .from('messages')
             .insert({
@@ -874,8 +945,8 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                 conversation_id: conversation.id,
                 organization_id: orgId,
                 sender_type: 'bot',
-                content,
-                metadata
+                content: contentForInsert,
+                metadata: metadataForInsert
             })
 
         await options.supabase
@@ -887,9 +958,69 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             .eq('id', conversation.id)
     }
 
+    const activateOutboundTextContent = async (content: OutboundMessageInput) => {
+        if (typeof content !== 'string') return { content, metadata: {} }
+        if (!isInternalAgentActivationEnabled(orgId)) return { content, metadata: {} }
+
+        const currentResult = {
+            answer: content,
+            refusal: isRagNoAnswerResponse(content),
+            citations: [],
+            diagnostics: {
+                source: 'shared_inbound_current_reply',
+                response_kind: 'shared_inbound_current_reply'
+            }
+        }
+
+        try {
+            const activated = await runInternalAgentActivatedTurn({
+                request: buildInternalAgentActivationRequest({
+                    organizationId: orgId,
+                    conversationId: conversation.id,
+                    channel: options.platform,
+                    locale: responseLanguage,
+                    latestUserMessage: options.text,
+                    recentMessages: conversationHistoryForReply,
+                    settings: aiSettings,
+                    observedResult: currentResult
+                }),
+                currentResult,
+                executeCurrent: async () => currentResult
+            })
+            const activatedContent = activated.result.answer.trim() || content
+            return {
+                content: activatedContent,
+                metadata: {
+                    internal_agent_activation: activated.diagnostics,
+                    ...(activatedContent !== content
+                        ? { internal_agent_activated_content: activatedContent }
+                        : {})
+                }
+            }
+        } catch (error) {
+            return {
+                content,
+                metadata: {
+                    internal_agent_activation: {
+                        status: 'error',
+                        reason: error instanceof Error ? error.message : 'activation_error',
+                        activated: false,
+                        fallbackToCurrent: true,
+                        plannedTools: [],
+                        claimCount: 0
+                    }
+                }
+            }
+        }
+    }
+
     const sendOutboundAndCollectMetadata = async (content: OutboundMessageInput) => {
-        const outboundResult = await options.sendOutbound(content)
-        return buildOutboundProviderMetadata(options.platform, outboundResult)
+        const activated = await activateOutboundTextContent(content)
+        const outboundResult = await options.sendOutbound(activated.content)
+        return {
+            ...buildOutboundProviderMetadata(options.platform, outboundResult),
+            ...activated.metadata
+        }
     }
 
     const applyDeferredLeadEscalation = async () => {
@@ -1149,15 +1280,6 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         })
     }
 
-    let customerHistoryForFollowup = [options.text.trim()].filter(Boolean)
-    let assistantHistoryForFollowup: string[] = []
-    let conversationHistoryForReply: ConversationTurn[] = []
-    let leadSnapshotForReply: {
-        service_type?: string | null
-        extracted_fields?: Record<string, unknown> | null
-    } | null = null
-    let fallbackKnowledgeContext: string | null = null
-    let fallbackKnowledgeChunks: RagChunk[] | null = null
     let requiredIntakeAnalysis = analyzeRequiredIntakeState({
         requiredFields: requiredIntakeFields,
         recentCustomerMessages: customerHistoryForFollowup,
