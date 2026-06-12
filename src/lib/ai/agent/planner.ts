@@ -1,5 +1,12 @@
 import { calculateUsageCreditCost } from '@/lib/billing/credit-cost'
-import { normalizeAgentPlan, type AgentPlan, type AgentRequest } from './contracts'
+import {
+  normalizeAgentPlan,
+  type AgentPlan,
+  type AgentPlanStep,
+  type AgentRequest,
+  type AtomicAgentClaim,
+} from './contracts'
+import { reviewAgentPlan, type AgentPlanReviewIssue } from './plan-review'
 import type { InternalAgentToolDescriptor } from './tool-registry'
 
 type AgentPlannerCreateCompletionOptions = {
@@ -98,6 +105,21 @@ function normalizeUsage(
   }
 }
 
+function usageWithExtra(
+  left: AgentPlannerResult['usage'],
+  right: AgentPlannerResult['usage']
+): AgentPlannerResult['usage'] {
+  const inputTokens = left.inputTokens + right.inputTokens
+  const outputTokens = left.outputTokens + right.outputTokens
+  const totalTokens = left.totalTokens + right.totalTokens
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    estimatedCredits: left.estimatedCredits + right.estimatedCredits,
+  }
+}
+
 function completionParams(model: string) {
   if (/^gpt-5(?:[.-]|$)/i.test(model) || /^o\d/i.test(model)) {
     return {
@@ -110,6 +132,90 @@ function completionParams(model: string) {
     temperature: 0,
     max_tokens: MAX_AGENT_PLANNER_OUTPUT_TOKENS,
   }
+}
+
+const CONTRACT_TEXT_NORMALIZATION_MAP: Record<string, string> = {
+  ı: 'i',
+  İ: 'i',
+  ğ: 'g',
+  Ğ: 'g',
+  ü: 'u',
+  Ü: 'u',
+  ş: 's',
+  Ş: 's',
+  ö: 'o',
+  Ö: 'o',
+  ç: 'c',
+  Ç: 'c',
+}
+
+const TABLE_FACT_TERMS = [
+  'fee',
+  'price',
+  'tuition',
+  'cost',
+  'payment',
+  'installment',
+  'discount',
+  'scholarship',
+  'quota',
+  'score',
+  'ranking',
+  'ucret',
+  'ücret',
+  'fiyat',
+  'kac para',
+  'kaç para',
+  'tl',
+  'odeme',
+  'ödeme',
+  'taksit',
+  'indirim',
+  'burs',
+  'kontenjan',
+  'puan',
+  'siralama',
+  'sıralama',
+  'kdv',
+  'iban',
+  'kart',
+]
+
+const CATALOG_FACT_TERMS = [
+  'program list',
+  'program_list',
+  'programs',
+  'departments',
+  'faculties',
+  'schools',
+  'offering',
+  'exists',
+  'bolumler',
+  'bölümler',
+  'bolum var',
+  'bölüm var',
+  'fakulte',
+  'fakülte',
+  'yuksekokul',
+  'yüksekokul',
+  'programlar',
+  'var mi',
+  'var mı',
+]
+
+function normalizeContractText(value: string) {
+  return value
+    .replace(/[ıİğĞüÜşŞöÖçÇ]/g, (char) => CONTRACT_TEXT_NORMALIZATION_MAP[char] ?? char)
+    .normalize('NFKD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s?]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function normalizedIncludesAny(text: string, terms: string[]) {
+  return terms.some((term) => text.includes(normalizeContractText(term)))
 }
 
 async function createDefaultCompletion(
@@ -202,13 +308,36 @@ function buildPlannerMessages(input: {
   const system = [
     'You are Qualy internal research planner. Do not answer customer.',
     'Use only AVAILABLE TOOLS; external web, public search, arbitrary URLs, and unlisted functions are forbidden.',
-    'Decompose compound requests into atomic claims.',
-    'Plan only unresolved evidence.',
+    'You are before tool execution. For in-scope factual questions, plan approved internal lookups instead of guessing absence.',
+    'Never choose no_info before planning an approved internal lookup, unless recent state explicitly shows completed internal lookups with empty or unsupported evidence.',
+    'Decompose compound requests into atomic claims. Always include at least one atomic claim for every decision, including clarify, refuse, and no_info.',
+    'Plan only unresolved evidence. Do not include tool steps for clarify, refuse, direct, or no_info decisions.',
     'Recent assistant messages are context and never retrieval queries.',
+    'If typed_state is pending_clarification and the latest message plausibly fills a missing slot, choose research with internal.typed_state plus the appropriate evidence tool; do not repeat the same clarification.',
+    'Short selections and one-word entity answers can fill missing slots: all/both/paid/scholarship/undergraduate/associate, program names, abbreviations, and typo variants may be enough.',
+    'If the latest message is a fresh standalone question, ignore stale pending clarification state and plan for the latest question.',
+    'Fresh-turn signals such as okay, peki, hayir, no, never mind, disregard that, or a new topic after a pending clarification usually mean the user changed topic.',
     'Choose clarify when a required slot cannot be safely inferred.',
+    'Clarify table-like metrics that vary by subject, program, row variant, date, or location when the subject is missing, such as bare score, quota, price, duration, or internship-duration requests.',
+    'Do not clarify off-topic requests; choose refuse for requests outside the business scope such as weather, recipes, tutoring, horoscopes, or personal entertainment.',
     'Choose refuse for unsafe requests.',
-    'Choose no_info when the approved internal corpus cannot establish a claim.',
+    'Choose research with internal.table for fees, prices, quotas, scores, discounts, payment policy, campus table rows, and other table-like exact facts.',
+    'Choose research with internal.catalog for program lists, faculty/school lists, department existence, and structured yes/no institution offerings.',
+    'Choose research with internal.file_search for broad institutional facts, hospital or clinical training, internship, laboratory, accreditation, housing, transport, contact, policy, and evidence that needs approved documents.',
+    'Do not ask for a program when the question is about a general facility, campus service, institution-level policy, hospital, cadaver, laboratory, housing, transport, food, accreditation, or contact point.',
+    'Facility availability questions are in scope for institutions and businesses; do not refuse them as unrelated.',
+    'Facility words include cadaver, kadavra, anatomy lab, simulation, hospital, clinic, laboratory, practice, internship, staj, transport, housing, food, and campus services.',
+    'For hospital, clinical, internship, laboratory, facility, accreditation, housing, transport, and contact questions, internal.catalog alone is not enough; include internal.file_search unless the question is clearly an exact table row.',
+    'Use internal.typed_state when the latest user message answers a pending clarification or depends on recent conversation state.',
+    'Add internal.claim_verifier when the plan will produce customer-facing factual claims.',
+    'Add internal.presenter only when the turn is already supported/direct and only needs customer-facing style.',
+    'Clarification must be an object: { "question": string, "missing_slots": string[] }.',
+    'Confidence must be a number from 0 to 1, not a word.',
     'Return JSON only with keys: decision, claims, steps, stop_conditions, clarification, reason, confidence.',
+    'Valid research example: {"decision":"research","claims":[{"id":"claim-1","question":"What is the requested fee?","required_evidence":"Direct approved fee evidence","risk":"medium"}],"steps":[{"id":"step-1","tool":"internal.table","claim_ids":["claim-1"],"args":{"source_groups":["brochure"],"query":"requested fee"},"depends_on":[]}],"stop_conditions":["claim supported"],"clarification":null,"reason":"Need exact table fact.","confidence":0.82}.',
+    'Valid refusal example: {"decision":"refuse","claims":[{"id":"claim-1","question":"Can the assistant collect sensitive payment credentials?","required_evidence":"Safety boundary","risk":"critical"}],"steps":[],"stop_conditions":["unsafe request refused"],"clarification":null,"reason":"Sensitive data must not be collected.","confidence":0.95}.',
+    'Valid clarification example: {"decision":"clarify","claims":[{"id":"claim-1","question":"Which program is needed for the requested metric?","required_evidence":"Missing slot resolution","risk":"medium"}],"steps":[],"stop_conditions":["clarification required"],"clarification":{"question":"Hangi program için öğrenmek istiyorsunuz?","missing_slots":["program"]},"reason":"Program is required before lookup.","confidence":0.78}.',
+    'Valid pending follow-up example: latest_message "all" with pending scope clarification -> {"decision":"research","claims":[{"id":"claim-1","question":"Resolve the pending scope and retrieve the requested list","required_evidence":"Conversation state plus approved catalog evidence","risk":"low"}],"steps":[{"id":"step-1","tool":"internal.typed_state","claim_ids":["claim-1"],"args":{"source_groups":["conversation_state"]},"depends_on":[]},{"id":"step-2","tool":"internal.catalog","claim_ids":["claim-1"],"args":{"source_groups":["structured_catalog"],"query":"resolved requested list"},"depends_on":["step-1"]}],"stop_conditions":["claim supported"],"clarification":null,"reason":"Latest message fills pending clarification.","confidence":0.86}.',
   ].join(' ')
 
   const userPayload = {
@@ -219,6 +348,7 @@ function buildPlannerMessages(input: {
       ...(turn.metadata ? { metadata: turn.metadata } : {}),
     })),
     typed_state: input.request.conversationState ?? null,
+    conversation_context_hints: buildConversationContextHints(input.request),
     behavior_policy: input.request.behaviorPolicy,
     source_policy: {
       allowed: input.request.sourcePolicy.allowedSourceGroups,
@@ -232,6 +362,349 @@ function buildPlannerMessages(input: {
     { role: 'system', content: system },
     { role: 'user', content: JSON.stringify(userPayload, null, 2) },
   ]
+}
+
+function buildConversationContextHints(request: AgentRequest) {
+  const state = request.conversationState
+  const status = typeof state?.status === 'string' ? state.status : undefined
+  const latest = request.latestUserMessage.trim()
+  return {
+    has_pending_clarification: status === 'pending_clarification',
+    pending_missing_slots: Array.isArray(state?.missingSlots) ? state.missingSlots : [],
+    pending_requested_metric: state?.requestedMetric ?? state?.requestedFacet ?? null,
+    pending_active_intent: state?.activeIntent ?? null,
+    pending_original_question: state?.originalQuestion ?? null,
+    latest_message_is_short: latest.length > 0 && latest.length <= 40,
+    latest_message_should_be_checked_against_pending_state: status === 'pending_clarification',
+  }
+}
+
+function buildPlanRepairMessages(input: {
+  request: AgentRequest
+  toolDescriptors: InternalAgentToolDescriptor[]
+  originalContent: string
+  parsedPlan: Record<string, unknown> | null
+  normalizedPlan: AgentPlan | null
+  issues: AgentPlanReviewIssue[]
+  validationError?: string | null
+}) {
+  const system = [
+    'You are Qualy internal agent plan repairer. Do not answer the customer.',
+    'Repair the planner JSON so it follows the internal agent contract and addresses every listed issue.',
+    'Use only AVAILABLE TOOLS and allowed source groups. External web and unregistered tools are forbidden.',
+    'Every decision must include at least one atomic claim.',
+    'Research decisions must include at least one tool step. Clarify, refuse, direct, and no_info decisions must not include tool steps.',
+    'When pending clarification state is used, include internal.typed_state before the evidence tool.',
+    'When a stale pending state is irrelevant to the latest standalone question, plan for the latest question instead.',
+    'Return JSON only with keys: decision, claims, steps, stop_conditions, clarification, reason, confidence.',
+  ].join(' ')
+
+  const userPayload = {
+    latest_message: input.request.latestUserMessage,
+    recent_ordered_turns: input.request.recentMessages.slice(-10),
+    typed_state: input.request.conversationState ?? null,
+    conversation_context_hints: buildConversationContextHints(input.request),
+    behavior_policy: input.request.behaviorPolicy,
+    source_policy: input.request.sourcePolicy,
+    available_tools: input.toolDescriptors,
+    validation_error: input.validationError ?? null,
+    repair_issues: input.issues,
+    original_raw_output: input.originalContent,
+    parsed_plan: input.parsedPlan,
+    normalized_plan: input.normalizedPlan,
+  }
+
+  return [
+    { role: 'system', content: system },
+    { role: 'user', content: JSON.stringify(userPayload, null, 2) },
+  ]
+}
+
+async function tryRepairAgentPlan(input: {
+  request: AgentRequest
+  toolDescriptors: InternalAgentToolDescriptor[]
+  createCompletion: AgentPlannerCreateCompletion
+  model: string
+  originalContent: string
+  parsedPlan: Record<string, unknown> | null
+  normalizedPlan: AgentPlan | null
+  issues: AgentPlanReviewIssue[]
+  usage: AgentPlannerResult['usage']
+  registeredToolNames: Set<string>
+  validationError?: string | null
+  signal?: AbortSignal
+}): Promise<AgentPlannerResult | null> {
+  if (input.issues.length === 0) return null
+
+  const messages = buildPlanRepairMessages(input)
+  const prompt = messages.map((message) => message.content).join('\n\n')
+  const completion = await input
+    .createCompletion(
+      {
+        model: input.model,
+        messages,
+        response_format: { type: 'json_object' },
+        ...completionParams(input.model),
+      },
+      input.signal ? { signal: input.signal } : undefined
+    )
+    .catch(() => null)
+  if (!completion) return null
+  const content = completion.choices?.[0]?.message?.content ?? ''
+  const repairUsage = normalizeUsage(completion.usage, { input: prompt, output: content })
+  const parsed = parseJsonObject(content)
+  if (!parsed) return null
+
+  const plan = normalizeAgentPlan(parsed)
+  if (!plan) return null
+
+  const validationError = validatePlan(
+    plan,
+    input.registeredToolNames,
+    input.request.sourcePolicy.allowedSourceGroups
+  )
+  if (validationError) return null
+
+  const review = reviewAgentPlan({ request: input.request, plan })
+  if (review.shouldRepair) return null
+
+  return {
+    plan,
+    reason: `repaired: ${plan.reason ?? 'planned'}`,
+    usage: usageWithExtra(input.usage, repairUsage),
+    model: input.model,
+  }
+}
+
+function hasIssue(issues: AgentPlanReviewIssue[], code: AgentPlanReviewIssue['code']) {
+  return issues.some((issue) => issue.code === code)
+}
+
+function firstContractRepairIssue(issues: AgentPlanReviewIssue[]) {
+  const priority: AgentPlanReviewIssue['code'][] = [
+    'off_topic_clarified',
+    'pending_state_reasked',
+    'pending_state_missing_typed_state',
+    'stale_pending_state_clarified',
+    'document_evidence_tool_missing',
+    'facility_or_policy_refused',
+  ]
+  for (const code of priority) {
+    const issue = issues.find((candidate) => candidate.code === code)
+    if (issue) return issue
+  }
+  return undefined
+}
+
+function findToolDescriptor(
+  toolDescriptors: InternalAgentToolDescriptor[],
+  toolName: string
+): InternalAgentToolDescriptor | null {
+  return toolDescriptors.find((descriptor) => descriptor.name === toolName) ?? null
+}
+
+function selectSourceGroups(input: {
+  request: AgentRequest
+  toolDescriptors: InternalAgentToolDescriptor[]
+  toolName: string
+}): string[] | null {
+  const descriptor = findToolDescriptor(input.toolDescriptors, input.toolName)
+  if (!descriptor) return null
+
+  const allowed = new Set(input.request.sourcePolicy.allowedSourceGroups)
+  const toolGroups = new Set(descriptor.sourceGroups.filter((group) => allowed.has(group)))
+  if (toolGroups.size === 0) return null
+
+  const preferred = [
+    ...input.request.sourcePolicy.priority,
+    ...input.request.sourcePolicy.allowedSourceGroups,
+    ...descriptor.sourceGroups,
+  ]
+  const ordered = Array.from(new Set(preferred)).filter((group) => toolGroups.has(group))
+  return ordered.length > 0 ? ordered.slice(0, 4) : null
+}
+
+function chooseContractEvidenceTool(input: {
+  request: AgentRequest
+  toolDescriptors: InternalAgentToolDescriptor[]
+  issues: AgentPlanReviewIssue[]
+}): string | null {
+  const available = new Set(input.toolDescriptors.map((descriptor) => descriptor.name))
+  const state = input.request.conversationState
+  const stateText = normalizeContractText(
+    [
+      state?.activeIntent,
+      state?.requestedMetric,
+      state?.requestedFacet,
+      state?.originalQuestion,
+      ...(Array.isArray(state?.missingSlots) ? state.missingSlots : []),
+    ]
+      .filter(Boolean)
+      .join(' ')
+  )
+  const latestText = normalizeContractText(input.request.latestUserMessage)
+  const combined = `${latestText} ${stateText}`.trim()
+
+  if (
+    hasIssue(input.issues, 'document_evidence_tool_missing') ||
+    hasIssue(input.issues, 'facility_or_policy_refused')
+  ) {
+    return available.has('internal.file_search') ? 'internal.file_search' : null
+  }
+
+  if (hasIssue(input.issues, 'stale_pending_state_clarified')) {
+    if (normalizedIncludesAny(latestText, TABLE_FACT_TERMS) && available.has('internal.table')) {
+      return 'internal.table'
+    }
+    return available.has('internal.file_search') ? 'internal.file_search' : null
+  }
+
+  if (
+    hasIssue(input.issues, 'pending_state_reasked') ||
+    hasIssue(input.issues, 'pending_state_missing_typed_state')
+  ) {
+    if (normalizedIncludesAny(combined, TABLE_FACT_TERMS) && available.has('internal.table')) {
+      return 'internal.table'
+    }
+    if (normalizedIncludesAny(combined, CATALOG_FACT_TERMS) && available.has('internal.catalog')) {
+      return 'internal.catalog'
+    }
+    return available.has('internal.file_search') ? 'internal.file_search' : null
+  }
+
+  if (normalizedIncludesAny(latestText, TABLE_FACT_TERMS) && available.has('internal.table')) {
+    return 'internal.table'
+  }
+  if (normalizedIncludesAny(latestText, CATALOG_FACT_TERMS) && available.has('internal.catalog')) {
+    return 'internal.catalog'
+  }
+  return available.has('internal.file_search') ? 'internal.file_search' : null
+}
+
+function buildContractClaim(input: {
+  request: AgentRequest
+  risk?: AtomicAgentClaim['risk']
+  requiredEvidence?: string
+}): AtomicAgentClaim {
+  return {
+    id: 'claim-1',
+    question: input.request.latestUserMessage.trim().slice(0, 400) || 'Handle the latest turn',
+    requiredEvidence: input.requiredEvidence ?? 'Approved internal evidence or policy boundary',
+    risk: input.risk ?? 'medium',
+    status: 'unresolved',
+  }
+}
+
+function buildContractFallbackPlan(input: {
+  request: AgentRequest
+  toolDescriptors: InternalAgentToolDescriptor[]
+  issues: AgentPlanReviewIssue[]
+  registeredToolNames: Set<string>
+}): { plan: AgentPlan; reason: string } | null {
+  const issue = firstContractRepairIssue(input.issues)
+  if (!issue) return null
+
+  if (issue.code === 'off_topic_clarified') {
+    const plan: AgentPlan = {
+      decision: 'refuse',
+      claims: [
+        buildContractClaim({
+          request: input.request,
+          risk: 'low',
+          requiredEvidence: 'Business scope boundary',
+        }),
+      ],
+      steps: [],
+      stopConditions: ['off-topic request bounded'],
+      reason: 'Off-topic turn should be bounded instead of clarified.',
+      confidence: 0.9,
+    }
+    return { plan, reason: `contract_repaired: ${issue.code}` }
+  }
+
+  const evidenceTool = chooseContractEvidenceTool({
+    request: input.request,
+    toolDescriptors: input.toolDescriptors,
+    issues: input.issues,
+  })
+  if (!evidenceTool || !input.registeredToolNames.has(evidenceTool)) return null
+
+  const evidenceSourceGroups = selectSourceGroups({
+    request: input.request,
+    toolDescriptors: input.toolDescriptors,
+    toolName: evidenceTool,
+  })
+  if (!evidenceSourceGroups) return null
+
+  const claim = buildContractClaim({
+    request: input.request,
+    requiredEvidence:
+      evidenceTool === 'internal.table'
+        ? 'Exact approved structured or table evidence'
+        : evidenceTool === 'internal.catalog'
+          ? 'Approved structured catalog evidence'
+          : 'Approved document evidence',
+  })
+  const steps: AgentPlanStep[] = []
+  let evidenceDependsOn: string[] = []
+
+  if (
+    (issue.code === 'pending_state_reasked' ||
+      issue.code === 'pending_state_missing_typed_state') &&
+    input.registeredToolNames.has('internal.typed_state')
+  ) {
+    const typedStateGroups = selectSourceGroups({
+      request: input.request,
+      toolDescriptors: input.toolDescriptors,
+      toolName: 'internal.typed_state',
+    })
+    if (typedStateGroups) {
+      steps.push({
+        id: 'step-1',
+        tool: 'internal.typed_state',
+        claimIds: [claim.id],
+        args: {
+          source_groups: typedStateGroups,
+          latest_message: input.request.latestUserMessage,
+        },
+        dependsOn: [],
+      })
+      evidenceDependsOn = ['step-1']
+    }
+  }
+
+  steps.push({
+    id: `step-${steps.length + 1}`,
+    tool: evidenceTool,
+    claimIds: [claim.id],
+    args: {
+      source_groups: evidenceSourceGroups,
+      query: input.request.latestUserMessage,
+    },
+    dependsOn: evidenceDependsOn,
+  })
+
+  const plan: AgentPlan = {
+    decision: 'research',
+    claims: [claim],
+    steps,
+    stopConditions: ['claim supported or unsupported by approved evidence'],
+    reason: 'Bounded planner contract repair routed the latest turn to approved internal evidence.',
+    confidence: 0.78,
+  }
+
+  const validationError = validatePlan(
+    plan,
+    input.registeredToolNames,
+    input.request.sourcePolicy.allowedSourceGroups
+  )
+  if (validationError) return null
+
+  const review = reviewAgentPlan({ request: input.request, plan })
+  const unrepairedIssues = review.issues.filter((reviewIssue) => reviewIssue.code !== issue.code)
+  if (unrepairedIssues.length > 0) return null
+
+  return { plan, reason: `contract_repaired: ${issue.code}` }
 }
 
 function failedResult(reason: string, model: string): AgentPlannerResult {
@@ -272,18 +745,159 @@ export async function planInternalAgentTurn(input: {
     const usage = normalizeUsage(completion.usage, { input: prompt, output: content })
     const parsed = parseJsonObject(content)
     if (!parsed) {
+      const review = reviewAgentPlan({
+        request: input.request,
+        plan: null,
+        validationError: 'malformed_planner_output',
+      })
+      const repaired = await tryRepairAgentPlan({
+        request: input.request,
+        toolDescriptors: input.toolDescriptors,
+        createCompletion,
+        model,
+        originalContent: content,
+        parsedPlan: null,
+        normalizedPlan: null,
+        issues: review.issues,
+        usage,
+        registeredToolNames,
+        validationError: 'malformed_planner_output',
+        signal: input.signal,
+      })
+      if (repaired) return repaired
+
+      const contractFallback = buildContractFallbackPlan({
+        request: input.request,
+        toolDescriptors: input.toolDescriptors,
+        issues: review.issues,
+        registeredToolNames,
+      })
+      if (contractFallback) {
+        return {
+          plan: contractFallback.plan,
+          reason: contractFallback.reason,
+          usage,
+          model,
+        }
+      }
+
       return { plan: null, reason: 'malformed_planner_output', usage, model }
     }
 
     const plan = normalizeAgentPlan(parsed)
-    if (!plan) return { plan: null, reason: 'invalid_plan', usage, model }
+    if (!plan) {
+      const review = reviewAgentPlan({
+        request: input.request,
+        plan: null,
+        validationError: 'invalid_plan',
+      })
+      const repaired = await tryRepairAgentPlan({
+        request: input.request,
+        toolDescriptors: input.toolDescriptors,
+        createCompletion,
+        model,
+        originalContent: content,
+        parsedPlan: parsed,
+        normalizedPlan: null,
+        issues: review.issues,
+        usage,
+        registeredToolNames,
+        validationError: 'invalid_plan',
+        signal: input.signal,
+      })
+      if (repaired) return repaired
+
+      const contractFallback = buildContractFallbackPlan({
+        request: input.request,
+        toolDescriptors: input.toolDescriptors,
+        issues: review.issues,
+        registeredToolNames,
+      })
+      if (contractFallback) {
+        return {
+          plan: contractFallback.plan,
+          reason: contractFallback.reason,
+          usage,
+          model,
+        }
+      }
+
+      return { plan: null, reason: 'invalid_plan', usage, model }
+    }
 
     const validationError = validatePlan(
       plan,
       registeredToolNames,
       input.request.sourcePolicy.allowedSourceGroups
     )
-    if (validationError) return { plan: null, reason: validationError, usage, model }
+    if (validationError) {
+      const review = reviewAgentPlan({ request: input.request, plan, validationError })
+      const repaired = await tryRepairAgentPlan({
+        request: input.request,
+        toolDescriptors: input.toolDescriptors,
+        createCompletion,
+        model,
+        originalContent: content,
+        parsedPlan: parsed,
+        normalizedPlan: plan,
+        issues: review.issues,
+        usage,
+        registeredToolNames,
+        validationError,
+        signal: input.signal,
+      })
+      if (repaired) return repaired
+
+      const contractFallback = buildContractFallbackPlan({
+        request: input.request,
+        toolDescriptors: input.toolDescriptors,
+        issues: review.issues,
+        registeredToolNames,
+      })
+      if (contractFallback) {
+        return {
+          plan: contractFallback.plan,
+          reason: contractFallback.reason,
+          usage,
+          model,
+        }
+      }
+
+      return { plan: null, reason: validationError, usage, model }
+    }
+
+    const review = reviewAgentPlan({ request: input.request, plan })
+    if (review.shouldRepair) {
+      const repaired = await tryRepairAgentPlan({
+        request: input.request,
+        toolDescriptors: input.toolDescriptors,
+        createCompletion,
+        model,
+        originalContent: content,
+        parsedPlan: parsed,
+        normalizedPlan: plan,
+        issues: review.issues,
+        usage,
+        registeredToolNames,
+        signal: input.signal,
+      })
+      if (repaired) return repaired
+
+      const contractFallback = buildContractFallbackPlan({
+        request: input.request,
+        toolDescriptors: input.toolDescriptors,
+        issues: review.issues,
+        registeredToolNames,
+      })
+      if (contractFallback) {
+        return {
+          plan: contractFallback.plan,
+          reason: contractFallback.reason,
+          usage,
+          model,
+        }
+      }
+    }
 
     return {
       plan,

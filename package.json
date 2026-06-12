@@ -26,6 +26,7 @@
     "rag:yiu-pdfs:scenario-cases": "npx tsx scripts/knowledge/rag-build-yiu-scenario-cases.ts",
     "rag:file-search:ingest": "npx tsx scripts/knowledge/rag-file-search-ingest.ts",
     "agent:shadow:report": "npx tsx scripts/knowledge/report-agent-shadow.ts",
+    "agent:shadow:acceptance": "npx tsx scripts/knowledge/agent-shadow-synthetic-acceptance.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\""
   },
   "dependencies": {

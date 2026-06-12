@@ -29,6 +29,12 @@ import {
     isInternalAgentShadowEnabled,
     type InternalAgentShadowDiagnostics
 } from '@/lib/ai/agent/shadow'
+import {
+    buildInternalAgentActivationRequest,
+    isInternalAgentActivationEnabled,
+    runInternalAgentActivatedTurn,
+    type InternalAgentActivationDiagnostics
+} from '@/lib/ai/agent/activation'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 
@@ -81,6 +87,7 @@ export interface ChatMessage {
 
 export interface SimulationResponse {
     response: string
+    agentActivation?: InternalAgentActivationDiagnostics
     agentShadow?: InternalAgentShadowDiagnostics
     matchedSkill?: {
         id: string
@@ -147,11 +154,44 @@ export async function simulateChat(
     }
 
     const aiSettings = await getOrgAiSettings(organizationId, { locale: responseLanguage })
-    const withAgentShadow = async (
+    const withAgentBoundary = async (
         response: SimulationResponse,
         diagnostics: Record<string, unknown>
     ): Promise<SimulationResponse> => {
-        if (!isInternalAgentShadowEnabled(organizationId)) return response
+        let finalResponse = response
+
+        if (isInternalAgentActivationEnabled(organizationId)) {
+            try {
+                const currentResult = {
+                    answer: finalResponse.response,
+                    refusal: false,
+                    citations: [],
+                    diagnostics,
+                }
+                const activated = await runInternalAgentActivatedTurn({
+                    request: buildInternalAgentActivationRequest({
+                        organizationId,
+                        channel: 'simulator',
+                        locale: responseLanguage,
+                        latestUserMessage: message,
+                        recentMessages: history,
+                        settings: aiSettings,
+                        observedResult: currentResult,
+                    }),
+                    currentResult,
+                    executeCurrent: async () => currentResult,
+                })
+                finalResponse = {
+                    ...finalResponse,
+                    response: activated.result.answer,
+                    agentActivation: activated.diagnostics,
+                }
+            } catch {
+                finalResponse = response
+            }
+        }
+
+        if (!isInternalAgentShadowEnabled(organizationId)) return finalResponse
 
         try {
             const shadowInput: InternalAgentTurnShadowInput = {
@@ -162,18 +202,18 @@ export async function simulateChat(
                 recentMessages: history,
                 settings: aiSettings,
                 observedResult: {
-                    answer: response.response,
+                    answer: finalResponse.response,
                     refusal: false,
                     diagnostics
                 }
             }
             const agentShadow = await runInternalAgentTurnShadow(shadowInput)
             return {
-                ...response,
+                ...finalResponse,
                 agentShadow
             }
         } catch {
-            return response
+            return finalResponse
         }
     }
     const matchThreshold = typeof threshold === 'number' ? threshold : aiSettings.match_threshold
@@ -229,7 +269,7 @@ export async function simulateChat(
     // 2. Determine response
     if (bestMatch && bestMatch.similarity >= activeThreshold) {
         const matchedSkillDetails = await getSkill(bestMatch.skill_id)
-        return await withAgentShadow({
+        return await withAgentBoundary({
             response: bestMatch.response_text,
             matchedSkill: {
                 id: bestMatch.skill_id,
@@ -290,7 +330,7 @@ export async function simulateChat(
             })
             totalInputTokens += routerInputTokens
             totalOutputTokens += routerOutputTokens
-            return await withAgentShadow({
+            return await withAgentBoundary({
                 response: fallbackResponse,
                 matchedSkill: bestMatch ? {
                     id: bestMatch.skill_id,
@@ -399,7 +439,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                 const topResult = kbResults[0]
                 totalInputTokens += routerInputTokens + ragInputTokens
                 totalOutputTokens += routerOutputTokens + ragOutputTokens
-                return await withAgentShadow({
+                return await withAgentBoundary({
                     response: guardedResponse,
                     matchedSkill: {
                         id: 'rag-knowledge-base',
@@ -448,7 +488,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
     })
     totalInputTokens += routerInputTokens + ragInputTokens
     totalOutputTokens += routerOutputTokens + ragOutputTokens
-    return await withAgentShadow({
+    return await withAgentBoundary({
         response: fallbackResponse,
         matchedSkill: bestMatch ? {
             id: bestMatch.skill_id,

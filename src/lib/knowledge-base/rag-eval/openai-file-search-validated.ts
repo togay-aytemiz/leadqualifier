@@ -5,6 +5,11 @@ import { isInternalAgentShadowEnabled } from '@/lib/ai/agent/shadow'
 import { runInternalAgentTurnShadow } from '@/lib/ai/agent/runtime-shadow'
 import type { AgentPlannerCreateCompletion } from '@/lib/ai/agent/planner'
 import {
+  buildInternalAgentActivationRequest,
+  isInternalAgentActivationEnabled,
+  runInternalAgentActivatedTurn,
+} from '@/lib/ai/agent/activation'
+import {
   compileBehaviorPolicyFromSettings,
   formatBehaviorPolicyForPrompt,
   summarizeBehaviorPolicy,
@@ -1963,7 +1968,7 @@ async function strictDirectResult(input: {
   }
 }
 
-async function runOpenAiFileSearchValidatedQuestionCurrent(
+export async function runOpenAiFileSearchValidatedQuestionCurrent(
   input: OpenAiFileSearchValidatedQuestionInput
 ): Promise<RagProviderResult> {
   const startedAt = Date.now()
@@ -3352,7 +3357,30 @@ async function runOpenAiFileSearchValidatedQuestionCurrent(
 export async function runOpenAiFileSearchValidatedQuestion(
   input: OpenAiFileSearchValidatedQuestionInput
 ): Promise<RagProviderResult> {
-  const currentResult = await runOpenAiFileSearchValidatedQuestionCurrent(input)
+  const runCurrent = () => runOpenAiFileSearchValidatedQuestionCurrent(input)
+  const currentResult = input.organizationId && isInternalAgentActivationEnabled(input.organizationId)
+    ? (
+      await runInternalAgentActivatedTurn<RagProviderResult>({
+        request: buildInternalAgentActivationRequest({
+          organizationId: input.organizationId,
+          conversationId: input.conversationId,
+          channel: input.channel ?? 'demo_chat',
+          locale: resolveMvpResponseLanguage(input.question),
+          latestUserMessage: input.question,
+          recentMessages: input.conversationHistory,
+          conversationState: findLatestRagTypedConversationState(input.conversationHistory ?? []),
+          settings: input.settings,
+          sourcePriorityGroups: input.sourcePriorityGroups,
+        }),
+        executeCurrent: runCurrent,
+        createPlannerCompletion: input.internalAgentPlannerCreateCompletion,
+        createPresenterCompletion: input.presentationCreateCompletion,
+        plannerModel: input.internalAgentPlannerModel,
+        presenterModel: input.answerModel,
+      })
+    ).result
+    : await runCurrent()
+
   if (!input.organizationId || !isInternalAgentShadowEnabled(input.organizationId)) {
     return currentResult
   }

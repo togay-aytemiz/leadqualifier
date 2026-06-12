@@ -1,4 +1,5 @@
 import type { InternalAgentShadowDiagnostics } from '@/lib/ai/agent/shadow'
+import type { InternalAgentActivationDiagnostics } from '@/lib/ai/agent/activation'
 
 export type RagAnswerProvider =
   | 'current_rag'
@@ -191,6 +192,7 @@ export type RagProviderResult = {
       finalVerdict?: string
     }
     internalAgentShadow?: InternalAgentShadowDiagnostics
+    internalAgentActivation?: InternalAgentActivationDiagnostics
   }
 }
 
