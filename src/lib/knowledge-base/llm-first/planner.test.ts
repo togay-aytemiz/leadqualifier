@@ -63,6 +63,8 @@ describe('runLlmFirstTurnPlanner', () => {
     expect(prompt).toContain('The latest user correction overrides earlier assistant assumptions')
     expect(prompt).toContain('Negated or rejected intent must not become the active intent')
     expect(prompt).toContain('must preserve the unresolved user request from earlier history')
+    expect(prompt).toContain('Clarify terse fragments')
+    expect(prompt).toContain('answer all matching table variants')
   })
 
   it('routes a complete campus-location question directly to search', async () => {

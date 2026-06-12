@@ -20,6 +20,7 @@ import {
   runLlmFirstTurnPlanner,
   type LlmFirstPlannerCreateCompletion,
 } from './planner'
+import { composeLlmFirstTableFactAnswer } from './table-facts'
 
 type CitationSource = { title?: string; url?: string }
 
@@ -215,7 +216,13 @@ export async function runLlmFirstFileSearchPipeline(input: {
   }
 
   const generationStartedAt = Date.now()
-  const generated = await composeLlmFirstGroundedAnswer({
+  const tableFactAnswer = composeLlmFirstTableFactAnswer({
+    resolvedQuestion: planner.plan.resolvedQuestion,
+    answerGoal: planner.plan.answerGoal,
+    responseLanguage: input.responseLanguage,
+    chunks,
+  })
+  const generated = tableFactAnswer ?? await composeLlmFirstGroundedAnswer({
     resolvedQuestion: planner.plan.resolvedQuestion,
     answerGoal: planner.plan.answerGoal,
     requiredFacts: planner.plan.requiredFacts,
@@ -288,7 +295,9 @@ export async function runLlmFirstFileSearchPipeline(input: {
         addedEngagement: usePolish ? polished.addedEngagement : false,
         model: polished.model,
       },
-      strictVerdict: 'verified_evidence_answer',
+      strictVerdict: tableFactAnswer
+        ? 'verified_table_fact_answer'
+        : 'verified_evidence_answer',
     },
   }
 }

@@ -90,6 +90,8 @@ function systemPrompt(
     'For a broad location question such as "kampüs nerede" with no named campus, search for the organization\'s campuses or locations together instead of selecting one arbitrary address from a document footer.',
     'Choose clarify only when missing information is necessary for a meaningful search and materially changes the answer.',
     'Before clarifying, verify the missing information is not already present in history.',
+    'Clarify terse fragments that name a facet but omit the entity, type, cycle, or year needed for a meaningful answer; examples include unnamed affiliated-location questions, broad registration-date questions without cycle/year, or facility/object availability questions without a program or context.',
+    'For concrete brochure/table metric questions where the program is known but language, scholarship, or discount variant is not specified, search first and answer all matching table variants when concise instead of forcing a clarification.',
     'Ask exactly one concise, specific clarification question. Never ask generic questions such as "Hangi konuda bilgi almak istersiniz?".',
     'Choose refuse only for unsafe, private, impossible, or clearly out-of-scope requests under the tenant policy.',
     'For search, write a standalone resolved_question that faithfully preserves the requested metric and a focused search_query for OpenAI File Search.',

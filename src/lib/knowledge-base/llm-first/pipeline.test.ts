@@ -151,6 +151,78 @@ describe('runLlmFirstFileSearchPipeline', () => {
     })
   })
 
+  it('answers concrete table facts from retrieved brochure tables without another answer LLM call', async () => {
+    const responsesCreate = vi.fn(async () => ({
+      output_text: 'retrieval complete',
+      output: [
+        {
+          type: 'file_search_call',
+          results: [
+            {
+              file_id: 'file_tip',
+              filename: 'tip.md',
+              score: 0.97,
+              text: [
+                '# YİÜ Tanıtım Broşürü - Tıp Fakültesi Kontenjan ve Ücretler',
+                '',
+                '| Puan Kodu | Bölüm Adı | Puan Türü | 2025 Kontenjanı | 2024 Başarı Sırası | 2024 Taban Puanı | 2025 Fiyat |',
+                '|---|---|---:|---:|---:|---:|---:|',
+                '| 207910033 | Tıp Fakültesi (Ücretli) | SAY | 75 | 36.073 | 453,467 | 720.000 |',
+                '| 207910015 | Tıp Fakültesi (Burslu) | SAY | 13 | 11.519 | 497,406 | - |',
+                '| 207950202 | Tıp Fakültesi (%50 İnd.) | SAY | 10 | 18.145 | 483,077 | 360.000 |',
+                '| 207950114 | Tıp Fakültesi (İngilizce) (Ücretli) | SAY | 41 | 39.907 | 448,213 | 720.000 |',
+              ].join('\n'),
+            },
+          ],
+        },
+      ],
+    }))
+    const plannerCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              decision: 'search',
+              resolved_question: 'Türkçe Tıp programının 2025 kontenjanı kaç?',
+              search_query: 'Türkçe Tıp 2025 kontenjanı',
+              answer_goal: 'Türkçe Tıp kontenjanını burs/indirim seçenekleriyle söyle.',
+              response_language: 'tr',
+              required_facts: ['2025 kontenjanı'],
+              forbidden_assumptions: [],
+              confidence: 0.98,
+            }),
+          },
+        },
+      ],
+    }))
+    const answerCreateCompletion = vi.fn()
+    const polishCreateCompletion = vi.fn(async () => ({
+      choices: [{ message: { content: '{"answer":"","engagement_question":"","engagement_evidence":""}' } }],
+    }))
+
+    const result = await runLlmFirstFileSearchPipeline({
+      client: { responses: { create: responsesCreate } },
+      vectorStoreId: 'vs_yiu',
+      retrievalModel: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      latestUserMessage: 'Türkçe Tıp kontenjanı kaç?',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      settings,
+      plannerCreateCompletion,
+      answerCreateCompletion,
+      polishCreateCompletion,
+    })
+
+    expect(answerCreateCompletion).not.toHaveBeenCalled()
+    expect(result.answer).toContain('Ücretli 75')
+    expect(result.answer).toContain('Burslu 13')
+    expect(result.answer).toContain('%50 İndirimli 10')
+    expect(result.answer).not.toContain('41')
+    expect(result.refusal).toBe(false)
+    expect(result.diagnostics?.strictVerdict).toBe('verified_table_fact_answer')
+  })
+
   it('rejects polish that mutates a protected numeric fact', async () => {
     const responsesCreate = vi.fn(async () => ({
       output_text: 'retrieval complete',
