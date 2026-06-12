@@ -344,10 +344,12 @@ function normalizeQuestionText(question: string, entities: StrictQuestionEntity[
       search
     )
   const asksDiscountedVariant = /(?:% ?50|yuzde ?50|indirimli)/.test(search)
+  const asksEnglishVariant =
+    /(?:^|[^a-z0-9])(?:ing|ingilizce|ingilizcesi|english)(?:[^a-z0-9]|$)/.test(search)
 
   if (entity) {
     if (asksPrice) {
-      if (entity.canonicalName === 'Tıp Fakültesi' && /(?:ingilizce|english)/.test(search)) {
+      if (entity.canonicalName === 'Tıp Fakültesi' && asksEnglishVariant) {
         return 'İngilizce Tıp ücreti ne kadar?'
       }
       if (entity.canonicalName === 'Tıp Fakültesi' && /(?:turkce|türkçe|turkish)/.test(search)) {

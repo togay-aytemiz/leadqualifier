@@ -397,7 +397,8 @@ describe('resolveRagPendingClarificationFollowup', () => {
       latestUserMessage: 'menemen',
       pending: {
         originalQuestion: 'kaç para',
-        clarificationQuestion: 'Hangi bölüm, program veya hizmet için ücret bilgisini öğrenmek istiyorsunuz?',
+        clarificationQuestion:
+          'Hangi bölüm, program veya hizmet için ücret bilgisini öğrenmek istiyorsunuz?',
         missingSlots: ['scope'],
         requestedMetric: 'price',
         retrievalIntent: 'price',
@@ -410,5 +411,34 @@ describe('resolveRagPendingClarificationFollowup', () => {
     })
 
     expect(result).toBeNull()
+  })
+
+  it('uses concise slot values for entity/scope clarifications even when LLM asks to clarify again', () => {
+    const result = resolveRagPendingClarificationFollowup({
+      latestUserMessage: 'Dil ve Konuşma Terapisi',
+      pending: {
+        originalQuestion: 'kaç para',
+        clarificationQuestion: 'Hangi program için fiyat öğrenmek istiyorsunuz?',
+        missingSlots: ['program'],
+        requestedMetric: 'price',
+        retrievalIntent: 'price',
+      },
+      llmTurnType: 'new_question',
+      llmAction: 'clarify',
+      llmStateConfidence: 0.88,
+      llmStateReason: 'mistakenly asked for the same missing slot again',
+      llmClarificationQuestion: 'Hangi konuda bilgi istiyorsunuz?',
+    })
+
+    expect(result).toMatchObject({
+      action: 'rewrite',
+      stateDecision: 'use',
+      pendingClarificationUsed: true,
+      consumedPendingState: true,
+      requestedMetric: 'price',
+      retrievalIntent: 'price',
+    })
+    expect(result?.question).toContain('kaç para')
+    expect(result?.question).toContain('Dil ve Konuşma Terapisi')
   })
 })

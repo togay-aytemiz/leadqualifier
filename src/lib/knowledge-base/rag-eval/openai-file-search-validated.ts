@@ -27,10 +27,7 @@ import {
   type OpenAiFileSearchInstructionProfile,
   runOpenAiFileSearchQuestion,
 } from './openai-file-search'
-import {
-  planBrochureQuery,
-  type BrochureQueryPlan,
-} from './brochure-query-plan'
+import { planBrochureQuery, type BrochureQueryPlan } from './brochure-query-plan'
 import { resolveBrochureTableFact } from './brochure-table'
 import { resolveApprovedSourceFact } from './approved-source-facts'
 import { buildValidatedFollowup } from './validated-followup'
@@ -646,12 +643,7 @@ function sourceGroupFilter(plan: BrochureQueryPlan): OpenAiFileSearchFilter | un
 function dedupeProviderCitations(citations: RagProviderCitation[]) {
   const seen = new Set<string>()
   return citations.filter((citation) => {
-    const key = [
-      citation.providerSourceId,
-      citation.title,
-      citation.url,
-      citation.quote,
-    ]
+    const key = [citation.providerSourceId, citation.title, citation.url, citation.quote]
       .filter(Boolean)
       .join('|')
     if (seen.has(key)) return false
@@ -1509,10 +1501,18 @@ function inferRequestedMetricFromText(value: string): string | undefined {
     return 'success_rank'
   }
   if (/(?:kontenjan|kac kisi|kac ogrenci)/.test(normalized)) return 'quota'
-  if (/(?:kac para|kac tl|ucret(?:i|ler|leri)?\b|fiyat(?:i|lar|lari)?\b|ne kadar|maliyet|tutar)/.test(normalized)) {
+  if (
+    /(?:kac para|kac tl|ucret(?:i|ler|leri)?\b|fiyat(?:i|lar|lari)?\b|ne kadar|maliyet|tutar)/.test(
+      normalized
+    )
+  ) {
     return 'price'
   }
-  if (/(?:staj|klinik uygulama|uygulamali egitim).{0,60}(?:kac gun|sure|suresi)|(?:kac gun|sure|suresi).{0,60}(?:staj|klinik uygulama|uygulamali egitim)/.test(normalized)) {
+  if (
+    /(?:staj|klinik uygulama|uygulamali egitim).{0,60}(?:kac gun|sure|suresi)|(?:kac gun|sure|suresi).{0,60}(?:staj|klinik uygulama|uygulamali egitim)/.test(
+      normalized
+    )
+  ) {
     return 'internship_duration'
   }
   if (/(?:kac yil|kac yillik|egitim suresi|ne kadar sur)/.test(normalized)) {
@@ -1520,7 +1520,11 @@ function inferRequestedMetricFromText(value: string): string | undefined {
   }
   if (/hazirlik/.test(normalized)) return 'preparation'
   if (/(?:nerede|nerde|adres|kampus|kampusu|yerleske)/.test(normalized)) return 'location'
-  if (/(?:hangi bolum|hangi program|bolumlere kayit|programlara kayit|tum bolum|tüm bölüm|listele|listeler)/.test(normalized)) {
+  if (
+    /(?:hangi bolum|hangi program|bolumlere kayit|programlara kayit|tum bolum|tüm bölüm|listele|listeler)/.test(
+      normalized
+    )
+  ) {
     return 'program_list'
   }
   return undefined
@@ -1555,6 +1559,7 @@ function augmentQuestionWithRequestedMetric(input: { question: string; metric?: 
 const REFERENTIAL_HISTORY_FOLLOWUP_TERMS = [
   'ingilizce',
   'ingilizcesi',
+  'ing',
   'english',
   'turkce',
   'türkçe',
@@ -1626,6 +1631,7 @@ const REFERENTIAL_HISTORY_STOPWORDS = new Set([
   'indirimli',
   'ingilizce',
   'ingilizcesi',
+  'ing',
   'english',
   'turkce',
   'türkçe',
@@ -1665,15 +1671,17 @@ function recentHistoryHasBusinessFactContext(history: KnowledgeSearchPlanningTur
   )
   return Boolean(
     inferRequestedMetricFromText(text) ||
-      /(?:program|bolum|bölüm|fakulte|fakülte|hizmet|urun|ürün|ucret|ücret|fiyat|kontenjan|puan|siralama|sıralama|kampus|kampüs|basvuru|başvuru|kayit|kayıt|tl)/.test(
-        text
-      )
+    /(?:program|bolum|bölüm|fakulte|fakülte|hizmet|urun|ürün|ucret|ücret|fiyat|kontenjan|puan|siralama|sıralama|kampus|kampüs|basvuru|başvuru|kayit|kayıt|tl)/.test(
+      text
+    )
   )
 }
 
 function variantHintFromFollowup(question: string) {
   const normalized = normalizeForSupport(question)
-  if (/(?:ingilizce|ingilizcesi|english)/.test(normalized)) return 'Varyant/dil: İngilizce'
+  if (/(?:^|[^a-z0-9])(?:ing|ingilizce|ingilizcesi|english)(?:[^a-z0-9]|$)/.test(normalized)) {
+    return 'Varyant/dil: İngilizce'
+  }
   if (/(?:turkce|türkçe|turkcesi|türkçesi|turkish)/.test(normalized)) {
     return 'Varyant/dil: Türkçe'
   }
@@ -1914,8 +1922,7 @@ function fallbackContextualOrchestration(input: {
     return {
       action: 'clarify',
       question: input.question,
-      clarificationQuestion:
-        'Bir önceki konuyla ilgili hangi ayrıntıyı kontrol etmemi istersiniz?',
+      clarificationQuestion: 'Bir önceki konuyla ilgili hangi ayrıntıyı kontrol etmemi istersiniz?',
       reason: input.reason ?? 'ambiguous_assistant_offer',
     }
   }
@@ -2104,11 +2111,18 @@ async function runContextualOrchestrator(input: {
     }
 
     if (action === 'clarify') {
+      if (pendingClarificationRepair && pendingClarificationRepair.action !== 'clarify') {
+        return {
+          ...pendingClarificationRepair,
+          usage,
+        }
+      }
       return {
         action,
         question: input.question,
         clarificationQuestion:
-          clarificationQuestion || 'Hangi konu veya kapsamı kastettiğinizi biraz daha netleştirir misiniz?',
+          clarificationQuestion ||
+          'Hangi konu veya kapsamı kastettiğinizi biraz daha netleştirir misiniz?',
         reason: reason || 'contextual_clarification',
         usage,
         ...metadata,
@@ -2141,7 +2155,8 @@ async function runContextualOrchestrator(input: {
         action: 'clarify',
         question: input.question,
         clarificationQuestion:
-          clarificationQuestion || 'Hangi konu veya kapsamı kastettiğinizi biraz daha netleştirir misiniz?',
+          clarificationQuestion ||
+          'Hangi konu veya kapsamı kastettiğinizi biraz daha netleştirir misiniz?',
         reason: 'low_confidence_contextual_orchestration',
         usage,
         ...metadata,
@@ -2427,30 +2442,33 @@ export async function runOpenAiFileSearchValidatedQuestionCurrent(
     contextualClarificationCatalogOverride?.refusal === false &&
     strictUnderstanding?.safety === 'none'
 
-  if (contextualOrchestration?.action === 'clarify' && contextualOrchestration.clarificationQuestion) {
+  if (
+    contextualOrchestration?.action === 'clarify' &&
+    contextualOrchestration.clarificationQuestion
+  ) {
     if (canOverrideContextualClarification) {
       contextualClarificationOverriddenByCatalog = true
     } else {
-    return applyContextualOrchestration(
-      clarificationResult({
-        startedAt,
-        queryIntent: 'contextual_followup',
-        clarification: {
-          reason: contextualOrchestration.reason,
-          question: contextualOrchestration.clarificationQuestion,
-        },
-        pendingClarification: buildRagPendingClarificationState({
-          originalQuestion: input.question,
-          clarificationQuestion: contextualOrchestration.clarificationQuestion,
-          missingSlots: contextualOrchestration.missingSlots,
-          requestedMetric: contextualRequestedMetric,
-          retrievalIntent: contextualOrchestration.retrievalIntent ?? contextualRequestedMetric,
-          sourcePreference: contextualOrchestration.sourcePreference,
-          riskLevel: contextualOrchestration.riskLevel,
-          doNotRetrieveText: contextualOrchestration.doNotRetrieveText,
-        }),
-      })
-    )
+      return applyContextualOrchestration(
+        clarificationResult({
+          startedAt,
+          queryIntent: 'contextual_followup',
+          clarification: {
+            reason: contextualOrchestration.reason,
+            question: contextualOrchestration.clarificationQuestion,
+          },
+          pendingClarification: buildRagPendingClarificationState({
+            originalQuestion: input.question,
+            clarificationQuestion: contextualOrchestration.clarificationQuestion,
+            missingSlots: contextualOrchestration.missingSlots,
+            requestedMetric: contextualRequestedMetric,
+            retrievalIntent: contextualOrchestration.retrievalIntent ?? contextualRequestedMetric,
+            sourcePreference: contextualOrchestration.sourcePreference,
+            riskLevel: contextualOrchestration.riskLevel,
+            doNotRetrieveText: contextualOrchestration.doNotRetrieveText,
+          }),
+        })
+      )
     }
   }
 
@@ -3066,8 +3084,10 @@ export async function runOpenAiFileSearchValidatedQuestionCurrent(
           originalQuestion: effectiveQuestion,
           clarificationQuestion: clarification.question,
           missingSlots: ['scope'],
-          requestedMetric: contextualRequestedMetric ?? inferRequestedMetricFromText(effectiveQuestion),
-          retrievalIntent: contextualRequestedMetric ?? inferRequestedMetricFromText(effectiveQuestion),
+          requestedMetric:
+            contextualRequestedMetric ?? inferRequestedMetricFromText(effectiveQuestion),
+          retrievalIntent:
+            contextualRequestedMetric ?? inferRequestedMetricFromText(effectiveQuestion),
         }),
       })
     )
@@ -3317,8 +3337,7 @@ export async function runOpenAiFileSearchValidatedQuestionCurrent(
 
   const retrievalAttempts: RagProviderResult[] = []
   const retrievalAttemptKeys = new Set<string>()
-  const shouldRunSourcePriority =
-    sourcePriorityGroups.length > 0 && !isExactBrochureTablePlan(plan)
+  const shouldRunSourcePriority = sourcePriorityGroups.length > 0 && !isExactBrochureTablePlan(plan)
 
   if (shouldRunSourcePriority) {
     sourcePriorityUsed = true
@@ -3706,31 +3725,32 @@ export async function runOpenAiFileSearchValidatedQuestion(
     conversationHistory: activationHistory,
     pendingClarification: input.pendingClarification,
   })
-  const currentResult = input.organizationId && isInternalAgentActivationEnabled(input.organizationId)
-    ? withActivationPendingClarification(
-      (
-        await runInternalAgentActivatedTurn<RagProviderResult>({
-        request: buildInternalAgentActivationRequest({
-          organizationId: input.organizationId,
-          conversationId: input.conversationId,
-          channel: input.channel ?? 'demo_chat',
-          locale: activationLocale,
-          latestUserMessage: input.question,
-          recentMessages: activationHistory,
-          conversationState: activationConversationState,
-          settings: input.settings,
-          sourcePriorityGroups: input.sourcePriorityGroups,
-        }),
-        executeCurrent: runCurrent,
-        createPlannerCompletion: input.internalAgentPlannerCreateCompletion,
-        createPresenterCompletion: input.presentationCreateCompletion,
-        plannerModel: input.internalAgentPlannerModel,
-        presenterModel: input.answerModel,
-        })
-      ).result,
-      input.question
-    )
-    : await runCurrent()
+  const currentResult =
+    input.organizationId && isInternalAgentActivationEnabled(input.organizationId)
+      ? withActivationPendingClarification(
+          (
+            await runInternalAgentActivatedTurn<RagProviderResult>({
+              request: buildInternalAgentActivationRequest({
+                organizationId: input.organizationId,
+                conversationId: input.conversationId,
+                channel: input.channel ?? 'demo_chat',
+                locale: activationLocale,
+                latestUserMessage: input.question,
+                recentMessages: activationHistory,
+                conversationState: activationConversationState,
+                settings: input.settings,
+                sourcePriorityGroups: input.sourcePriorityGroups,
+              }),
+              executeCurrent: runCurrent,
+              createPlannerCompletion: input.internalAgentPlannerCreateCompletion,
+              createPresenterCompletion: input.presentationCreateCompletion,
+              plannerModel: input.internalAgentPlannerModel,
+              presenterModel: input.answerModel,
+            })
+          ).result,
+          input.question
+        )
+      : await runCurrent()
 
   if (!input.organizationId || !isInternalAgentShadowEnabled(input.organizationId)) {
     return currentResult
@@ -3743,7 +3763,9 @@ export async function runOpenAiFileSearchValidatedQuestion(
     locale: activationLocale,
     latestUserMessage: input.question,
     recentMessages: activationHistory,
-    conversationState: readTypedConversationStateFromDiagnostics(currentResult.diagnostics) ?? activationConversationState,
+    conversationState:
+      readTypedConversationStateFromDiagnostics(currentResult.diagnostics) ??
+      activationConversationState,
     settings: input.settings,
     sourcePriorityGroups: input.sourcePriorityGroups,
     observedResult: currentResult,

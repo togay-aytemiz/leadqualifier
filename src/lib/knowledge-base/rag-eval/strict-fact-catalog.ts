@@ -884,6 +884,10 @@ function includesAlias(search: string, aliases: string[]) {
   })
 }
 
+function hasEnglishVariantSignal(search: string) {
+  return /(?:^|[^a-z0-9])(?:ing|ingilizce|ingilizcesi|english)(?:[^a-z0-9]|$)/.test(search)
+}
+
 function findSupportedUnit(understanding: StrictQuestionUnderstanding) {
   const entity = understanding.entities[0]
   if (entity) {
@@ -929,9 +933,7 @@ function renderDegreeLevelPrograms() {
   const undergraduateGroups = FACULTIES.map(
     (unit) => `${unit.name}: ${(unit.programs ?? []).join(', ')}`
   )
-  const associateGroups = SCHOOLS.map(
-    (unit) => `${unit.name}: ${(unit.programs ?? []).join(', ')}`
-  )
+  const associateGroups = SCHOOLS.map((unit) => `${unit.name}: ${(unit.programs ?? []).join(', ')}`)
   return `Lisans programları: ${undergraduateGroups.join('; ')}. Ön lisans programları: ${associateGroups.join('; ')}.`
 }
 
@@ -1032,9 +1034,7 @@ function findCampusProgramGroup(search: string) {
 }
 
 function renderCampusProgramGroups(campus: (typeof CAMPUS_PROGRAM_GROUPS)[number]) {
-  return campus.groups
-    .map((group) => `${group.unit}: ${group.programs.join(', ')}`)
-    .join('; ')
+  return campus.groups.map((group) => `${group.unit}: ${group.programs.join(', ')}`).join('; ')
 }
 
 function renderAllCampusProgramGroups() {
@@ -1081,9 +1081,7 @@ function resolveCampusProgramListingFact(search: string): StrictCatalogAnswer | 
   )
   const asksCampusProgramListing =
     (hasExplicitCampusKey &&
-      /(?:hangi bolum|hangi program|hangi fakulte|bolumler|programlar|fakulteler)/.test(
-        search
-      )) ||
+      /(?:hangi bolum|hangi program|hangi fakulte|bolumler|programlar|fakulteler)/.test(search)) ||
     /(?:hangi|nerede|nerde).{0,30}(?:kampus|yerleske)/.test(search) ||
     /(?:tip fakultesi|saglik bilimleri|shmyo|meslek yuksekokulu|spor bilimleri).{0,40}(?:kampus|yerleske|nerede|nerde)/.test(
       search
@@ -1484,10 +1482,13 @@ function resolveInternshipPolicyFact(search: string): StrictCatalogAnswer | null
   const hasInternshipTerm =
     /(?:staj|intornluk|intörnlük|uygulamali egitim|isletmede mesleki egitim|zorunlu uygulama|klinik uygulama)/.test(
       search
-    ) || (/(?:mezuniyet|zorunlu)/.test(search) && /uygulama/.test(search))
+    ) ||
+    (/(?:mezuniyet|zorunlu)/.test(search) && /uygulama/.test(search))
   if (!hasInternshipTerm) return null
 
-  if (/(?:ozel hastane|özel hastane).{0,60}staj|staj.{0,60}(?:ozel hastane|özel hastane)/.test(search)) {
+  if (
+    /(?:ozel hastane|özel hastane).{0,60}staj|staj.{0,60}(?:ozel hastane|özel hastane)/.test(search)
+  ) {
     return {
       answer:
         'Onaylı kaynaklarda Ergoterapi için 2. ve 3. sınıf yaz stajlarında Ulusal Staj Programı ve özel hastaneler vb. seçenekler listelenir. Genel Uygulamalı Eğitimler Yönergesi ise stajın programın niteliğine ve komisyon/onay süreçlerine bağlı olduğunu gösterir. Bu nedenle özel hastanede staj imkanı tüm programlar için otomatik garanti olarak anlatılmamalıdır; ilgili program ve komisyon koşulu birlikte doğrulanmalıdır.',
@@ -1545,7 +1546,11 @@ function resolveInternshipPolicyFact(search: string): StrictCatalogAnswer | null
     return {
       answer:
         'Genel Uygulamalı Eğitimler Yönergesi stajın hangi sınıfta yapılacağını tüm programlar için tek bir sınıf olarak belirtmez. Onaylı kaynaklarda Tıp için klinik stajlar Dönem IV ve Dönem V’te, intörnlük Dönem VI’da; Ergoterapi için 2. sınıf ve 3. sınıf yaz stajları ile 4. sınıf klinik uygulama stajı listelenir. Diğer programlar için kesin sınıf/dönem bilgisi program bazında doğrulanmalıdır.',
-      citations: [INTERNSHIP_POLICY_CITATION, CLINICAL_TRAINING_CITATION, ERGOTHERAPY_TRAINING_CITATION],
+      citations: [
+        INTERNSHIP_POLICY_CITATION,
+        CLINICAL_TRAINING_CITATION,
+        ERGOTHERAPY_TRAINING_CITATION,
+      ],
       refusal: false,
       reason: 'catalog_internship_policy_fact',
     }
@@ -1741,8 +1746,7 @@ function resolveScholarshipFact(search: string): StrictCatalogAnswer | null {
     }
   }
 
-  const asksPreferenceRates =
-    /tercih bursu/.test(search) || /(?:^|\s)1\s*tercih/.test(search)
+  const asksPreferenceRates = /tercih bursu/.test(search) || /(?:^|\s)1\s*tercih/.test(search)
   if (asksPreferenceRates) {
     return {
       answer:
@@ -1767,8 +1771,7 @@ function resolveScholarshipFact(search: string): StrictCatalogAnswer | null {
   }
 
   const asksYksScholarship =
-    /(?:yks|ustun basari|ilk\s*100|ilk\s*500|ilk\s*10000)/.test(search) &&
-    /burs/.test(search)
+    /(?:yks|ustun basari|ilk\s*100|ilk\s*500|ilk\s*10000)/.test(search) && /burs/.test(search)
   if (asksYksScholarship) {
     return {
       answer:
@@ -1795,16 +1798,17 @@ function resolveProgramFeeFact(search: string): StrictCatalogAnswer | null {
   const program = PROGRAM_FEE_FACTS.find((fact) => includesAlias(search, fact.aliases))
   if (program) {
     const displayName =
-      program.name === 'Tıp Fakültesi' && /(?:ingilizce|english)/.test(search)
+      program.name === 'Tıp Fakültesi' && hasEnglishVariantSignal(search)
         ? 'İngilizce Tıp'
         : program.name === 'Tıp Fakültesi' && /(?:turkce|türkçe|turkish)/.test(search)
           ? 'Türkçe Tıp'
           : program.name
 
     return {
-      answer: asksDiscountedProgramVariant && !asksPrice
-        ? `Evet. ${displayName} için %50 indirimli program satırı bulunur; 2025 fiyatı ${program.discounted50} olarak listelenir.`
-        : `${displayName} için 2025 broşüründe Ücretli fiyat ${program.paid}, %50 indirimli fiyat ${program.discounted50} olarak listelenir. Burslu kontenjan satırında fiyat alanı "-" olarak gösterilir.`,
+      answer:
+        asksDiscountedProgramVariant && !asksPrice
+          ? `Evet. ${displayName} için %50 indirimli program satırı bulunur; 2025 fiyatı ${program.discounted50} olarak listelenir.`
+          : `${displayName} için 2025 broşüründe Ücretli fiyat ${program.paid}, %50 indirimli fiyat ${program.discounted50} olarak listelenir. Burslu kontenjan satırında fiyat alanı "-" olarak gösterilir.`,
       citations: [PROGRAM_FEE_CITATION],
       refusal: false,
       reason: 'catalog_program_fee_fact',
@@ -1862,7 +1866,11 @@ function resolvePreparationScopeFact(search: string): StrictCatalogAnswer | null
 }
 
 function resolvePaymentPolicyScopeFact(search: string): StrictCatalogAnswer | null {
-  if (/(?:kart bilg|kart numara|cvv|cvc|kredi kart.{0,40}(?:yaz|paylas|gonder|ver|buraya))/.test(search)) {
+  if (
+    /(?:kart bilg|kart numara|cvv|cvc|kredi kart.{0,40}(?:yaz|paylas|gonder|ver|buraya))/.test(
+      search
+    )
+  ) {
     return null
   }
 
@@ -1912,7 +1920,8 @@ function resolvePaymentPolicyScopeFact(search: string): StrictCatalogAnswer | nu
 
   const topic = (() => {
     if (/kdv/.test(search)) return 'KDV dahil olup olmadığı'
-    if (/(?:taksit|kredi kartina taksit|kredi karti taksit)/.test(search)) return 'taksit veya kredi kartı taksit koşulu'
+    if (/(?:taksit|kredi kartina taksit|kredi karti taksit)/.test(search))
+      return 'taksit veya kredi kartı taksit koşulu'
     if (/(?:pesin|peşin)/.test(search)) return 'peşin ödeme zorunluluğu'
     if (/(?:online od|odeme online|ödeme online)/.test(search)) return 'online ödeme imkanı'
     if (/(?:kayit sirasinda|kayıt sırasında|ne kadar odeme|ne kadar ödeme)/.test(search)) {
@@ -2006,7 +2015,11 @@ function resolveAdmissionsDecisionGuard(search: string): StrictCatalogAnswer | n
     )
   if (!asksPersonalPlacement) return null
 
-  if (/(?:tercih listesi|hangi bolumleri yazmaliyim|hangi bölümleri yazmalıyım|tercihlerimi)/.test(search)) {
+  if (
+    /(?:tercih listesi|hangi bolumleri yazmaliyim|hangi bölümleri yazmalıyım|tercihlerimi)/.test(
+      search
+    )
+  ) {
     return {
       answer:
         'Nihai tercih listesi hazırlayamam veya sizin yerinize tercih kararı veremem. Broşürdeki puan türü, 2025 kontenjanı, 2024 taban puanı ve başarı sırası verileriyle seçenekleri karşılaştırabilirim; bunun için puanınızı veya başarı sıralamanızı, puan türünüzü, program ilgisi/önceliğinizi ve burs/indirim tercihinizi belirtmeniz gerekir. Kesin kazanma ya da yerleşme garantisi verilemez.',
@@ -2091,10 +2104,8 @@ function resolveRecognitionScopeFact(search: string): StrictCatalogAnswer | null
   const asksDomesticCredential =
     /(?:diploma|diplomaniz|diplomanız|mezun olunca diplomam).{0,80}(?:devlet universitesi|devlet üniversitesi|ayni gecerlilik|aynı geçerlilik|gecerli mi|geçerli mi|yok denk|yök denk)/.test(
       search
-    ) ||
-    /(?:yok denkligi|yök denkliği|yok denkliği|yök denkligi)/.test(search)
-  const asksPublicExamOutcome =
-    /(?:kpss|atanabilir|atanma|atanir miyim|atanır mıyım)/.test(search)
+    ) || /(?:yok denkligi|yök denkliği|yok denkliği|yök denkligi)/.test(search)
+  const asksPublicExamOutcome = /(?:kpss|atanabilir|atanma|atanir miyim|atanır mıyım)/.test(search)
   if (!asksInstitutionRecognition && !asksDomesticCredential && !asksPublicExamOutcome) {
     return null
   }
@@ -2156,7 +2167,11 @@ function resolveCredentialScopeFact(search: string): StrictCatalogAnswer | null 
 }
 
 function resolveRegistrationScopeFact(search: string): StrictCatalogAnswer | null {
-  if (/(?:benim yerime|yerime).{0,30}(?:kayit|kayıt)|(?:kayit|kayıt).{0,30}(?:benim yerime|yerime)/.test(search)) {
+  if (
+    /(?:benim yerime|yerime).{0,30}(?:kayit|kayıt)|(?:kayit|kayıt).{0,30}(?:benim yerime|yerime)/.test(
+      search
+    )
+  ) {
     return {
       answer:
         'sizin yerinize kayıt yapamam veya resmi başvuru işlemi gerçekleştiremem. Kayıt işlemleri yalnızca üniversitenin güncel resmi kayıt kanalları, e-Devlet/ÖSYM süreçleri ve yetkili kayıt birimleri üzerinden yürütülmelidir. Karar için aday türü, kayıt dönemi, gerekli belgeler, kimlik doğrulama ve resmi kayıt kanalı birlikte doğrulanmalıdır.',
@@ -2197,7 +2212,11 @@ function resolveAcademicProcessScopeFact(search: string): StrictCatalogAnswer | 
     }
   }
 
-  if (/(?:devamsizlik|devamsızlık|devamsizliktan kal|devamsızlıktan kal|devam zorunlu|devam zorunlulugu|devam zorunluluğu)/.test(search)) {
+  if (
+    /(?:devamsizlik|devamsızlık|devamsizliktan kal|devamsızlıktan kal|devam zorunlu|devam zorunlulugu|devam zorunluluğu)/.test(
+      search
+    )
+  ) {
     return {
       answer:
         'Devamsızlık ve derse devam zorunluluğu hakkında onaylı aday öğrenci kaynaklarında bu botun kesin oran/kural verebileceği net bilgi bulunmamaktadır. Devamsızlıktan kalma koşulu ders, program, uygulama/staj türü ve resmi ders devam yönergesine bağlıdır. Karar için ilgili ders/program, dönem, teorik-uygulamalı ders ayrımı ve resmi ders devam kuralı birlikte doğrulanmalıdır.',
@@ -2207,7 +2226,11 @@ function resolveAcademicProcessScopeFact(search: string): StrictCatalogAnswer | 
     }
   }
 
-  if (/(?:en az ders calisarak|en az ders çalışarak|az calisarak|az çalışarak|kolay bolum|kolay bölüm|en kolay bolum|en kolay bölüm)/.test(search)) {
+  if (
+    /(?:en az ders calisarak|en az ders çalışarak|az calisarak|az çalışarak|kolay bolum|kolay bölüm|en kolay bolum|en kolay bölüm)/.test(
+      search
+    )
+  ) {
     return {
       answer:
         'Bölümleri “en az ders çalışarak okunur” gibi bir ölçüte göre önermek uygun değildir. Ders yükü ve zorluk öğrencinin hazırlığına, ilgi alanına, programın müfredatına, uygulama/staj yüküne ve akademik beklentilere göre değişir. Tercih için programın ders planı, puan türü, mesleki hedef, çalışma alışkanlığı ve mezuniyet koşulları birlikte değerlendirilmelidir.',
@@ -2316,8 +2339,7 @@ function resolveOffTopicScopeFact(
     .replace(/\s+/g, ' ')
     .trim()
   return {
-    answer:
-      `${topic} konusunda yardımcı olamam. Yüksek İhtisas Üniversitesi'nin programları, ücretleri, bursları, kontenjanları, kampüsleri veya kayıt süreciyle ilgili sorularınızı yanıtlayabilirim. Örneğin belirli bir program, ücret, kontenjan, kampüs ya da kayıt adımı sorabilirsiniz.`,
+    answer: `${topic} konusunda yardımcı olamam. Yüksek İhtisas Üniversitesi'nin programları, ücretleri, bursları, kontenjanları, kampüsleri veya kayıt süreciyle ilgili sorularınızı yanıtlayabilirim. Örneğin belirli bir program, ücret, kontenjan, kampüs ya da kayıt adımı sorabilirsiniz.`,
     citations: [OFF_TOPIC_SCOPE_CITATION],
     refusal: true,
     reason: 'catalog_off_topic_scope_guard',

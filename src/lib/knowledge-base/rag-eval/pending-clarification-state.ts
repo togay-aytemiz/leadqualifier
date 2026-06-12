@@ -38,7 +38,9 @@ function readRecord(value: unknown): Record<string, unknown> | null {
 }
 
 function readString(value: unknown, maxChars = MAX_PENDING_TEXT_CHARS) {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, maxChars).trim() : ''
+  return typeof value === 'string'
+    ? value.replace(/\s+/g, ' ').trim().slice(0, maxChars).trim()
+    : ''
 }
 
 function readStringArray(value: unknown) {
@@ -220,10 +222,7 @@ function looksLikeExternalTaskReply(value: string) {
   )
 }
 
-function shouldTrustLlmSlotUseDecision(input: {
-  latestUserMessage: string
-  llmTurnType?: string
-}) {
+function shouldTrustLlmSlotUseDecision(input: { latestUserMessage: string; llmTurnType?: string }) {
   if (
     input.llmTurnType &&
     input.llmTurnType !== 'clarification_answer' &&
@@ -235,7 +234,9 @@ function shouldTrustLlmSlotUseDecision(input: {
   if (looksLikeExternalTaskReply(input.latestUserMessage)) return false
   if (messageLooksLikeFreshQuestion(input.latestUserMessage)) return false
 
-  const tokenCount = normalizeForPending(input.latestUserMessage).split(/\s+/).filter(Boolean).length
+  const tokenCount = normalizeForPending(input.latestUserMessage)
+    .split(/\s+/)
+    .filter(Boolean).length
   return tokenCount > 0 && tokenCount <= 5
 }
 
@@ -259,13 +260,58 @@ function hasSlotFillingSignal(input: {
     /(?:\btum\b|\btumu\b|\bhepsi\b|\btamami\b|\bgenel\b|\bfark etmez\b|\bburslu\b|\bucretli\b|\blisans\b|\bon lisans\b|\bingilizce\b|\bturkce\b|\bbireysel\b|\bkurumsal\b|\bprogram\b|\bbolum\b|\bsecenek)/.test(
       normalized
     )
-  const intentPhrase =
-    /(?:gormek ist|bilgi almak ist|listele|soyle|goster|yaz|olur)/.test(normalized)
+  const intentPhrase = /(?:gormek ist|bilgi almak ist|listele|soyle|goster|yaz|olur)/.test(
+    normalized
+  )
 
   return (
     tokensOverlap(input.latestUserMessage, pendingText) ||
     (scopeSignal && (tokensOverlap(normalized, pendingText) || intentPhrase))
   )
+}
+
+function pendingRequestsEntityLikeSlot(pending: RagPendingClarificationState) {
+  const normalized = normalizeForPending(
+    [
+      pending.originalQuestion,
+      pending.clarificationQuestion,
+      pending.requestedMetric,
+      pending.requestedFacet,
+      pending.retrievalIntent,
+      ...(pending.missingSlots ?? []),
+    ]
+      .filter(Boolean)
+      .join(' ')
+  )
+
+  return /(?:program|bolum|fakulte|hizmet|urun|product|service|scope|kapsam|entity|birim|kategori|paket|konu)/.test(
+    normalized
+  )
+}
+
+function looksLikeConciseSlotValue(input: {
+  latestUserMessage: string
+  pending: RagPendingClarificationState
+}) {
+  if (!pendingRequestsEntityLikeSlot(input.pending)) return false
+  if (looksLikeExternalTaskReply(input.latestUserMessage)) return false
+  if (
+    looksLikeNoProgressReply(input.latestUserMessage) ||
+    looksLikeStillAmbiguousReply(input.latestUserMessage)
+  ) {
+    return false
+  }
+  if (messageLooksLikeFreshQuestion(input.latestUserMessage)) return false
+
+  const normalized = normalizeForPending(input.latestUserMessage)
+  if (
+    /^(?:evet|hayir|hayır|tamam|ok|okay|olur|peki|bakar misin|bakabilir misin)$/.test(normalized)
+  ) {
+    return false
+  }
+
+  const tokens = normalized.split(/[^a-z0-9]+/).filter(Boolean)
+  return tokens.length > 0 && tokens.length <= 8 && tokens.some((token) => token.length >= 2)
 }
 
 function metricKey(value: string | undefined) {
@@ -305,9 +351,7 @@ function hasSplitSignal(input: {
   pending: RagPendingClarificationState
 }) {
   const normalized = normalizeForPending(input.latestUserMessage)
-  const hasConnector = /[,;]|(?:\bve\b|\bayrica\b|\bde\b|\bda\b|\balso\b|\band\b)/.test(
-    normalized
-  )
+  const hasConnector = /[,;]|(?:\bve\b|\bayrica\b|\bde\b|\bda\b|\balso\b|\band\b)/.test(normalized)
   if (!hasConnector) return false
 
   const requested = new Set([
@@ -371,8 +415,14 @@ function correctedPendingStateDecision(input: {
     return 'clarify' as const
   }
 
-  if (input.stateDecision === 'ignore' || input.stateDecision === 'clarify') {
+  const conciseSlotValue = looksLikeConciseSlotValue(input)
+
+  if (input.stateDecision === 'ignore') {
     return input.stateDecision
+  }
+
+  if (input.stateDecision === 'clarify') {
+    return conciseSlotValue ? ('use' as const) : input.stateDecision
   }
 
   if (
@@ -392,6 +442,7 @@ function correctedPendingStateDecision(input: {
   }
 
   if (hasSlotFillingSignal(input)) return 'use' as const
+  if (conciseSlotValue) return 'use' as const
 
   return null
 }

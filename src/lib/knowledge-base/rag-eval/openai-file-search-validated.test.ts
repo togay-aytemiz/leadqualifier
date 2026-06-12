@@ -295,7 +295,10 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
                     id: 'step-2',
                     tool: 'internal.catalog',
                     claim_ids: ['claim-1'],
-                    args: { source_groups: ['structured_catalog'], query: 'resolved requested list' },
+                    args: {
+                      source_groups: ['structured_catalog'],
+                      query: 'resolved requested list',
+                    },
                     depends_on: ['step-1'],
                   },
                 ],
@@ -564,7 +567,8 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
                 reason: 'recipe outside business scope',
                 should_retrieve: false,
                 answer_policy: 'redirect_to_supported_scope',
-                refusal_answer: 'Bu konuda yardımcı olamam. Kurumla ilgili sorularınızı yanıtlayabilirim.',
+                refusal_answer:
+                  'Bu konuda yardımcı olamam. Kurumla ilgili sorularınızı yanıtlayabilirim.',
                 confidence: 0.95,
               }),
             },
@@ -702,7 +706,8 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
               action: 'refuse',
               route: 'off_topic_boundary',
               domain_relevance: 'out_of_scope',
-              reason: 'latest message is an unrelated recipe request after a clarification question',
+              reason:
+                'latest message is an unrelated recipe request after a clarification question',
               should_retrieve: false,
               confidence: 0.95,
             }),
@@ -821,8 +826,7 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
               file_id: 'file_programs',
               filename: 'programs.md',
               score: 0.93,
-              text:
-                'Kayıt olunabilecek programlar arasında Tıp Fakültesi, Sağlık Bilimleri Fakültesi bölümleri ve meslek yüksekokulu programları bulunur.',
+              text: 'Kayıt olunabilecek programlar arasında Tıp Fakültesi, Sağlık Bilimleri Fakültesi bölümleri ve meslek yüksekokulu programları bulunur.',
             },
           ],
         },
@@ -908,8 +912,7 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
               file_id: 'file_programs',
               filename: 'programs.md',
               score: 0.91,
-              text:
-                'Kayıt olunabilecek tüm programlar broşürde fakülte ve meslek yüksekokulu başlıkları altında listelenir.',
+              text: 'Kayıt olunabilecek tüm programlar broşürde fakülte ve meslek yüksekokulu başlıkları altında listelenir.',
             },
           ],
         },
@@ -987,8 +990,9 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
     const orchestratorArgs = contextualOrchestratorCreateCompletion.mock.calls[0]?.[0] as {
       messages?: Array<{ role: string; content: string }>
     }
-    const systemPrompt = orchestratorArgs.messages?.find((message) => message.role === 'system')
-      ?.content
+    const systemPrompt = orchestratorArgs.messages?.find(
+      (message) => message.role === 'system'
+    )?.content
     expect(systemPrompt).toContain('turn_type')
     expect(systemPrompt).toContain('clarification_answer')
     expect(systemPrompt).toContain('do_not_retrieve_text')
@@ -1472,7 +1476,9 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
 
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
-        input: expect.stringContaining('Kullanıcının netleştirmesi ve ek sorusu: tümü, ücretleri de yaz'),
+        input: expect.stringContaining(
+          'Kullanıcının netleştirmesi ve ek sorusu: tümü, ücretleri de yaz'
+        ),
       })
     )
     expect(result.diagnostics).toMatchObject({
@@ -1496,7 +1502,8 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
               action: 'rewrite',
               reason: 'low_confidence_scope_resolution',
               rewritten_question: 'program detayları',
-              clarification_question: 'Hangi program veya konuyu kastettiğinizi netleştirir misiniz?',
+              clarification_question:
+                'Hangi program veya konuyu kastettiğinizi netleştirir misiniz?',
               should_retrieve: true,
               confidence: 0.31,
             }),
@@ -1706,7 +1713,8 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
           message: {
             content: JSON.stringify({
               route: 'multi_hop_file_search',
-              reason: 'Website admissions page and brochure summary require separate evidence hops.',
+              reason:
+                'Website admissions page and brochure summary require separate evidence hops.',
               required_evidence: ['admissions page evidence', 'brochure summary evidence'],
               confidence: 0.9,
               hops: [
@@ -2075,7 +2083,9 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
       const userPrompt = messages.find((message) => message.role === 'user')?.content ?? ''
 
       expect(systemPrompt).toContain('Do not expose internal retrieval or source mechanics')
-      expect(systemPrompt).toContain('brochure, document, PDF, website, table, row, field, citation')
+      expect(systemPrompt).toContain(
+        'brochure, document, PDF, website, table, row, field, citation'
+      )
       expect(systemPrompt).toContain('Bol emoji kullan, Gen-Z gibi konuş.')
       expect(userPrompt).toContain(
         'Tıp Fakültesi (Ücretli) için 2025 fiyatı 720.000 TL olarak broşürde gösterilmiştir.'
@@ -3722,6 +3732,64 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
     })
   })
 
+  it('uses pending price slot values even when the contextual LLM asks to clarify again', async () => {
+    const create = vi.fn(async () => ({
+      output_text: 'retrieval complete',
+      output: [],
+      usage: { input_tokens: 50, output_tokens: 5, total_tokens: 55 },
+    }))
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'new_question',
+              action: 'clarify',
+              route: 'clarify_missing_slots',
+              domain_relevance: 'in_scope',
+              reason: 'mistakenly treated the program name as under-specified',
+              clarification_question: 'Hangi konuda bilgi istiyorsunuz?',
+              should_retrieve: false,
+              confidence: 0.88,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 190, completion_tokens: 35, total_tokens: 225 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Dil ve Konuşma Terapisi',
+      qualityMode: 'strict',
+      contextualOrchestratorCreateCompletion,
+      pendingClarification: {
+        originalQuestion: 'kaç para',
+        clarificationQuestion: 'Hangi program için fiyat öğrenmek istiyorsunuz?',
+        missingSlots: ['program'],
+        requestedMetric: 'price',
+        retrievalIntent: 'price',
+      },
+      conversationHistory: [
+        { role: 'user', content: 'kaç para' },
+        { role: 'assistant', content: 'Hangi program için fiyat öğrenmek istiyorsunuz?' },
+      ],
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result.answer).toContain('Dil ve Konuşma Terapisi')
+    expect(result.answer).toContain('490.000 TL')
+    expect(result.answer).toContain('245.000 TL')
+    expect(result.diagnostics).toMatchObject({
+      contextualTurnType: 'clarification_answer',
+      contextualRequestedMetric: 'price',
+      strictVerdict: 'catalog_program_fee_fact',
+    })
+  })
+
   it('strict mode preserves actionable payment-method boundaries without LLM evaluator rewrites', async () => {
     const create = vi.fn(async () => ({
       output_text: 'retrieval complete',
@@ -4003,8 +4071,7 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
               file_id: 'file_tip',
               filename: 'fees.md',
               score: 0.96,
-              text:
-                '| Puan Kodu | Bölüm Adı | Puan Türü | 2025 Kontenjanı | 2024 Başarı Sırası | 2024 Taban Puanı | 2025 Fiyat |\n| 203510128 | Tıp Fakültesi (İngilizce Ücretli) | SAY | 41 | 767.115 | 309,532 | 720.000 |',
+              text: '| Puan Kodu | Bölüm Adı | Puan Türü | 2025 Kontenjanı | 2024 Başarı Sırası | 2024 Taban Puanı | 2025 Fiyat |\n| 203510128 | Tıp Fakültesi (İngilizce Ücretli) | SAY | 41 | 767.115 | 309,532 | 720.000 |',
             },
           ],
         },
@@ -4039,6 +4106,77 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
       answerModel: 'gpt-4o-mini',
       vectorStoreId: 'vs_123',
       question: 'Tıp İngilizce ücretli',
+      qualityMode: 'strict',
+      contextualOrchestratorCreateCompletion,
+      conversationHistory: [
+        { role: 'user', content: 'taban puanlar nedir' },
+        {
+          role: 'assistant',
+          content:
+            'Broşürde taban puanlar program ve burs/indirim satırı bazında listelenir. Hangi programı ve hangi burs/indirim türünü sorduğunuzu belirtmeniz gerekir.',
+        },
+      ],
+    })
+
+    expect(result.answer).toContain('2024 taban puanı 309,532')
+    expect(result.answer).not.toContain('2025 fiyatı 720.000 TL')
+    expect(result.diagnostics).toMatchObject({
+      queryIntent: 'brochure_table_fact',
+      contextualTurnType: 'clarification_answer',
+      contextualRetrievalIntent: 'base_score',
+      contextualRequestedMetric: 'base_score',
+    })
+  })
+
+  it('preserves the original table metric when a clarification answer uses a language abbreviation', async () => {
+    const create = vi.fn(async () => ({
+      id: 'resp_base_score_abbrev',
+      output_text: 'retrieval complete',
+      output: [
+        {
+          type: 'file_search_call',
+          status: 'completed',
+          results: [
+            {
+              file_id: 'file_tip',
+              filename: 'fees.md',
+              score: 0.96,
+              text: '| Puan Kodu | Bölüm Adı | Puan Türü | 2025 Kontenjanı | 2024 Başarı Sırası | 2024 Taban Puanı | 2025 Fiyat |\n| 203510128 | Tıp Fakültesi (İngilizce Ücretli) | SAY | 41 | 767.115 | 309,532 | 720.000 |',
+            },
+          ],
+        },
+      ],
+      usage: { input_tokens: 80, output_tokens: 7, total_tokens: 87 },
+    }))
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'clarification_answer',
+              action: 'rewrite',
+              reason: 'user_supplied_table_row_scope',
+              rewritten_question:
+                'Önceki soru: taban puanlar nedir\nKullanıcının netleştirmesi: tıp ing ücretli',
+              original_user_question_used: 'taban puanlar nedir',
+              latest_user_clarification_used: 'tıp ing ücretli',
+              should_retrieve: true,
+              retrieval_intent: 'base_score',
+              requested_metric: 'base_score',
+              confidence: 0.94,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 220, completion_tokens: 54, total_tokens: 274 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'tıp ing ücretli',
       qualityMode: 'strict',
       contextualOrchestratorCreateCompletion,
       conversationHistory: [

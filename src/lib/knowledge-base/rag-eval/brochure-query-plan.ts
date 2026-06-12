@@ -1,4 +1,7 @@
-import { buildPriceClarificationQuestion, shouldAskPriceClarification } from '@/lib/knowledge-base/rag-clarification'
+import {
+  buildPriceClarificationQuestion,
+  shouldAskPriceClarification,
+} from '@/lib/knowledge-base/rag-clarification'
 
 export type BrochureQueryIntent =
   | 'brochure_table_fact'
@@ -213,7 +216,11 @@ const FIELD_PATTERNS: Array<{
     label: '2025 Kontenjanı',
     patterns: [/\bkontenjan/, /\bkac kisi/, /\bkac ogrenci/, /\bkac aday/, /\bkisi aliniyor/],
   },
-  { field: 'success_rank', label: '2024 Başarı Sırası', patterns: [/\bbasari sirasi/, /\bsiralama/] },
+  {
+    field: 'success_rank',
+    label: '2024 Başarı Sırası',
+    patterns: [/\bbasari sirasi/, /\bsiralama/],
+  },
   { field: 'base_score', label: '2024 Taban Puanı', patterns: [/\btaban puan/] },
   {
     field: 'point_type',
@@ -252,6 +259,14 @@ function normalize(value: string) {
     .trim()
 }
 
+function hasEnglishVariantSignal(normalized: string) {
+  return (
+    normalized.includes('ingilizce') ||
+    normalized.includes('english') ||
+    /(?:^|[^a-z0-9])ing(?:[^a-z0-9]|$)/.test(normalized)
+  )
+}
+
 function detectRequestedFields(question: string): BrochureTableField[] {
   const normalized = normalize(question)
   if (/\bsatir/.test(normalized) && /(?:acikla|ozetle|temkinli)/.test(normalized)) {
@@ -267,7 +282,9 @@ function detectRequestedFields(question: string): BrochureTableField[] {
     .map(({ field }) => field)
   if (
     requestedFields.length === 0 &&
-    /(?:% ?50|\byuzde ?50\b|\bindirimli\s+program\b|\bburslu\s+program\b|\bucretli\s+program\b)/.test(normalized) &&
+    /(?:% ?50|\byuzde ?50\b|\bindirimli\s+program\b|\bburslu\s+program\b|\bucretli\s+program\b)/.test(
+      normalized
+    ) &&
     /(?:var mi|varmi|mevcut mu|bulunuyor mu)/.test(normalized)
   ) {
     return ['price' satisfies BrochureTableField]
@@ -286,7 +303,7 @@ function detectVariants(question: string) {
   const normalized = normalize(question)
   if (normalized.includes('hazirlik')) return ['Hazırlık']
 
-  const english = normalized.includes('ingilizce')
+  const english = hasEnglishVariantSignal(normalized)
   const discounted = /% ?50|yuzde ?50/.test(normalized)
   const burslu = normalized.includes('burslu')
   const paid = normalized.includes('ucretli')
@@ -370,7 +387,10 @@ function detectGuardrailReason(question: string): BrochureGuardrailReason | unde
   return undefined
 }
 
-function admissionChanceClarification(question: string, programs: string[]): BrochureQueryPlan['clarification'] {
+function admissionChanceClarification(
+  question: string,
+  programs: string[]
+): BrochureQueryPlan['clarification'] {
   const normalized = normalize(question)
   const asksAdmissionChance =
     /(?:puan|siralama|siralamam|puanim|bu siralamayla|bu puanla).{0,80}(?:kazan|yerles|girer miyim|gelir mi)/.test(
@@ -417,14 +437,16 @@ export function planBrochureQuery(question: string): BrochureQueryPlan {
   const programs = programMatches.map((match) => match.program)
   const variants = detectVariants(question)
   const guardrailReason = detectGuardrailReason(question)
-  const clarification = admissionChanceClarification(question, programs) ?? (requestedFields.includes('price')
-    && programs.length === 0
-    && shouldAskPriceClarification(question)
-    ? {
-        reason: 'missing_price_subject' as const,
-        question: buildPriceClarificationQuestion('tr', 'education'),
-      }
-    : undefined)
+  const clarification =
+    admissionChanceClarification(question, programs) ??
+    (requestedFields.includes('price') &&
+    programs.length === 0 &&
+    shouldAskPriceClarification(question)
+      ? {
+          reason: 'missing_price_subject' as const,
+          question: buildPriceClarificationQuestion('tr', 'education'),
+        }
+      : undefined)
 
   let intent: BrochureQueryIntent = 'general_approved_corpus'
   let sourceGroups: string[] = []
