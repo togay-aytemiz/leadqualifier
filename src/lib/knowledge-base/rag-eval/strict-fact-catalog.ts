@@ -271,7 +271,7 @@ const PROGRAM_FEE_CITATION: RagProviderCitation = {
   providerSourceId: 'strict-catalog:program-fees-2025',
   title: 'YİÜ Tanıtım Broşürü - 2025 Program Ücretleri',
   quote:
-    'Broşür program ücret tablolarında ücretli, burslu ve %50 indirimli satırlar program bazında listelenir; burslu satırlarda fiyat alanı "-" olarak gösterilir.',
+    '2025 program ücretlerinde ücretli, burslu ve %50 indirimli seçenekler program bazında listelenir; burslu kontenjanlarda eğitim ücreti alınmaz.',
 }
 
 const PROGRAM_DURATION_CITATION: RagProviderCitation = {
@@ -1710,7 +1710,7 @@ function resolveScholarshipFact(search: string): StrictCatalogAnswer | null {
   if (asksBursluFee) {
     return {
       answer:
-        'Burslu kontenjan, tercih bursu ve akademik başarı bursu gibi indirim burslarından ayrı değerlendirilmelidir. Broşürde program ücret tablolarında Burslu satırlarının fiyat alanı "-" olarak gösterilir; Ücretli ve %50 indirimli satırlarda tutar yer alır. Kayıt sırasında varsa ek ödeme veya koşullar için resmi kayıt ve burs duyuruları kontrol edilmelidir.',
+        'Burslu kontenjan, tercih bursu ve akademik başarı bursu gibi indirim burslarından ayrı değerlendirilmelidir. Burslu kontenjanlarda eğitim ücreti alınmaz; ücretli ve %50 indirimli seçeneklerde ilgili tutar uygulanır. Kayıt sırasında varsa ek ödeme veya koşullar için resmi kayıt ve burs duyuruları kontrol edilmelidir.',
       citations: [PROGRAM_FEE_CITATION, SCHOLARSHIP_CITATION],
       refusal: false,
       reason: 'catalog_scholarship_fact',
@@ -1724,7 +1724,7 @@ function resolveScholarshipFact(search: string): StrictCatalogAnswer | null {
   if (asksBursluVsPaid) {
     return {
       answer:
-        'Burslu kontenjan ile ücretli kontenjan program ücret tablosunda ayrı satırlar olarak listelenir. Broşürde Burslu satırlarının fiyat alanı "-" olarak gösterilir; Ücretli satırlarda ilgili programın tam ücret tutarı yer alır. Tercih bursu, akademik başarı bursu ve diğer indirim bursları ise ayrıca koşulları olan burs/indirim başlıklarıdır.',
+        'Burslu kontenjanlarda eğitim ücreti alınmaz; ücretli kontenjanlarda ilgili programın tam ücret tutarı uygulanır. Tercih bursu, akademik başarı bursu ve diğer indirim bursları ise ayrıca koşulları olan burs/indirim başlıklarıdır.',
       citations: [PROGRAM_FEE_CITATION, SCHOLARSHIP_CITATION],
       refusal: false,
       reason: 'catalog_scholarship_fact',
@@ -1807,8 +1807,8 @@ function resolveProgramFeeFact(search: string): StrictCatalogAnswer | null {
     return {
       answer:
         asksDiscountedProgramVariant && !asksPrice
-          ? `Evet. ${displayName} için %50 indirimli program satırı bulunur; 2025 fiyatı ${program.discounted50} olarak listelenir.`
-          : `${displayName} için 2025 broşüründe Ücretli fiyat ${program.paid}, %50 indirimli fiyat ${program.discounted50} olarak listelenir. Burslu kontenjan satırında fiyat alanı "-" olarak gösterilir.`,
+          ? `Evet. ${displayName} için %50 indirimli program bulunmaktadır; 2025 ücreti ${program.discounted50}.`
+          : `${displayName} için 2025 ücretli program ücreti ${program.paid}, %50 indirimli ücreti ${program.discounted50}. Burslu kontenjanlarda eğitim ücreti alınmaz.`,
       citations: [PROGRAM_FEE_CITATION],
       refusal: false,
       reason: 'catalog_program_fee_fact',
@@ -1826,7 +1826,7 @@ function resolveProgramFeeFact(search: string): StrictCatalogAnswer | null {
   if (asksBroadProgramFees) {
     return {
       answer:
-        '2025 broşüründe ücretler program ve burs/indirim satırı bazında listelenir. Kısa özet: Tıp Fakültesi 720.000 TL, %50 indirimli 360.000 TL; Beslenme ve Diyetetik, Dil ve Konuşma Terapisi, Fizyoterapi ve Rehabilitasyon ve Hemşirelik 490.000 TL, %50 indirimli 245.000 TL; Sağlık Yönetimi, Ergoterapi ve Ebelik 460.000 TL, %50 indirimli 230.000 TL; Antrenörlük Eğitimi 380.000 TL, %50 indirimli 190.000 TL; birçok ön lisans programı 330.000 TL, %50 indirimli 165.000 TL; Grafik Tasarım ve Elektrik 300.000 TL, %50 indirimli 150.000 TL. Burslu satırlarda fiyat alanı "-" olarak gösterilir. Net cevap için programı belirtirseniz ilgili satırı söyleyebilirim.',
+        '2025 program ücretleri şöyle: Tıp Fakültesi 720.000 TL, %50 indirimli 360.000 TL; Beslenme ve Diyetetik, Dil ve Konuşma Terapisi, Fizyoterapi ve Rehabilitasyon ve Hemşirelik 490.000 TL, %50 indirimli 245.000 TL; Sağlık Yönetimi, Ergoterapi ve Ebelik 460.000 TL, %50 indirimli 230.000 TL; Antrenörlük Eğitimi 380.000 TL, %50 indirimli 190.000 TL; birçok ön lisans programı 330.000 TL, %50 indirimli 165.000 TL; Grafik Tasarım ve Elektrik 300.000 TL, %50 indirimli 150.000 TL. Burslu kontenjanlarda eğitim ücreti alınmaz. Net cevap için programı belirtirseniz ilgili ücreti söyleyebilirim.',
       citations: [PROGRAM_FEE_CITATION],
       refusal: false,
       reason: 'catalog_program_fee_fact',

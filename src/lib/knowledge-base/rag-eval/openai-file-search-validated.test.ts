@@ -3470,7 +3470,11 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
 
       expect(systemPrompt).toContain('Do not expose internal retrieval or source mechanics')
       expect(systemPrompt).toContain('Daha samimi ve kısa konuş.')
-      expect(userPrompt).toContain('2025 broşüründe Ücretli fiyat 490.000 TL')
+      expect(userPrompt).toContain('2025 ücretli program ücreti 490.000 TL')
+      expect(userPrompt).toContain('%50 indirimli ücreti 245.000 TL')
+      expect(userPrompt).toContain('Burslu kontenjanlarda eğitim ücreti alınmaz')
+      expect(userPrompt).not.toContain('broşür')
+      expect(userPrompt).not.toContain('fiyat alanı')
 
       return {
         choices: [

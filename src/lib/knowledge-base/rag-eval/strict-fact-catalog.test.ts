@@ -120,9 +120,7 @@ describe('resolveStrictCatalogAnswer', () => {
       refusal: true,
       reason: 'catalog_admissions_decision_guard',
     })
-    expect(preference?.answer.toLocaleLowerCase('tr-TR')).toContain(
-      'sizin yerinize tercih kararı'
-    )
+    expect(preference?.answer.toLocaleLowerCase('tr-TR')).toContain('sizin yerinize tercih kararı')
     expect(preference?.answer).toContain('çalışmak istediğiniz ortam')
     expect(preference?.answer).toContain('kesin yerleşme garantisi')
 
@@ -260,8 +258,10 @@ describe('resolveStrictCatalogAnswer', () => {
       reason: 'catalog_scholarship_fact',
     })
     expect(bursluFee?.answer).toContain('Burslu kontenjan')
-    expect(bursluFee?.answer).toContain('fiyat alanı "-"')
+    expect(bursluFee?.answer).toContain('eğitim ücreti alınmaz')
     expect(bursluFee?.answer).toContain('tercih bursu')
+    expect(bursluFee?.answer).not.toContain('fiyat alanı')
+    expect(bursluFee?.citations[0]?.quote).not.toContain('fiyat alanı')
     expect(bursluFee?.answer).not.toContain('tamamen ücretsiz değil')
 
     const firstThousand = catalogAnswer('İlk 1000’e girene burs var mı?')
@@ -305,6 +305,9 @@ describe('resolveStrictCatalogAnswer', () => {
     expect(overview?.answer).toContain('Tıp Fakültesi')
     expect(overview?.answer).toContain('720.000 TL')
     expect(overview?.answer).toContain('programı belirtirseniz')
+    expect(overview?.answer).toContain('Burslu kontenjanlarda eğitim ücreti alınmaz')
+    expect(overview?.answer).not.toContain('fiyat alanı')
+    expect(overview?.answer).not.toContain('broşür')
 
     const answer = catalogAnswer('ilkyardım ücret')
 
@@ -316,7 +319,8 @@ describe('resolveStrictCatalogAnswer', () => {
     expect(answer?.answer).toContain('330.000 TL')
     expect(answer?.answer).toContain('165.000 TL')
     expect(answer?.answer).toContain('Burslu')
-    expect(answer?.answer).not.toContain('fiyat alanı broşürde belirtilmemiştir')
+    expect(answer?.answer).not.toContain('fiyat alanı')
+    expect(answer?.answer).not.toContain('broşür')
 
     const dkt = catalogAnswer('dkt kaç tl')
     expect(dkt).toMatchObject({
@@ -471,8 +475,18 @@ describe('resolveStrictCatalogAnswer', () => {
     expect(baglica?.answer).toContain('Bağlıca Mahallesi Höyük Caddesi No:1')
   })
 
-  it('does not let supported existence catalog swallow discount or tuition questions', () => {
-    expect(catalogAnswer('Tıp Fakültesinde %50 indirimli program var mı?')).toBeNull()
+  it('answers discounted program availability without source mechanics', () => {
+    const answer = catalogAnswer('Tıp Fakültesinde %50 indirimli program var mı?')
+
+    expect(answer).toMatchObject({
+      refusal: false,
+      reason: 'catalog_program_fee_fact',
+    })
+    expect(answer?.answer).toContain('%50 indirimli program bulunmaktadır')
+    expect(answer?.answer).toContain('360.000 TL')
+    expect(answer?.answer).not.toContain('program satırı')
+    expect(answer?.answer).not.toContain('fiyat alanı')
+    expect(answer?.answer).not.toContain('broşür')
   })
 
   it('defines affiliated hospital terminology without inventing a hospital identity', () => {
