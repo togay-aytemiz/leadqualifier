@@ -122,8 +122,10 @@ function currentLooksSupported(current: InternalAgentActivatedCurrentResult) {
   if (current.refusal !== true) return true
 
   const strictVerdict = String(current.diagnostics?.strictVerdict ?? '')
-  return strictVerdict === 'catalog_unsupported_existence' ||
+  return (
+    strictVerdict === 'catalog_unsupported_existence' ||
     /^catalog_.+(?:scope|guard|boundary|fact|existence)$/i.test(strictVerdict)
+  )
 }
 
 function createCurrentEvidenceTool<T extends InternalAgentActivatedCurrentResult>(input: {
@@ -239,7 +241,9 @@ function verifyActivationGraph(
   const supported = new Set(
     graph.claims.filter((claim) => claim.status === 'supported').map((claim) => claim.id)
   )
-  const conflicted = graph.claims.filter((claim) => claim.status === 'conflicted').map((claim) => claim.id)
+  const conflicted = graph.claims
+    .filter((claim) => claim.status === 'conflicted')
+    .map((claim) => claim.id)
 
   if (conflicted.length > 0) {
     return {
@@ -333,7 +337,9 @@ async function createDefaultPresenterCompletion(args: Record<string, unknown>) {
 
   const { default: OpenAI } = await import('openai')
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  return openai.chat.completions.create(args as never) as Promise<Awaited<ReturnType<AgentPlannerCreateCompletion>>>
+  return openai.chat.completions.create(args as never) as Promise<
+    Awaited<ReturnType<AgentPlannerCreateCompletion>>
+  >
 }
 
 function stripPresenterText(value: string) {
@@ -429,12 +435,13 @@ export async function runInternalAgentActivatedTurn<T extends InternalAgentActiv
   const controller = await runInternalAgentController({
     request: input.request,
     registry,
-    plan: async ({ request, descriptors }) => planInternalAgentTurn({
-      request,
-      toolDescriptors: descriptors,
-      createCompletion: input.createPlannerCompletion,
-      model: input.plannerModel,
-    }),
+    plan: async ({ request, descriptors }) =>
+      planInternalAgentTurn({
+        request,
+        toolDescriptors: descriptors,
+        createCompletion: input.createPlannerCompletion,
+        model: input.plannerModel,
+      }),
     verify: verifyActivationGraph,
   })
 
@@ -465,6 +472,20 @@ export async function runInternalAgentActivatedTurn<T extends InternalAgentActiv
         }
       : {}),
     usage: controller.usage,
+  }
+
+  if (controller.decision === 'no_info' && controller.trace.stopReason === 'plan_claim_mismatch') {
+    const current = await getCurrent()
+    const fallbackDiagnostics: InternalAgentActivationDiagnostics = {
+      ...diagnostics,
+      status: 'error',
+      activated: false,
+      fallbackToCurrent: true,
+    }
+    return {
+      result: resultWithActivationDiagnostics(current, fallbackDiagnostics),
+      diagnostics: fallbackDiagnostics,
+    }
   }
 
   if (controller.decision === 'clarify') {

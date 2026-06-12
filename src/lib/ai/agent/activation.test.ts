@@ -293,4 +293,144 @@ describe('runInternalAgentActivatedTurn', () => {
       fallbackToCurrent: true,
     })
   })
+
+  it('falls open to the current provider when controller plan claims become inconsistent', async () => {
+    const executeCurrent = vi.fn(async () => ({
+      answer: 'Dil ve Konuşma Terapisi ücreti 490.000 TL.',
+      refusal: false,
+      citations: [{ providerSourceId: 'catalog', title: 'Program Ücretleri' }],
+      diagnostics: { strictVerdict: 'catalog_program_fee_fact' },
+    }))
+    const createPlannerCompletion = vi
+      .fn<AgentPlannerCreateCompletion>()
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                decision: 'research',
+                claims: [
+                  {
+                    id: 'claim-1',
+                    question: 'Resolve pending program slot for the requested price.',
+                    required_evidence: 'Conversation state plus approved fee evidence',
+                    risk: 'medium',
+                  },
+                ],
+                steps: [
+                  {
+                    id: 'step-1',
+                    tool: 'internal.typed_state',
+                    claim_ids: ['claim-1'],
+                    args: { source_groups: ['conversation_state'] },
+                    depends_on: [],
+                  },
+                ],
+                stop_conditions: ['claim supported'],
+                reason: 'Latest message fills pending state.',
+                confidence: 0.84,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 },
+      })
+      .mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                decision: 'research',
+                claims: [
+                  {
+                    id: 'claim-2',
+                    question: 'Changed claim after retry.',
+                    required_evidence: 'Different evidence',
+                    risk: 'medium',
+                  },
+                ],
+                steps: [
+                  {
+                    id: 'step-1',
+                    tool: 'internal.table',
+                    claim_ids: ['claim-2'],
+                    args: { source_groups: ['brochure'], query: 'Dil ve Konuşma Terapisi ücret' },
+                    depends_on: [],
+                  },
+                ],
+                stop_conditions: ['claim supported'],
+                reason: 'Changed plan.',
+                confidence: 0.84,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 },
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                decision: 'research',
+                claims: [
+                  {
+                    id: 'claim-2',
+                    question: 'Changed claim after retry.',
+                    required_evidence: 'Different evidence',
+                    risk: 'medium',
+                  },
+                ],
+                steps: [
+                  {
+                    id: 'step-1',
+                    tool: 'internal.table',
+                    claim_ids: ['claim-2'],
+                    args: { source_groups: ['brochure'], query: 'Dil ve Konuşma Terapisi ücret' },
+                    depends_on: [],
+                  },
+                ],
+                stop_conditions: ['claim supported'],
+                reason: 'Changed plan.',
+                confidence: 0.84,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 },
+      })
+
+    const result = await runInternalAgentActivatedTurn({
+      request: request({
+        latestUserMessage: 'Dil ve Konuşma Terapisi',
+        conversationState: {
+          status: 'pending_clarification',
+          activeIntent: 'price',
+          requestedMetric: 'price',
+          missingSlots: ['program'],
+          originalQuestion: 'kaç para',
+          latestClarification: 'Dil ve Konuşma Terapisi',
+        },
+      }),
+      executeCurrent,
+      createPlannerCompletion,
+      enabled: true,
+    })
+
+    expect(createPlannerCompletion).toHaveBeenCalledTimes(3)
+    expect(executeCurrent).toHaveBeenCalledTimes(1)
+    expect(result.result.answer).toBe('Dil ve Konuşma Terapisi ücreti 490.000 TL.')
+    expect(result.diagnostics).toMatchObject({
+      status: 'error',
+      reason: 'plan_claim_mismatch',
+      activated: false,
+      fallbackToCurrent: true,
+      plannedTools: ['internal.typed_state'],
+      controller: {
+        trace: {
+          stopReason: 'plan_claim_mismatch',
+        },
+      },
+    })
+  })
 })
