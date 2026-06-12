@@ -209,6 +209,9 @@ describe('runLlmFirstFileSearchPipeline', () => {
       recentMessages: [],
       responseLanguage: 'tr',
       settings,
+      sourceGroupScopes: {
+        durationFacts: ['contact-admin'],
+      },
       plannerCreateCompletion,
       answerCreateCompletion,
       polishCreateCompletion,
@@ -220,6 +223,241 @@ describe('runLlmFirstFileSearchPipeline', () => {
     expect(result.answer).toContain('%50 İndirimli 10')
     expect(result.answer).not.toContain('41')
     expect(result.refusal).toBe(false)
+    expect(result.diagnostics?.strictVerdict).toBe('verified_table_fact_answer')
+  })
+
+  it('retries File Search with alternate queries before returning no-info', async () => {
+    const responsesCreate = vi
+      .fn()
+      .mockResolvedValueOnce({
+        output_text: 'retrieval complete',
+        output: [
+          {
+            type: 'file_search_call',
+            results: [
+              {
+                file_id: 'file_irrelevant',
+                filename: 'overview.md',
+                score: 0.74,
+                text: 'Tıp Fakültesi Ankara’da eğitim vermektedir.',
+              },
+            ],
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        output_text: 'retrieval complete',
+        output: [
+          {
+            type: 'file_search_call',
+            results: [
+              {
+                file_id: 'file_duration',
+                filename: 'tip-egitim.md',
+                score: 0.96,
+                text: 'Tıp Fakültesi eğitimi hazırlık sınıfları hariç 6 yıl sürmektedir.',
+              },
+            ],
+          },
+        ],
+      })
+    const plannerCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              decision: 'search',
+              resolved_question: 'Yüksek İhtisas Üniversitesi Tıp Fakültesi kaç yıllık?',
+              search_query: 'Tıp Fakültesi kaç yıllık eğitim süresi',
+              search_queries: [
+                'Tıp Fakültesi eğitim süresi yıl',
+                'Tıp Fakültesi hazırlık hariç kaç yıl sürer',
+              ],
+              answer_goal: 'Tıp Fakültesi eğitim süresini kaynaklı ve kısa söyle.',
+              response_language: 'tr',
+              required_facts: ['eğitim süresi'],
+              forbidden_assumptions: [],
+              confidence: 0.98,
+            }),
+          },
+        },
+      ],
+    }))
+    const answerCreateCompletion = vi
+      .fn()
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                answer: 'NO_ANSWER',
+                used_evidence_ids: [],
+              }),
+            },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                answer: 'Tıp Fakültesi eğitimi hazırlık sınıfları hariç 6 yıl sürmektedir.',
+                used_evidence_ids: ['E2'],
+              }),
+            },
+          },
+        ],
+      })
+    const polishCreateCompletion = vi.fn(async () => ({
+      choices: [{ message: { content: '{"answer":"","engagement_question":"","engagement_evidence":""}' } }],
+    }))
+
+    const result = await runLlmFirstFileSearchPipeline({
+      client: { responses: { create: responsesCreate } },
+      vectorStoreId: 'vs_yiu',
+      retrievalModel: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      latestUserMessage: 'Tıp Fakültesi kaç yıllık?',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      settings,
+      sourceGroupScopes: {
+        durationFacts: ['contact-admin'],
+      },
+      plannerCreateCompletion,
+      answerCreateCompletion,
+      polishCreateCompletion,
+    })
+
+    expect(responsesCreate).toHaveBeenCalledTimes(2)
+    expect(responsesCreate.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        input: expect.stringContaining('hazırlık hariç kaç yıl'),
+        tools: [
+          expect.objectContaining({
+            filters: {
+              type: 'in',
+              key: 'source_group',
+              value: ['contact-admin'],
+            },
+          }),
+        ],
+      })
+    )
+    expect(result.answer).toContain('6 yıl')
+    expect(result.refusal).toBe(false)
+    expect(result.diagnostics?.strictVerdict).toBe('verified_table_fact_answer')
+  })
+
+  it('adds table column labels to expanded retrieval for price facts and answers row snippets', async () => {
+    const responsesCreate = vi
+      .fn()
+      .mockResolvedValueOnce({
+        output_text: 'retrieval complete',
+        output: [
+          {
+            type: 'file_search_call',
+            results: [
+              {
+                file_id: 'file_foreign_fee',
+                filename: 'foreign.md',
+                score: 0.7,
+                text: 'Yabancı öğrenciler için yıllık eğitim ücreti 6.000 ABD dolarıdır.',
+              },
+            ],
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        output_text: 'retrieval complete',
+        output: [
+          {
+            type: 'file_search_call',
+            results: [
+              {
+                file_id: 'file_table_rows',
+                filename: 'sbf-table.md',
+                score: 0.94,
+                text: [
+                  '| - | Ergoterapi (Ücretli) | SAY | 6 | - | - | 460.000 |',
+                  '| - | Ergoterapi (Burslu) | SAY | 4 | - | - | - |',
+                  '| - | Ergoterapi (%50 İnd.) | SAY | 19 | - | - | 230.000 |',
+                ].join('\n'),
+              },
+            ],
+          },
+        ],
+      })
+    const plannerCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              decision: 'search',
+              resolved_question: 'Yüksek İhtisas Üniversitesi Ergoterapi programı ücreti nedir?',
+              search_query: 'Ergoterapi programı ücreti Yüksek İhtisas Üniversitesi',
+              search_queries: ['Ergoterapi ücret bilgisi', 'Ergoterapi fiyat'],
+              answer_goal: 'Ergoterapi programının ücret bilgisini söyle.',
+              response_language: 'tr',
+              required_facts: ['ücret'],
+              forbidden_assumptions: [],
+              confidence: 0.98,
+            }),
+          },
+        },
+      ],
+    }))
+    const answerCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer: 'NO_ANSWER',
+              used_evidence_ids: [],
+            }),
+          },
+        },
+      ],
+    }))
+    const polishCreateCompletion = vi.fn(async () => ({
+      choices: [{ message: { content: '{"answer":"","engagement_question":"","engagement_evidence":""}' } }],
+    }))
+
+    const result = await runLlmFirstFileSearchPipeline({
+      client: { responses: { create: responsesCreate } },
+      vectorStoreId: 'vs_yiu',
+      retrievalModel: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      latestUserMessage: 'Ergoterapi ücreti nedir?',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      settings,
+      sourceGroupScopes: {
+        tableFacts: ['brochure-program-fee-saglik-bilimleri'],
+      },
+      plannerCreateCompletion,
+      answerCreateCompletion,
+      polishCreateCompletion,
+    })
+
+    expect(responsesCreate).toHaveBeenCalledTimes(2)
+    expect(responsesCreate.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        input: expect.stringContaining('2025 Fiyat'),
+        tools: [
+          expect.objectContaining({
+            filters: {
+              type: 'in',
+              key: 'source_group',
+              value: ['brochure-program-fee-saglik-bilimleri'],
+            },
+          }),
+        ],
+      })
+    )
+    expect(result.answer).toContain('Ücretli 460.000 TL')
+    expect(result.answer).toContain('%50 İndirimli 230.000 TL')
     expect(result.diagnostics?.strictVerdict).toBe('verified_table_fact_answer')
   })
 

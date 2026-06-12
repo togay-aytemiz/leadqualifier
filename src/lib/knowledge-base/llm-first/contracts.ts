@@ -2,6 +2,7 @@ export type LlmFirstSearchPlan = {
   decision: 'search'
   resolvedQuestion: string
   searchQuery: string
+  searchQueries: string[]
   answerGoal: string
   responseLanguage: string
   requiredFacts: string[]
@@ -74,6 +75,7 @@ export function parseLlmFirstTurnPlan(value: unknown): LlmFirstTurnPlan | null {
       decision,
       resolvedQuestion,
       searchQuery,
+      searchQueries: textArray(input.search_queries ?? input.searchQueries, 5),
       answerGoal,
       responseLanguage,
       requiredFacts: textArray(input.required_facts ?? input.requiredFacts),

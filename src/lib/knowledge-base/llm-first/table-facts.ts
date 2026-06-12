@@ -3,7 +3,14 @@ import type { RagChunk } from '@/lib/knowledge-base/rag'
 
 import type { LlmFirstGroundedAnswer } from './evidence'
 
-type MetricKey = 'quota' | 'success_rank' | 'base_score' | 'price' | 'point_type' | 'program_code'
+type MetricKey =
+  | 'quota'
+  | 'success_rank'
+  | 'base_score'
+  | 'price'
+  | 'point_type'
+  | 'program_code'
+  | 'duration'
 type VariantKey = 'paid' | 'scholarship' | 'discount' | 'prep'
 
 type ParsedTable = {
@@ -20,6 +27,16 @@ type SelectedRow = {
   chunk: RagChunk
   evidenceId: string
 }
+
+const ADMISSIONS_TABLE_HEADERS = [
+  'Puan Kodu',
+  'Bölüm Adı',
+  'Puan Türü',
+  '2025 Kontenjanı',
+  '2024 Başarı Sırası',
+  '2024 Taban Puanı',
+  '2025 Fiyat',
+]
 
 const TURKISH_CHAR_MAP: Record<string, string> = {
   ı: 'i',
@@ -54,6 +71,7 @@ const SUBJECT_STOPWORDS = new Set([
   'fiyat',
   'fiyati',
   'icin',
+  'egitim',
   'ingilizce',
   'ind',
   'indirim',
@@ -73,15 +91,25 @@ const SUBJECT_STOPWORDS = new Set([
   'sirasi',
   'siralama',
   'soyle',
+  'sure',
+  'suresi',
   'taban',
   'tl',
   'tr',
   'turkce',
   'turu',
+  'universite',
+  'universitesi',
   'ucret',
   'ucreti',
   'ucretli',
   'var',
+  'yuksek',
+  'ihtisas',
+  'year',
+  'years',
+  'yil',
+  'yillik',
   'yuzde',
 ])
 
@@ -120,6 +148,11 @@ const METRICS: Array<{
     queryPatterns: [/\bprogram kodu\b/, /\bpuan kodu\b/],
     headerPatterns: [/\bprogram kodu\b/, /\bpuan kodu\b/],
   },
+  {
+    key: 'duration',
+    queryPatterns: [/\begitim suresi\b/, /\bsuresi\b/, /\bkac yil\b/, /\bkac yillik\b/],
+    headerPatterns: [/\begitim suresi\b/, /\beducation time\b/, /\bsure\b/],
+  },
 ]
 
 function normalize(value: string) {
@@ -146,6 +179,22 @@ function isSeparatorRow(cells: string[]) {
   return cells.length > 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.trim()))
 }
 
+function isHeaderLikeRow(cells: string[]) {
+  const normalized = cells.map((cell) => normalize(cell)).join(' ')
+  return /\b(bolum|program).*\badi\b/.test(normalized) || /\bpuan turu\b/.test(normalized)
+}
+
+function isLikelyAdmissionDataRow(cells: string[]) {
+  if (cells.length !== ADMISSIONS_TABLE_HEADERS.length) return false
+  if (isSeparatorRow(cells) || isHeaderLikeRow(cells)) return false
+
+  const program = normalize(cells[1] ?? '')
+  const pointType = normalize(cells[2] ?? '')
+  const hasProgramName = /[a-z]/.test(program)
+  const hasPointType = /^(say|ea|tyt|-)$/.test(pointType)
+  return hasProgramName && hasPointType
+}
+
 function extractTables(chunks: RagChunk[]): ParsedTable[] {
   const tables: ParsedTable[] = []
 
@@ -169,6 +218,34 @@ function extractTables(chunks: RagChunk[]): ParsedTable[] {
         tables.push({ headers, rows, chunk, chunkIndex })
       }
       index = cursor
+    }
+
+    let orphanRows: string[][] = []
+    for (const line of lines) {
+      const cells = splitMarkdownRow(line)
+      if (isLikelyAdmissionDataRow(cells)) {
+        orphanRows.push(cells)
+        continue
+      }
+
+      if (orphanRows.length > 0) {
+        tables.push({
+          headers: ADMISSIONS_TABLE_HEADERS,
+          rows: orphanRows,
+          chunk,
+          chunkIndex,
+        })
+        orphanRows = []
+      }
+    }
+
+    if (orphanRows.length > 0) {
+      tables.push({
+        headers: ADMISSIONS_TABLE_HEADERS,
+        rows: orphanRows,
+        chunk,
+        chunkIndex,
+      })
     }
   })
 
@@ -219,7 +296,18 @@ function subjectTokens(question: string) {
 function rowMatchesSubject(program: string, tokens: string[]) {
   if (tokens.length === 0) return false
   const normalizedProgram = normalize(program)
-  return tokens.every((token) => normalizedProgram.includes(token))
+  const matchingTokens = tokens.filter((token) => normalizedProgram.includes(token))
+  if (matchingTokens.length === 0) return false
+  return matchingTokens.length === tokens.length || matchingTokens.some((token) => token.length >= 5)
+}
+
+function durationValue(line: string) {
+  const match = line.match(/\b(?:[1-9]|1[0-2])\s*(?:yıl|yil|years?|sene)\b(?:\s*\([^)]+\))?/i)
+  return match?.[0]?.trim() ?? ''
+}
+
+function cleanDurationValue(value: string) {
+  return value.replace(/\s*\((?:years?|yil|yıl)\)\s*/gi, '').trim()
 }
 
 function requestedLanguage(question: string) {
@@ -265,7 +353,10 @@ function variantLabel(program: string) {
 
 function baseProgramLabel(program: string) {
   return program
-    .replace(/\s*\((?:Ücretli|Burslu|%50\s*İnd\.?|%50\s*İndirimli|Hazırlık)\)\s*/gi, ' ')
+    .replace(
+      /\s*\((?:Ücretli|Burslu|%50\s*İnd\.?|%50\s*İndirimli|Hazırlık|Türkçe|İngilizce|English)\)\s*/gi,
+      ' '
+    )
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -283,6 +374,7 @@ function formatValue(metricKey: MetricKey, value: string) {
     if (trimmed === '-') return 'ücret belirtilmemiş'
     return /\btl\b/i.test(trimmed) ? trimmed : `${trimmed} TL`
   }
+  if (metricKey === 'duration') return cleanDurationValue(trimmed)
   return trimmed
 }
 
@@ -295,6 +387,7 @@ function metricLabel(metricKey: MetricKey, header: string, plural: boolean) {
   if (metricKey === 'base_score') return `${prefix}${plural ? 'taban puanları' : 'taban puanı'}`
   if (metricKey === 'price') return `${prefix}${plural ? 'ücretleri' : 'ücreti'}`
   if (metricKey === 'point_type') return plural ? 'puan türleri' : 'puan türü'
+  if (metricKey === 'duration') return plural ? 'eğitim süreleri' : 'eğitim süresi'
   return plural ? 'program kodları' : 'program kodu'
 }
 
@@ -317,6 +410,68 @@ function dedupeRows(rows: SelectedRow[]) {
     seen.add(key)
     return true
   })
+}
+
+function extractLineMetricRows(input: {
+  metricKey: MetricKey
+  chunks: RagChunk[]
+  tokens: string[]
+}): SelectedRow[] {
+  if (input.metricKey !== 'duration') return []
+
+  const rows: SelectedRow[] = []
+  input.chunks.forEach((chunk, chunkIndex) => {
+    const lines = chunk.content
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+    const subjectLine = lines.find(
+      (line) => line.length <= 160 && rowMatchesSubject(line, input.tokens)
+    )
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index] ?? ''
+      if (line.length <= 160 && rowMatchesSubject(line, input.tokens)) {
+        const nearbyDuration =
+          durationValue(line) ||
+          durationValue(lines[index + 1] ?? '') ||
+          durationValue(lines[index + 2] ?? '') ||
+          durationValue(lines[index + 3] ?? '')
+        if (nearbyDuration) {
+          rows.push({
+            program: line.replace(durationValue(line), '').trim() || line,
+            variant: variantLabel(line),
+            value: nearbyDuration,
+            chunk,
+            evidenceId: `E${chunkIndex + 1}`,
+          })
+        }
+      }
+
+      if (
+        subjectLine &&
+        metricDefinition(input.metricKey).headerPatterns.some((pattern) =>
+          pattern.test(normalize(line))
+        )
+      ) {
+        const nearbyDuration =
+          durationValue(lines[index + 1] ?? '') ||
+          durationValue(lines[index + 2] ?? '') ||
+          durationValue(lines[index + 3] ?? '')
+        if (nearbyDuration) {
+          rows.push({
+            program: subjectLine,
+            variant: variantLabel(subjectLine),
+            value: nearbyDuration,
+            chunk,
+            evidenceId: `E${chunkIndex + 1}`,
+          })
+        }
+      }
+    }
+  })
+
+  return rows
 }
 
 function buildAnswer(input: {
@@ -397,6 +552,17 @@ export function composeLlmFirstTableFactAnswer(input: {
         evidenceId: `E${table.chunkIndex + 1}`,
       })
     }
+  }
+
+  selectedRows.push(
+    ...extractLineMetricRows({
+      metricKey,
+      chunks: input.chunks,
+      tokens,
+    })
+  )
+  if (!metricHeader && metricKey === 'duration') {
+    metricHeader = input.responseLanguage === 'en' ? 'Education Time' : 'Eğitim Süresi'
   }
 
   const uniqueRows = dedupeRows(selectedRows)

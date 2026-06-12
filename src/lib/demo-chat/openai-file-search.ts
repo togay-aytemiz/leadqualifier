@@ -25,6 +25,14 @@ export type OpenAiFileSearchDemoReply = {
 const DEFAULT_FILE_SEARCH_DEMO_SLUGS = ['yiu-tanitim-gunleri-2026']
 const DEFAULT_RETRIEVAL_MODEL = 'gpt-4.1-mini'
 const DEFAULT_ANSWER_MODEL = 'gpt-4o-mini'
+const DEFAULT_TABLE_FACT_SOURCE_GROUPS = [
+    'brochure-program-fee-tip',
+    'brochure-program-fee-saglik-bilimleri',
+    'brochure-program-fee-spor',
+    'brochure-program-fee-shmyo',
+    'brochure-program-fee-myo',
+]
+const DEFAULT_DURATION_FACT_SOURCE_GROUPS = ['contact-admin', 'academic']
 
 function readEnabledSlugs() {
     const raw = process.env.DEMO_CHAT_FILE_SEARCH_SLUGS?.trim()
@@ -54,6 +62,24 @@ function readRetrievalModel() {
 function readAnswerModel() {
     return process.env.DEMO_CHAT_FILE_SEARCH_ANSWER_MODEL?.trim()
         || DEFAULT_ANSWER_MODEL
+}
+
+function readTableFactSourceGroups() {
+    const raw = process.env.DEMO_CHAT_FILE_SEARCH_TABLE_FACT_SOURCE_GROUPS?.trim()
+    if (!raw) return DEFAULT_TABLE_FACT_SOURCE_GROUPS
+    return raw
+        .split(',')
+        .map((sourceGroup) => sourceGroup.trim())
+        .filter(Boolean)
+}
+
+function readDurationFactSourceGroups() {
+    const raw = process.env.DEMO_CHAT_FILE_SEARCH_DURATION_FACT_SOURCE_GROUPS?.trim()
+    if (!raw) return DEFAULT_DURATION_FACT_SOURCE_GROUPS
+    return raw
+        .split(',')
+        .map((sourceGroup) => sourceGroup.trim())
+        .filter(Boolean)
 }
 
 function usageModelName(retrievalModel: string, answerModel: string) {
@@ -126,6 +152,10 @@ export async function buildOpenAiFileSearchDemoReply(input: {
             recentMessages: input.conversationHistory ?? [],
             responseLanguage,
             citationSourcesByFilename: sourceManifest.sourcesByFilename,
+            sourceGroupScopes: {
+                tableFacts: readTableFactSourceGroups(),
+                durationFacts: readDurationFactSourceGroups(),
+            },
             maxResults: 20,
             settings,
         })

@@ -72,6 +72,10 @@ describe('runLlmFirstTurnPlanner', () => {
       decision: 'search',
       resolved_question: 'Üniversitenin kampüsleri nerede?',
       search_query: 'üniversite kampüs yerleşke adresleri',
+      search_queries: [
+        'kampüs yerleşke adresleri',
+        'üniversite lokasyon ulaşım kampüs',
+      ],
       answer_goal: 'Kampüslerin adlarını ve doğrulanmış konumlarını açıkça belirt.',
       response_language: 'tr',
       required_facts: ['kampüs adları', 'adres veya konum'],
@@ -98,6 +102,10 @@ describe('runLlmFirstTurnPlanner', () => {
       decision: 'search',
       resolvedQuestion: 'Üniversitenin kampüsleri nerede?',
       searchQuery: 'üniversite kampüs yerleşke adresleri',
+      searchQueries: [
+        'kampüs yerleşke adresleri',
+        'üniversite lokasyon ulaşım kampüs',
+      ],
     })
   })
 
