@@ -3,17 +3,10 @@ import sourceManifest from '@/lib/knowledge-base/provider-data/yiu-tanitim-gunle
 import { resolveMvpResponseLanguage } from '@/lib/ai/language'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { recordAiUsage } from '@/lib/ai/usage'
-import { runOpenAiFileSearchValidatedQuestion } from '@/lib/knowledge-base/rag-eval/openai-file-search-validated'
-import { polishGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-polish'
-import { BROCHURE_SOURCE_PRIORITY_GROUPS } from '@/lib/knowledge-base/rag-eval/brochure-query-plan'
-import {
-    findLatestRagPendingClarificationState,
-    normalizeRagPendingClarificationState,
-} from '@/lib/knowledge-base/rag-eval/pending-clarification-state'
+import { runLlmFirstFileSearchPipeline } from '@/lib/knowledge-base/llm-first/pipeline'
 import type { KnowledgeSearchPlanningTurn } from '@/lib/knowledge-base/query-planner'
-import type { RagChunk } from '@/lib/knowledge-base/rag'
 import type { DemoChatChannel } from '@/lib/demo-chat/channel'
-import type { RagPendingClarificationState, RagProviderCitation } from '@/lib/knowledge-base/rag-eval/types'
+import type { RagPendingClarificationState } from '@/lib/knowledge-base/rag-eval/types'
 
 type SupabaseLike = Parameters<typeof recordAiUsage>[0]['supabase']
 
@@ -32,8 +25,6 @@ export type OpenAiFileSearchDemoReply = {
 const DEFAULT_FILE_SEARCH_DEMO_SLUGS = ['yiu-tanitim-gunleri-2026']
 const DEFAULT_RETRIEVAL_MODEL = 'gpt-4.1-mini'
 const DEFAULT_ANSWER_MODEL = 'gpt-4o-mini'
-const DEFAULT_EVALUATOR_MODEL = 'gpt-4o-mini'
-const DEFAULT_RESEARCH_PLANNER_MODEL = 'gpt-4o-mini'
 
 function readEnabledSlugs() {
     const raw = process.env.DEMO_CHAT_FILE_SEARCH_SLUGS?.trim()
@@ -65,46 +56,8 @@ function readAnswerModel() {
         || DEFAULT_ANSWER_MODEL
 }
 
-function readQualityMode(): 'validated' | 'strict' {
-    return process.env.DEMO_CHAT_FILE_SEARCH_STRICT_QUALITY === '0'
-        ? 'validated'
-        : 'strict'
-}
-
-function readStrictLlmEvaluatorEnabled(qualityMode: 'validated' | 'strict') {
-    return qualityMode === 'strict' && process.env.DEMO_CHAT_FILE_SEARCH_LLM_EVALUATOR !== '0'
-}
-
-function readResearchPlannerEnabled(qualityMode: 'validated' | 'strict') {
-    return qualityMode === 'strict' && process.env.DEMO_CHAT_FILE_SEARCH_RESEARCH_PLANNER !== '0'
-}
-
-function readStrictEvaluatorModel() {
-    return process.env.DEMO_CHAT_FILE_SEARCH_EVALUATOR_MODEL?.trim()
-        || process.env.OPENAI_RAG_EVALUATOR_MODEL?.trim()
-        || DEFAULT_EVALUATOR_MODEL
-}
-
-function readResearchPlannerModel() {
-    return process.env.DEMO_CHAT_FILE_SEARCH_RESEARCH_PLANNER_MODEL?.trim()
-        || process.env.OPENAI_RAG_RESEARCH_PLANNER_MODEL?.trim()
-        || DEFAULT_RESEARCH_PLANNER_MODEL
-}
-
-function usageModelName(input: {
-    retrievalModel: string
-    answerModel: string
-    strictEvaluatorModel: string
-    strictLlmEvaluatorEnabled: boolean
-    researchPlannerModel: string
-    researchPlannerEnabled: boolean
-}) {
-    return Array.from(new Set([
-        input.retrievalModel,
-        input.answerModel,
-        ...(input.researchPlannerEnabled ? [input.researchPlannerModel] : []),
-        ...(input.strictLlmEvaluatorEnabled ? [input.strictEvaluatorModel] : []),
-    ])).join('+')
+function usageModelName(retrievalModel: string, answerModel: string) {
+    return Array.from(new Set([retrievalModel, answerModel])).join('+')
 }
 
 function mapCitationMetadata(citations: Array<{
@@ -119,89 +72,6 @@ function mapCitationMetadata(citations: Array<{
         ...(citation.url ? { url: citation.url } : {}),
         ...(typeof citation.score === 'number' ? { score: citation.score } : {}),
     }))
-}
-
-function splitStandaloneSourceUrls(answer: string) {
-    const sourceUrls: string[] = []
-    const proseLines: string[] = []
-
-    for (const line of answer.split(/\r?\n/)) {
-        const trimmed = line.trim()
-        if (/^https?:\/\/\S+$/i.test(trimmed)) {
-            sourceUrls.push(trimmed)
-        } else {
-            proseLines.push(line)
-        }
-    }
-
-    return {
-        prose: proseLines.join('\n').trim(),
-        sourceUrls: Array.from(new Set(sourceUrls)),
-    }
-}
-
-function citationsToPolishChunks(citations: RagProviderCitation[], fallbackContent: string): RagChunk[] {
-    const chunks = citations
-        .map((citation): RagChunk | null => {
-            const content = [citation.quote, citation.title].filter(Boolean).join('\n').trim()
-            if (!content) return null
-            return {
-                content,
-                similarity: citation.score,
-                document_id: citation.providerSourceId,
-                document_title: citation.title,
-                chunk_id: citation.providerSourceId,
-                source_url: citation.url ?? null,
-            }
-        })
-        .filter((chunk): chunk is RagChunk => Boolean(chunk))
-
-    if (chunks.length > 0) return chunks
-
-    return [{
-        content: fallbackContent,
-        document_id: 'demo-file-search-final-answer',
-        document_title: 'Validated final answer',
-        chunk_id: 'demo-file-search-final-answer',
-        source_url: null,
-    }]
-}
-
-async function polishDemoFileSearchFinalAnswer(input: {
-    answer: string
-    userMessage: string
-    responseLanguage: ReturnType<typeof resolveMvpResponseLanguage>
-    settings: Awaited<ReturnType<typeof getOrgAiSettings>>
-    answerModel: string
-    citations: RagProviderCitation[]
-}) {
-    const { prose, sourceUrls } = splitStandaloneSourceUrls(input.answer)
-    if (!prose) {
-        return {
-            answer: input.answer.trim(),
-            polish: null,
-        }
-    }
-
-    const polished = await polishGroundedRagAnswer({
-        answer: prose,
-        userMessage: input.userMessage,
-        responseLanguage: input.responseLanguage,
-        chunks: citationsToPolishChunks(input.citations, prose),
-        settings: input.settings,
-        model: input.answerModel,
-    })
-    const polishedProse = polished.answer.trim() || prose
-
-    return {
-        answer: [polishedProse, ...sourceUrls].join('\n').trim(),
-        polish: {
-            usedPolish: polished.usedPolish,
-            addedEngagement: polished.addedEngagement,
-            model: polished.model,
-            usage: polished.usage,
-        },
-    }
 }
 
 function recentUserHistoryMessages(history: KnowledgeSearchPlanningTurn[] | undefined) {
@@ -245,49 +115,21 @@ export async function buildOpenAiFileSearchDemoReply(input: {
         })
         const retrievalModel = readRetrievalModel()
         const answerModel = readAnswerModel()
-        const qualityMode = readQualityMode()
-        const strictLlmEvaluatorEnabled = readStrictLlmEvaluatorEnabled(qualityMode)
-        const strictEvaluatorModel = readStrictEvaluatorModel()
-        const researchPlannerEnabled = readResearchPlannerEnabled(qualityMode)
-        const researchPlannerModel = readResearchPlannerModel()
         const vectorStoreId = readVectorStoreId()
         const openai = new OpenAI({ apiKey })
-        const pendingClarification =
-            normalizeRagPendingClarificationState(input.pendingClarification)
-            ?? findLatestRagPendingClarificationState(input.conversationHistory ?? [])
-        const result = await runOpenAiFileSearchValidatedQuestion({
+        const result = await runLlmFirstFileSearchPipeline({
             client: openai,
-            organizationId: input.channel.organizationId,
-            conversationId: input.conversationId ?? undefined,
-            channel: 'demo_chat',
-            model: retrievalModel,
+            retrievalModel,
             answerModel,
             vectorStoreId,
-            question: input.message,
-            conversationHistory: input.conversationHistory ?? [],
-            pendingClarification: pendingClarification ?? undefined,
-            contextualOrchestratorMode: 'always',
-            instructionProfile: 'qualy',
-            citationSourcesByFilename: sourceManifest.sourcesByFilename,
-            sourcePriorityGroups: BROCHURE_SOURCE_PRIORITY_GROUPS,
-            maxResults: 8,
-            maxOutputTokens: 900,
-            settings,
-            qualityMode,
-            enableStrictLlmEvaluator: strictLlmEvaluatorEnabled,
-            strictEvaluatorModel,
-            enableLlmResearchPlanner: researchPlannerEnabled,
-            researchPlannerModel,
-        })
-        const finalPolish = await polishDemoFileSearchFinalAnswer({
-            answer: result.answer,
-            userMessage: input.message,
+            latestUserMessage: input.message,
+            recentMessages: input.conversationHistory ?? [],
             responseLanguage,
+            citationSourcesByFilename: sourceManifest.sourcesByFilename,
+            maxResults: 20,
             settings,
-            answerModel,
-            citations: result.citations,
         })
-        const answer = finalPolish.answer.trim()
+        const answer = result.answer.trim()
         if (!answer) return null
 
         if (result.usage?.totalTokens || result.usage?.inputTokens || result.usage?.outputTokens) {
@@ -295,29 +137,16 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                 await recordAiUsage({
                     organizationId: input.channel.organizationId,
                     category: 'rag',
-                    model: usageModelName({
-                        retrievalModel,
-                        answerModel,
-                        strictEvaluatorModel,
-                        strictLlmEvaluatorEnabled,
-                        researchPlannerModel,
-                        researchPlannerEnabled,
-                    }),
+                    model: usageModelName(retrievalModel, answerModel),
                     inputTokens: result.usage.inputTokens,
                     outputTokens: result.usage.outputTokens,
                     totalTokens: result.usage.totalTokens,
                     metadata: {
-                        source: 'demo_chat_openai_file_search_validated',
-                        response_kind: 'rag_openai_file_search_validated',
+                        source: 'demo_chat_llm_first_file_search',
+                        response_kind: 'rag_llm_first_file_search',
                         demo_chat_channel_id: input.channel.id,
                         ...(input.conversationId ? { conversation_id: input.conversationId } : {}),
                         vector_store_id: vectorStoreId,
-                        source_priority_groups: BROCHURE_SOURCE_PRIORITY_GROUPS,
-                        quality_mode: qualityMode,
-                        strict_llm_evaluator_enabled: strictLlmEvaluatorEnabled,
-                        strict_evaluator_model: strictEvaluatorModel,
-                        research_planner_enabled: researchPlannerEnabled,
-                        research_planner_model: researchPlannerModel,
                         conversation_history_turn_count: input.conversationHistory?.length ?? 0,
                         tool_calls: result.usage.toolCalls,
                         estimated_credits: result.usage.estimatedCredits,
@@ -329,29 +158,6 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                 console.error('Demo Chat: OpenAI File Search usage recording failed; continuing reply flow', error)
             }
         }
-        if (finalPolish.polish?.usage) {
-            try {
-                await recordAiUsage({
-                    organizationId: input.channel.organizationId,
-                    category: 'rag',
-                    model: finalPolish.polish.model,
-                    inputTokens: finalPolish.polish.usage.inputTokens,
-                    outputTokens: finalPolish.polish.usage.outputTokens,
-                    totalTokens: finalPolish.polish.usage.totalTokens,
-                    metadata: {
-                        source: 'demo_chat_openai_file_search_final_polish',
-                        response_kind: 'rag_openai_file_search_final_polish',
-                        demo_chat_channel_id: input.channel.id,
-                        ...(input.conversationId ? { conversation_id: input.conversationId } : {}),
-                        vector_store_id: vectorStoreId,
-                    },
-                    supabase: input.supabase,
-                })
-            } catch (error) {
-                console.error('Demo Chat: OpenAI File Search final polish usage recording failed; continuing reply flow', error)
-            }
-        }
-
         const citations = mapCitationMetadata(result.citations)
 
         return {
@@ -359,29 +165,18 @@ export async function buildOpenAiFileSearchDemoReply(input: {
             metadata: {
                 is_rag: true,
                 rag_extractive: false,
-                demo_chat_reply_source: 'openai_file_search_validated',
+                demo_chat_reply_source: 'llm_first_file_search',
                 rag_provider: result.provider,
                 rag_file_search: {
                     vector_store_id: vectorStoreId,
                     retrieval_model: retrievalModel,
                     answer_model: answerModel,
-                    strict_evaluator_model: strictEvaluatorModel,
-                    strict_llm_evaluator_enabled: strictLlmEvaluatorEnabled,
-                    research_planner_enabled: researchPlannerEnabled,
-                    research_planner_model: researchPlannerModel,
-                    source_priority_groups: BROCHURE_SOURCE_PRIORITY_GROUPS,
-                    quality_mode: qualityMode,
+                    pipeline_version: 'llm_first_v1',
                     refusal: result.refusal,
                     timings_ms: result.timingsMs,
                     diagnostics: result.diagnostics,
                     usage: result.usage,
-                    final_polish: finalPolish.polish
-                        ? {
-                            usedPolish: finalPolish.polish.usedPolish,
-                            addedEngagement: finalPolish.polish.addedEngagement,
-                            model: finalPolish.polish.model,
-                        }
-                        : null,
+                    final_polish: result.diagnostics?.presentationPolish ?? null,
                     conversation_history_turn_count: input.conversationHistory?.length ?? 0,
                 },
                 ...(result.diagnostics?.pendingClarification

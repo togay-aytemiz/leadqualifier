@@ -2,14 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const {
     getOrgAiSettingsMock,
-    polishGroundedRagAnswerMock,
     recordAiUsageMock,
-    runOpenAiFileSearchValidatedQuestionMock,
+    runLlmFirstFileSearchPipelineMock,
 } = vi.hoisted(() => ({
     getOrgAiSettingsMock: vi.fn(),
-    polishGroundedRagAnswerMock: vi.fn(),
     recordAiUsageMock: vi.fn(),
-    runOpenAiFileSearchValidatedQuestionMock: vi.fn(),
+    runLlmFirstFileSearchPipelineMock: vi.fn(),
 }))
 
 vi.mock('openai', () => ({
@@ -26,12 +24,8 @@ vi.mock('@/lib/ai/usage', () => ({
     recordAiUsage: recordAiUsageMock,
 }))
 
-vi.mock('@/lib/knowledge-base/rag-eval/openai-file-search-validated', () => ({
-    runOpenAiFileSearchValidatedQuestion: runOpenAiFileSearchValidatedQuestionMock,
-}))
-
-vi.mock('@/lib/knowledge-base/rag-answer-polish', () => ({
-    polishGroundedRagAnswer: polishGroundedRagAnswerMock,
+vi.mock('@/lib/knowledge-base/llm-first/pipeline', () => ({
+    runLlmFirstFileSearchPipeline: runLlmFirstFileSearchPipelineMock,
 }))
 
 import { buildOpenAiFileSearchDemoReply } from './openai-file-search'
@@ -52,13 +46,13 @@ describe('buildOpenAiFileSearchDemoReply', () => {
         vi.clearAllMocks()
     })
 
-    it('polishes the final customer-facing File Search reply regardless of provider path', async () => {
+    it('routes the demo directly through the LLM-first File Search pipeline', async () => {
         vi.stubEnv('OPENAI_API_KEY', 'sk-test')
         getOrgAiSettingsMock.mockResolvedValue({
             bot_name: 'Qualy',
             prompt: 'Bol emoji kullan, Gen-Z gibi konuş.',
         })
-        runOpenAiFileSearchValidatedQuestionMock.mockResolvedValue({
+        runLlmFirstFileSearchPipelineMock.mockResolvedValue({
             provider: 'openai_file_search_validated',
             answer:
                 'Tıp Fakültesi için 2025 broşüründe Ücretli fiyat 720.000 TL, %50 indirimli fiyat 360.000 TL olarak listelenir. Burslu kontenjan satırında fiyat alanı "-" olarak gösterilir.\nhttps://example.edu.tr/brochure.pdf',
@@ -83,14 +77,6 @@ describe('buildOpenAiFileSearchDemoReply', () => {
                 },
             },
         })
-        polishGroundedRagAnswerMock.mockResolvedValue({
-            answer:
-                'Tıp Fakültesi için 2025 ücretli program ücreti 720.000 TL, %50 indirimli ücret 360.000 TL. Burslu kontenjan için ücret alınmaz.',
-            usedPolish: true,
-            addedEngagement: false,
-            usage: { inputTokens: 80, outputTokens: 24, totalTokens: 104 },
-            model: 'gpt-4o-mini',
-        })
         recordAiUsageMock.mockResolvedValue(undefined)
 
         const result = await buildOpenAiFileSearchDemoReply({
@@ -100,33 +86,21 @@ describe('buildOpenAiFileSearchDemoReply', () => {
             conversationId: 'conv-1',
         })
 
-        expect(runOpenAiFileSearchValidatedQuestionMock).toHaveBeenCalledWith(expect.objectContaining({
-            organizationId: 'org-1',
-            conversationId: 'conv-1',
-            channel: 'demo_chat',
-            question: 'tip kaç para',
-            contextualOrchestratorMode: 'always',
+        expect(runLlmFirstFileSearchPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            latestUserMessage: 'tip kaç para',
+            recentMessages: [],
+            responseLanguage: 'tr',
             settings: {
                 bot_name: 'Qualy',
                 prompt: 'Bol emoji kullan, Gen-Z gibi konuş.',
             },
         }))
-        expect(polishGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
-            answer: expect.stringContaining('2025 broşüründe Ücretli fiyat 720.000 TL'),
-            userMessage: 'tip kaç para',
-            settings: {
-                bot_name: 'Qualy',
-                prompt: 'Bol emoji kullan, Gen-Z gibi konuş.',
-            },
-        }))
-        expect(result?.replyText).toContain('Tıp Fakültesi için 2025 ücretli program ücreti 720.000 TL')
-        expect(result?.replyText).not.toContain('broşür')
-        expect(result?.replyText).not.toContain('fiyat alanı')
-        expect(result?.replyText).not.toContain('satır')
+        expect(result?.replyText).toContain('Tıp Fakültesi için 2025 broşüründe')
         expect(result?.replyText).toContain('https://example.edu.tr/brochure.pdf')
         expect(result?.metadata.rag_file_search).toMatchObject({
+            pipeline_version: 'llm_first_v1',
             final_polish: {
-                usedPolish: true,
+                usedPolish: false,
                 addedEngagement: false,
                 model: 'gpt-4o-mini',
             },
@@ -139,7 +113,7 @@ describe('buildOpenAiFileSearchDemoReply', () => {
             bot_name: 'Qualy',
             prompt: 'Kısa ve net Türkçe konuş.',
         })
-        runOpenAiFileSearchValidatedQuestionMock.mockResolvedValue({
+        runLlmFirstFileSearchPipelineMock.mockResolvedValue({
             provider: 'openai_file_search_validated',
             answer: 'English Medicine tuition is 720,000 TL; discounted tuition is 360,000 TL.',
             citations: [],
@@ -148,14 +122,6 @@ describe('buildOpenAiFileSearchDemoReply', () => {
             usage: { inputTokens: 80, outputTokens: 16, totalTokens: 96, toolCalls: 0 },
             diagnostics: {},
         })
-        polishGroundedRagAnswerMock.mockResolvedValue({
-            answer: 'İngilizce Tıp programının ücreti 720.000 TL, %50 indirimli ücreti 360.000 TL.',
-            usedPolish: true,
-            addedEngagement: false,
-            usage: { inputTokens: 70, outputTokens: 20, totalTokens: 90 },
-            model: 'gpt-4o-mini',
-        })
-
         const result = await buildOpenAiFileSearchDemoReply({
             supabase: {},
             channel,
@@ -173,10 +139,13 @@ describe('buildOpenAiFileSearchDemoReply', () => {
         expect(getOrgAiSettingsMock).toHaveBeenCalledWith('org-1', expect.objectContaining({
             locale: 'tr',
         }))
-        expect(polishGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
-            userMessage: 'ingilizcesi?',
+        expect(runLlmFirstFileSearchPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            latestUserMessage: 'ingilizcesi?',
             responseLanguage: 'tr',
+            recentMessages: expect.arrayContaining([
+                expect.objectContaining({ role: 'user', content: 'tıp kaç para' }),
+            ]),
         }))
-        expect(result?.replyText).toContain('İngilizce Tıp')
+        expect(result?.replyText).toContain('English Medicine')
     })
 })
