@@ -2087,9 +2087,9 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
         'brochure, document, PDF, website, table, row, field, citation'
       )
       expect(systemPrompt).toContain('Bol emoji kullan, Gen-Z gibi konuş.')
-      expect(userPrompt).toContain(
-        'Tıp Fakültesi (Ücretli) için 2025 fiyatı 720.000 TL olarak broşürde gösterilmiştir.'
-      )
+      expect(userPrompt).toContain('Tıp Fakültesi (Ücretli) için 2025 ücreti 720.000 TL.')
+      expect(userPrompt).not.toContain('broşür')
+      expect(userPrompt).not.toContain('fiyat alanı')
 
       return {
         choices: [
@@ -2470,7 +2470,7 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
     expect(result).toMatchObject({
       refusal: false,
       answer:
-        'Tıp Fakültesi (Hazırlık) için 2025 fiyatı 410.000 TL olarak broşürde gösterilmiştir.\n\nİsterseniz bu başlıkla ilgili başka bir ayrıntıyı da kaynaklardan kontrol edebilirim.\nhttps://example.edu.tr/brochure.pdf',
+        'Tıp Fakültesi (Hazırlık) için 2025 ücreti 410.000 TL.\n\nİsterseniz bu başlıkla ilgili başka bir ayrıntıyı da kaynaklardan kontrol edebilirim.\nhttps://example.edu.tr/brochure.pdf',
       citations: [
         {
           providerSourceId: 'file_tip',
@@ -2636,7 +2636,7 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
 
     expect(result.answer).toBe(
       [
-        'Tıp Fakültesi (Ücretli) için 2025 fiyatı 720.000 TL olarak broşürde gösterilmiştir.',
+        'Tıp Fakültesi (Ücretli) için 2025 ücreti 720.000 TL.',
         '',
         'İsterseniz Tıp Fakültesi için burslu ve %50 indirimli seçenekleri de karşılaştırabilirim.',
         'https://example.edu.tr/brochure.pdf',

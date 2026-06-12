@@ -6,7 +6,7 @@ describe('buildValidatedFollowup', () => {
   it('offers an evidence-supported fee variant comparison after a table answer', () => {
     const followup = buildValidatedFollowup({
       question: 'Tıp Fakültesi ücretli programının fiyatı nedir?',
-      answer: 'Tıp Fakültesi (Ücretli) için 2025 fiyatı 720.000 TL olarak broşürde gösterilmiştir.',
+      answer: 'Tıp Fakültesi (Ücretli) için 2025 ücreti 720.000 TL.',
       plan: planBrochureQuery('Tıp Fakültesi ücretli programının fiyatı nedir?'),
       refusal: false,
       citations: [
@@ -35,14 +35,13 @@ describe('buildValidatedFollowup', () => {
       citations: [
         {
           providerSourceId: 'file_burs',
-          quote: '### Tercih Bursu\n%10, %7 ve %5 indirim uygulanır.\n### Akademik Başarı Bursu\nKoşullar broşürde açıklanır.',
+          quote:
+            '### Tercih Bursu\n%10, %7 ve %5 indirim uygulanır.\n### Akademik Başarı Bursu\nKoşullar broşürde açıklanır.',
         },
       ],
     })
 
-    expect(followup).toBe(
-      'Akademik başarı bursunun koşullarını da incelememi ister misiniz?'
-    )
+    expect(followup).toBe('Akademik başarı bursunun koşullarını da incelememi ister misiniz?')
   })
 
   it('offers an address after a supported campus answer', () => {
@@ -188,13 +187,12 @@ describe('buildValidatedFollowup', () => {
       citations: [
         {
           providerSourceId: 'file_burs',
-          quote: '### Tercih Bursu\n%10, %7 ve %5 indirim uygulanır.\n### Akademik Başarı Bursu\nKoşullar broşürde açıklanır.',
+          quote:
+            '### Tercih Bursu\n%10, %7 ve %5 indirim uygulanır.\n### Akademik Başarı Bursu\nKoşullar broşürde açıklanır.',
         },
       ],
     })
 
-    expect(followup).toBe(
-      'Akademik başarı bursunun koşullarını da incelememi ister misiniz?'
-    )
+    expect(followup).toBe('Akademik başarı bursunun koşullarını da incelememi ister misiniz?')
   })
 })

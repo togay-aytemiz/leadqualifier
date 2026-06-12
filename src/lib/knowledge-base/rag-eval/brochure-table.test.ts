@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { planBrochureQuery } from './brochure-query-plan'
-import {
-  parseBrochureTableRows,
-  resolveBrochureTableFact,
-} from './brochure-table'
+import { parseBrochureTableRows, resolveBrochureTableFact } from './brochure-table'
 import type { RagProviderCitation } from './types'
 
 const tableCitation: RagProviderCitation = {
@@ -61,9 +58,7 @@ describe('brochure table facts', () => {
 
   it('answers success rank and quota from the same Optisyenlik row', () => {
     const result = resolveBrochureTableFact({
-      plan: planBrochureQuery(
-        'Optisyenlik burslu programının başarı sırası ve kontenjanı nedir?'
-      ),
+      plan: planBrochureQuery('Optisyenlik burslu programının başarı sırası ve kontenjanı nedir?'),
       citations: [tableCitation],
     })
 
@@ -78,6 +73,19 @@ describe('brochure table facts', () => {
     expect(result?.answer).toContain('2024 başarı sırası 444.708')
     expect(result?.answer).toContain('2025 kontenjanı 7')
     expect(result?.answer).not.toContain('başarı sırası 7')
+  })
+
+  it('renders direct table facts as customer-facing answers without source mechanics', () => {
+    const result = resolveBrochureTableFact({
+      plan: planBrochureQuery('Optisyenlik burslu programının taban puanı nedir?'),
+      citations: [tableCitation],
+    })
+
+    expect(result?.answer).toContain('Optisyenlik (Burslu) için 2024 taban puanı 345,708')
+    expect(result?.answer).not.toContain('broşür')
+    expect(result?.answer).not.toContain('tablo')
+    expect(result?.answer).not.toContain('satır')
+    expect(result?.answer).not.toContain('alan')
   })
 
   it('summarizes broad table field questions when no single program is specified', () => {
@@ -106,7 +114,7 @@ describe('brochure table facts', () => {
     })
 
     expect(preparation?.row.programName).toBe('Tıp Fakültesi (Hazırlık)')
-    expect(preparation?.answer).toContain('2025 fiyatı 410.000 TL')
+    expect(preparation?.answer).toContain('2025 ücreti 410.000 TL')
     expect(englishDiscount?.row.programName).toBe('Tıp Fakültesi (İngilizce) (%50 İnd.)')
     expect(englishDiscount?.answer).toContain('2025 kontenjanı 6')
   })
@@ -117,9 +125,11 @@ describe('brochure table facts', () => {
       citations: [tableCitation],
     })
 
-    expect(result?.answer).toContain('2025 fiyat alanı')
+    expect(result?.answer).toContain('2025 ücret bilgisi')
     expect(result?.answer).toContain('belirtilmemiştir')
     expect(result?.answer).not.toContain('0 TL')
+    expect(result?.answer).not.toContain('fiyat alanı')
+    expect(result?.answer).not.toContain('broşür')
   })
 
   it('adds a verification warning for the known inconsistent brochure row', () => {

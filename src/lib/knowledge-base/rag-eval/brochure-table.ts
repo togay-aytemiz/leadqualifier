@@ -102,9 +102,9 @@ function rowHasVariant(rowName: string, variant: string | undefined) {
 }
 
 function matchingRows(rows: BrochureTableRow[], plan: BrochureQueryPlan) {
-  const programs = (plan.programs.length > 0 ? plan.programs : plan.program ? [plan.program] : []).map(
-    normalize
-  )
+  const programs = (
+    plan.programs.length > 0 ? plan.programs : plan.program ? [plan.program] : []
+  ).map(normalize)
   if (programs.length === 0) return rows
   const variants = plan.variants.length > 0 ? plan.variants : plan.variant ? [plan.variant] : []
   return rows.filter(
@@ -124,18 +124,18 @@ function fieldValue(row: BrochureTableRow, field: BrochureTableField) {
 }
 
 function missingFieldAnswer(field: BrochureTableField) {
-  if (field === 'price') return '2025 fiyat alanı broşürde belirtilmemiştir'
-  if (field === 'quota') return '2025 kontenjanı broşürde belirtilmemiştir'
-  if (field === 'success_rank') return '2024 başarı sırası broşürde belirtilmemiştir'
-  if (field === 'base_score') return '2024 taban puanı broşürde belirtilmemiştir'
-  if (field === 'point_type') return 'puan türü broşürde belirtilmemiştir'
-  return 'puan kodu broşürde belirtilmemiştir'
+  if (field === 'price') return '2025 ücret bilgisi belirtilmemiştir'
+  if (field === 'quota') return '2025 kontenjanı belirtilmemiştir'
+  if (field === 'success_rank') return '2024 başarı sırası belirtilmemiştir'
+  if (field === 'base_score') return '2024 taban puanı belirtilmemiştir'
+  if (field === 'point_type') return 'puan türü belirtilmemiştir'
+  return 'puan kodu belirtilmemiştir'
 }
 
 function supportedFieldAnswer(row: BrochureTableRow, field: BrochureTableField) {
   const value = fieldValue(row, field)
   if (!value || value === '-') return missingFieldAnswer(field)
-  if (field === 'price') return `2025 fiyatı ${value} TL`
+  if (field === 'price') return `2025 ücreti ${value} TL`
   if (field === 'quota') return `2025 kontenjanı ${value}`
   if (field === 'success_rank') return `2024 başarı sırası ${value}`
   if (field === 'base_score') return `2024 taban puanı ${value}`
@@ -150,13 +150,11 @@ function isKnownInconsistentRow(row: BrochureTableRow) {
 function renderAnswer(row: BrochureTableRow, fields: BrochureTableField[]) {
   const facts = fields.map((field) => supportedFieldAnswer(row, field))
   const factText =
-    facts.length === 1
-      ? facts[0]
-      : `${facts.slice(0, -1).join(', ')} ve ${facts.at(-1)}`
+    facts.length === 1 ? facts[0] : `${facts.slice(0, -1).join(', ')} ve ${facts.at(-1)}`
   const warning = isKnownInconsistentRow(row)
     ? ' Bu burslu satırındaki fiyat diğer burslu satırlarla tutarsız göründüğü için kayıt öncesinde üniversiteyle teyit edilmesi önerilir.'
     : ''
-  return `${row.programName} için ${factText} olarak broşürde gösterilmiştir.${warning}`
+  return `${row.programName} için ${factText}.${warning}`
 }
 
 function renderAnswers(rows: BrochureTableRow[], fields: BrochureTableField[]) {
