@@ -1830,3 +1830,30 @@ Recent rerun artifacts:
 
 5. **Unknown-safe-boundary typing**
    The `unknown_safe_boundary` bucket (`21`) should be reviewed and assigned to typed catalog slots so future candidate generation points to the exact fact sheet instead of a generic review queue.
+
+### Live UI 100-Question Smoke (2026-06-12)
+
+A systematic 100-question selection spanning all `508` rows was executed through the production Public Demo Chat UI. Every case started from a fresh demo conversation and used the visible reset -> type -> send -> rendered-answer path.
+
+| Metric | Result |
+|---|---:|
+| Cases | `100` |
+| Strict judge average | `7.11/10` |
+| Score 8-10 | `53` |
+| Score 6-7 | `24` |
+| Score 1-5 | `23` |
+| Average latency | `21.3s` |
+| p50 latency | `18.5s` |
+| p90 latency | `40.2s` |
+| Maximum latency | `92.2s` |
+| UI first-attempt timeout | `1` (`#334`, passed retry) |
+
+Primary product findings:
+
+- The strongest remaining generic issue is overly broad no-info behavior on answerable institution, bursary, fee, quota, registration, campus, and internship questions.
+- Entity/facet routing still fails on ambiguous domain words, notably `acil servis` being routed as transport service, program-existence questions being routed to facility/lab answers, and clinical-program questions drifting to Tıp/Ergoterapi evidence.
+- Some customer-visible answers still expose source mechanics such as `broşürde` and `onaylı kaynaklarda`, despite the final polish boundary.
+- The UI itself remained stable with no framework overlay or browser console errors; the user-experience risk is response latency rather than rendering stability.
+- The strict judge has known false negatives, so the full raw-answer report should be used for triage rather than treating the aggregate score as an exact product KPI.
+
+Full report: `docs/evaluations/yiu-live-ui-smoke-100-2026-06-12.md`.
