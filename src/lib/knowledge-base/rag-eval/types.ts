@@ -150,6 +150,15 @@ export type RagProviderResult = {
     qualityMode?: 'validated' | 'strict'
     normalizedQuestion?: string
     strictVerdict?: string
+    simpleRag?: {
+      standaloneQuery?: string
+      stateUsed: boolean
+      resultCount: number
+      topScores: number[]
+      selectedChunkIds: string[]
+      selectedFilenames: string[]
+      answerStatus: 'answer' | 'clarify' | 'no_info' | 'refuse'
+    }
     strictQuality?: {
       suggestedScore: 7 | 8 | 9
       tier: string

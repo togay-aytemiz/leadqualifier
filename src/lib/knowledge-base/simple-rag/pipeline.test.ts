@@ -1,0 +1,162 @@
+import { describe, expect, it, vi } from 'vitest'
+
+import { runSimpleRagPipeline } from './pipeline'
+
+function completion(payload: Record<string, unknown>, totalTokens = 20) {
+  return {
+    choices: [{ message: { content: JSON.stringify(payload) } }],
+    usage: {
+      prompt_tokens: totalTokens - 5,
+      completion_tokens: 5,
+      total_tokens: totalTokens,
+    },
+  }
+}
+
+const settings = { bot_name: 'Qualy', prompt: 'Kısa ve net cevap ver.' }
+
+describe('runSimpleRagPipeline', () => {
+  it('rewrites once, searches once, and answers once', async () => {
+    const rewriteCreateCompletion = vi.fn(async (_args: Record<string, unknown>) =>
+      completion({
+        status: 'search',
+        standalone_query: 'İngilizce Tıp programının ücreti nedir?',
+        response_language: 'tr',
+      }, 30)
+    )
+    const vectorSearch = vi.fn(async () => ({
+      data: [
+        {
+          file_id: 'file_1',
+          filename: 'medicine.md',
+          score: 0.94,
+          attributes: null,
+          content: [{ type: 'text' as const, text: 'İngilizce Tıp ücreti 720.000 TL.' }],
+        },
+      ],
+    }))
+    const answerCreateCompletion = vi.fn(async () =>
+      completion({
+        status: 'answer',
+        answer: 'İngilizce Tıp programının ücreti 720.000 TL’dir.',
+        used_chunk_ids: ['C1'],
+      }, 40)
+    )
+
+    const result = await runSimpleRagPipeline({
+      client: { vectorStores: { search: vectorSearch } },
+      vectorStoreId: 'vs_yiu',
+      answerModel: 'gpt-4o-mini',
+      rewriteModel: 'gpt-4.1-mini',
+      latestUserMessage: 'Peki bunun fiyatı ne?',
+      recentMessages: [{ role: 'user', content: 'İngilizce Tıp programını soruyorum.' }],
+      responseLanguage: 'tr',
+      settings,
+      citationSourcesByFilename: {
+        'medicine.md': { title: 'Tıp Ücretleri', url: 'https://example.edu.tr/medicine' },
+      },
+      rewriteCreateCompletion,
+      answerCreateCompletion,
+    })
+
+    expect(rewriteCreateCompletion).toHaveBeenCalledOnce()
+    expect(vectorSearch).toHaveBeenCalledOnce()
+    expect(answerCreateCompletion).toHaveBeenCalledOnce()
+    expect(JSON.stringify(rewriteCreateCompletion.mock.calls[0]?.[0])).not.toContain(
+      settings.prompt
+    )
+    expect(result.answer).toContain('720.000 TL')
+    expect(result.answer).toContain('https://example.edu.tr/medicine')
+    expect(result.refusal).toBe(false)
+    expect(result.usage.totalTokens).toBe(70)
+    expect(result.diagnostics).toMatchObject({
+      queryIntent: 'simple_rag_search',
+      contextualRetrievalIntent: 'İngilizce Tıp programının ücreti nedir?',
+      retryCount: 0,
+      strictVerdict: 'verified_evidence_answer',
+      simpleRag: {
+        resultCount: 1,
+        selectedChunkIds: ['C1'],
+        selectedFilenames: ['medicine.md'],
+        answerStatus: 'answer',
+      },
+    })
+  })
+
+  it('returns clarification before retrieval when the rewriter needs a subject', async () => {
+    const vectorSearch = vi.fn()
+    const answerCreateCompletion = vi.fn()
+    const result = await runSimpleRagPipeline({
+      client: { vectorStores: { search: vectorSearch } },
+      vectorStoreId: 'vs_yiu',
+      answerModel: 'gpt-4o-mini',
+      latestUserMessage: 'Peki fiyatı ne?',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      rewriteCreateCompletion: vi.fn(async () =>
+        completion({
+          status: 'clarify',
+          clarification_question: 'Hangi programın ücretini soruyorsunuz?',
+          missing_slot: 'program',
+          response_language: 'tr',
+        })
+      ),
+      answerCreateCompletion,
+    })
+
+    expect(result.answer).toBe('Hangi programın ücretini soruyorsunuz?')
+    expect(result.refusal).toBe(false)
+    expect(vectorSearch).not.toHaveBeenCalled()
+    expect(answerCreateCompletion).not.toHaveBeenCalled()
+    expect(result.diagnostics?.pendingClarification).toMatchObject({
+      originalQuestion: 'Peki fiyatı ne?',
+      missingSlots: ['program'],
+    })
+  })
+
+  it('returns no-info without marking an ordinary retrieval miss as refusal', async () => {
+    const result = await runSimpleRagPipeline({
+      client: { vectorStores: { search: vi.fn(async () => ({ data: [] })) } },
+      vectorStoreId: 'vs_yiu',
+      answerModel: 'gpt-4o-mini',
+      latestUserMessage: 'Otopark aboneliği var mı?',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      rewriteCreateCompletion: vi.fn(async () =>
+        completion({
+          status: 'search',
+          standalone_query: 'Üniversite otopark aboneliği var mı?',
+          response_language: 'tr',
+        })
+      ),
+      answerCreateCompletion: vi.fn(),
+    })
+
+    expect(result.answer).toBe('Bu bilgiye onaylı kaynaklarda ulaşamadım.')
+    expect(result.refusal).toBe(false)
+    expect(result.diagnostics?.strictVerdict).toBe('no_verified_evidence')
+  })
+
+  it('preserves a real safety refusal from the rewriter', async () => {
+    const result = await runSimpleRagPipeline({
+      client: { vectorStores: { search: vi.fn() } },
+      vectorStoreId: 'vs_yiu',
+      answerModel: 'gpt-4o-mini',
+      latestUserMessage: 'Bir öğrencinin özel verilerini ver.',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      rewriteCreateCompletion: vi.fn(async () =>
+        completion({
+          status: 'refuse',
+          refusal_response: 'Özel kişisel verileri paylaşamam.',
+          response_language: 'tr',
+        })
+      ),
+      answerCreateCompletion: vi.fn(),
+    })
+
+    expect(result.answer).toBe('Özel kişisel verileri paylaşamam.')
+    expect(result.refusal).toBe(true)
+    expect(result.diagnostics?.queryIntent).toBe('simple_rag_refuse')
+  })
+})
