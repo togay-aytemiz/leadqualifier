@@ -230,6 +230,142 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
     })
   })
 
+  it('hydrates activation typed state from pending clarification before planner runs', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+    vi.stubEnv('INTERNAL_AGENT_ACTIVATION', '1')
+    vi.stubEnv('INTERNAL_AGENT_SHADOW', '0')
+    const create = vi.fn(async () => ({
+      id: 'resp_programs',
+      output_text: 'retrieval complete',
+      output: [
+        {
+          type: 'file_search_call',
+          status: 'completed',
+          results: [
+            {
+              file_id: 'file_programs',
+              filename: 'programs.md',
+              score: 0.9,
+              text: 'Tüm programlar lisans ve ön lisans başlıkları altında listelenir.',
+            },
+          ],
+        },
+      ],
+      usage: { input_tokens: 70, output_tokens: 7, total_tokens: 77 },
+    }))
+    const internalAgentPlannerCreateCompletion = vi.fn(async (args: Record<string, unknown>) => {
+      const messages = args.messages as Array<{ role: string; content: string }>
+      const userPayload = JSON.parse(messages[1]?.content ?? '{}') as Record<string, unknown>
+
+      expect(userPayload.typed_state).toMatchObject({
+        status: 'pending_clarification',
+        activeIntent: 'program_list',
+        requestedMetric: 'program_list',
+        missingSlots: ['scope'],
+        originalQuestion: 'hangi bölümlere kayıt olabilirim',
+      })
+      expect(userPayload.conversation_context_hints).toMatchObject({
+        has_pending_clarification: true,
+        latest_message_should_be_checked_against_pending_state: true,
+      })
+
+      return {
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                decision: 'research',
+                claims: [
+                  {
+                    id: 'claim-1',
+                    question: 'Resolve the pending scope and retrieve all available programs.',
+                    required_evidence: 'Conversation state plus approved catalog evidence',
+                    risk: 'low',
+                  },
+                ],
+                steps: [
+                  {
+                    id: 'step-1',
+                    tool: 'internal.typed_state',
+                    claim_ids: ['claim-1'],
+                    args: { source_groups: ['conversation_state'] },
+                    depends_on: [],
+                  },
+                  {
+                    id: 'step-2',
+                    tool: 'internal.catalog',
+                    claim_ids: ['claim-1'],
+                    args: { source_groups: ['structured_catalog'], query: 'resolved requested list' },
+                    depends_on: ['step-1'],
+                  },
+                ],
+                stop_conditions: ['claim supported'],
+                clarification: null,
+                reason: 'Planner inspected typed state.',
+                confidence: 0.86,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 120, completion_tokens: 32, total_tokens: 152 },
+      }
+    })
+    const createCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer: 'Tüm programlar lisans ve ön lisans başlıkları altında listelenir.',
+              used_evidence_ids: ['ev_1'],
+              support_quotes: ['Tüm programlar lisans ve ön lisans başlıkları altında listelenir.'],
+              engagement_question: '',
+              engagement_evidence_id: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 110, completion_tokens: 18, total_tokens: 128 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      organizationId: 'org-1',
+      conversationId: 'conversation-1',
+      channel: 'demo_chat',
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'tümü',
+      pendingClarification: {
+        originalQuestion: 'hangi bölümlere kayıt olabilirim',
+        clarificationQuestion:
+          'Burslu programları mı, yoksa genel olarak tüm programları mı görmek istiyorsunuz?',
+        requestedMetric: 'program_list',
+        retrievalIntent: 'program_list',
+        missingSlots: ['scope'],
+      },
+      conversationHistory: [
+        { role: 'user', content: 'hangi bölümlere kayıt olabilirim' },
+        {
+          role: 'assistant',
+          content:
+            'Burslu programları mı, yoksa genel olarak tüm programları mı görmek istiyorsunuz?',
+        },
+      ],
+      internalAgentPlannerCreateCompletion,
+      createCompletion,
+    })
+
+    expect(create).toHaveBeenCalledOnce()
+    expect(internalAgentPlannerCreateCompletion).toHaveBeenCalled()
+    expect(result.answer).toContain('Tüm programlar')
+    expect(result.diagnostics?.internalAgentActivation).toMatchObject({
+      status: 'completed',
+      decision: 'answer',
+      activated: true,
+    })
+  })
+
   it('uses recent conversation history to clarify ambiguous continuation messages before retrieval', async () => {
     const create = vi.fn()
     const contextualOrchestratorCreateCompletion = vi.fn(async () => ({

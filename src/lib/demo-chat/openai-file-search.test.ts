@@ -132,4 +132,51 @@ describe('buildOpenAiFileSearchDemoReply', () => {
             },
         })
     })
+
+    it('uses recent conversation language for ambiguous short follow-ups', async () => {
+        vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+        getOrgAiSettingsMock.mockResolvedValue({
+            bot_name: 'Qualy',
+            prompt: 'Kısa ve net Türkçe konuş.',
+        })
+        runOpenAiFileSearchValidatedQuestionMock.mockResolvedValue({
+            provider: 'openai_file_search_validated',
+            answer: 'English Medicine tuition is 720,000 TL; discounted tuition is 360,000 TL.',
+            citations: [],
+            refusal: false,
+            timingsMs: { total: 10, retrieval: 0, generation: 0, validation: 0 },
+            usage: { inputTokens: 80, outputTokens: 16, totalTokens: 96, toolCalls: 0 },
+            diagnostics: {},
+        })
+        polishGroundedRagAnswerMock.mockResolvedValue({
+            answer: 'İngilizce Tıp programının ücreti 720.000 TL, %50 indirimli ücreti 360.000 TL.',
+            usedPolish: true,
+            addedEngagement: false,
+            usage: { inputTokens: 70, outputTokens: 20, totalTokens: 90 },
+            model: 'gpt-4o-mini',
+        })
+
+        const result = await buildOpenAiFileSearchDemoReply({
+            supabase: {},
+            channel,
+            message: 'ingilizcesi?',
+            conversationId: 'conv-1',
+            conversationHistory: [
+                { role: 'user', content: 'tıp kaç para' },
+                {
+                    role: 'assistant',
+                    content: 'Tıp Fakültesi için ücret 720.000 TL, %50 indirimli ücret 360.000 TL.',
+                },
+            ],
+        })
+
+        expect(getOrgAiSettingsMock).toHaveBeenCalledWith('org-1', expect.objectContaining({
+            locale: 'tr',
+        }))
+        expect(polishGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
+            userMessage: 'ingilizcesi?',
+            responseLanguage: 'tr',
+        }))
+        expect(result?.replyText).toContain('İngilizce Tıp')
+    })
 })

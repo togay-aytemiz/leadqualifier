@@ -170,6 +170,7 @@ function citationsToPolishChunks(citations: RagProviderCitation[], fallbackConte
 async function polishDemoFileSearchFinalAnswer(input: {
     answer: string
     userMessage: string
+    responseLanguage: ReturnType<typeof resolveMvpResponseLanguage>
     settings: Awaited<ReturnType<typeof getOrgAiSettings>>
     answerModel: string
     citations: RagProviderCitation[]
@@ -185,7 +186,7 @@ async function polishDemoFileSearchFinalAnswer(input: {
     const polished = await polishGroundedRagAnswer({
         answer: prose,
         userMessage: input.userMessage,
-        responseLanguage: resolveMvpResponseLanguage(input.userMessage),
+        responseLanguage: input.responseLanguage,
         chunks: citationsToPolishChunks(input.citations, prose),
         settings: input.settings,
         model: input.answerModel,
@@ -201,6 +202,23 @@ async function polishDemoFileSearchFinalAnswer(input: {
             usage: polished.usage,
         },
     }
+}
+
+function recentUserHistoryMessages(history: KnowledgeSearchPlanningTurn[] | undefined) {
+    return (history ?? [])
+        .filter((turn) => turn.role === 'user' && turn.content.trim())
+        .slice(-5)
+        .reverse()
+        .map((turn) => turn.content)
+}
+
+function resolveDemoResponseLanguage(
+    message: string,
+    history: KnowledgeSearchPlanningTurn[] | undefined
+) {
+    return resolveMvpResponseLanguage(message, {
+        historyMessages: recentUserHistoryMessages(history),
+    })
 }
 
 export async function buildOpenAiFileSearchDemoReply(input: {
@@ -220,7 +238,7 @@ export async function buildOpenAiFileSearchDemoReply(input: {
     }
 
     try {
-        const responseLanguage = resolveMvpResponseLanguage(input.message)
+        const responseLanguage = resolveDemoResponseLanguage(input.message, input.conversationHistory)
         const settings = await getOrgAiSettings(input.channel.organizationId, {
             supabase: input.supabase,
             locale: responseLanguage,
@@ -264,6 +282,7 @@ export async function buildOpenAiFileSearchDemoReply(input: {
         const finalPolish = await polishDemoFileSearchFinalAnswer({
             answer: result.answer,
             userMessage: input.message,
+            responseLanguage,
             settings,
             answerModel,
             citations: result.citations,

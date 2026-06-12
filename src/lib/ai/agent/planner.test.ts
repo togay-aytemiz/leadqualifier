@@ -430,6 +430,50 @@ describe('planInternalAgentTurn', () => {
     )
   })
 
+  it('repairs pending-state no-info decisions into typed-state research plans', async () => {
+    const staleNoInfo = JSON.stringify(
+      researchPlan({
+        decision: 'no_info',
+        steps: [],
+        reason: 'The short answer is not enough to search approved sources.',
+      })
+    )
+    const createCompletion = completionSequence([staleNoInfo, staleNoInfo])
+
+    const result = await planInternalAgentTurn({
+      request: buildRequest({
+        latestUserMessage: 'tümü',
+        conversationState: {
+          status: 'pending_clarification',
+          activeIntent: 'program_list',
+          requestedMetric: 'program_list',
+          missingSlots: ['scope'],
+          originalQuestion: 'hangi bölümlere kayıt olabilirim',
+        },
+        sourcePolicy: {
+          allowedSourceGroups: [
+            'conversation_state',
+            'structured_catalog',
+            'knowledge_base',
+          ],
+          priority: ['structured_catalog', 'knowledge_base'],
+        },
+      }),
+      toolDescriptors: buildCommonDescriptors(),
+      createCompletion,
+    })
+
+    expect(createCompletion).toHaveBeenCalledTimes(2)
+    expect(result.reason).toBe('contract_repaired: pending_state_reasked')
+    expect(result.plan).toMatchObject({
+      decision: 'research',
+      steps: [
+        { tool: 'internal.typed_state', dependsOn: [] },
+        { tool: 'internal.catalog', dependsOn: ['step-1'] },
+      ],
+    })
+  })
+
   it('does not repair a valid plan with no review issues', async () => {
     const createCompletion = completionWith(JSON.stringify(researchPlan()))
 

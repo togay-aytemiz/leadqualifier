@@ -500,11 +500,11 @@ export function reviewAgentPlan(input: {
 
   const tools = planTools(plan)
   if (isPending(request) && latestLikelyFillsPendingSlot(request)) {
-    if (plan.decision === 'clarify') {
+    if (plan.decision !== 'research') {
       addIssue(
         issues,
         'pending_state_reasked',
-        'Latest message likely fills a pending clarification slot; do not repeat the same clarification.'
+        'Latest message likely fills a pending clarification slot; resolve pending state instead of ending with a boundary or repeating the same clarification.'
       )
     }
     if (plan.decision === 'research' && !tools.has('internal.typed_state')) {

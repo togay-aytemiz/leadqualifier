@@ -1124,6 +1124,44 @@ function normalizeContextualHistory(history: KnowledgeSearchPlanningTurn[] | und
     .slice(-MAX_CONTEXTUAL_HISTORY_TURNS)
 }
 
+function recentUserHistoryMessages(history: KnowledgeSearchPlanningTurn[] | undefined) {
+  return (history ?? [])
+    .filter((turn) => turn.role === 'user' && turn.content.trim())
+    .slice(-5)
+    .reverse()
+    .map((turn) => turn.content)
+}
+
+function resolveQuestionResponseLanguage(
+  question: string,
+  history: KnowledgeSearchPlanningTurn[] | undefined
+) {
+  return resolveMvpResponseLanguage(question, {
+    historyMessages: recentUserHistoryMessages(history),
+  })
+}
+
+function resolveActivationConversationState(input: {
+  question: string
+  conversationHistory?: KnowledgeSearchPlanningTurn[]
+  pendingClarification?: RagPendingClarificationState | null
+}): RagTypedConversationState | null {
+  const history = normalizeContextualHistory(input.conversationHistory)
+  const existingState = findLatestRagTypedConversationState(history)
+  if (existingState) return existingState
+
+  const pendingClarification =
+    normalizeRagPendingClarificationState(input.pendingClarification) ??
+    findLatestRagPendingClarificationState(history)
+  if (!pendingClarification) return null
+
+  return buildTypedConversationState({
+    latestUserMessage: input.question,
+    history,
+    pendingClarification,
+  })
+}
+
 function formatContextualHistory(history: KnowledgeSearchPlanningTurn[]) {
   if (history.length === 0) return 'No recent conversation.'
   return history
@@ -3613,6 +3651,13 @@ export async function runOpenAiFileSearchValidatedQuestion(
   input: OpenAiFileSearchValidatedQuestionInput
 ): Promise<RagProviderResult> {
   const runCurrent = () => runOpenAiFileSearchValidatedQuestionCurrent(input)
+  const activationHistory = normalizeContextualHistory(input.conversationHistory)
+  const activationLocale = resolveQuestionResponseLanguage(input.question, activationHistory)
+  const activationConversationState = resolveActivationConversationState({
+    question: input.question,
+    conversationHistory: activationHistory,
+    pendingClarification: input.pendingClarification,
+  })
   const currentResult = input.organizationId && isInternalAgentActivationEnabled(input.organizationId)
     ? (
       await runInternalAgentActivatedTurn<RagProviderResult>({
@@ -3620,10 +3665,10 @@ export async function runOpenAiFileSearchValidatedQuestion(
           organizationId: input.organizationId,
           conversationId: input.conversationId,
           channel: input.channel ?? 'demo_chat',
-          locale: resolveMvpResponseLanguage(input.question),
+          locale: activationLocale,
           latestUserMessage: input.question,
-          recentMessages: input.conversationHistory,
-          conversationState: findLatestRagTypedConversationState(input.conversationHistory ?? []),
+          recentMessages: activationHistory,
+          conversationState: activationConversationState,
           settings: input.settings,
           sourcePriorityGroups: input.sourcePriorityGroups,
         }),
@@ -3644,10 +3689,10 @@ export async function runOpenAiFileSearchValidatedQuestion(
     organizationId: input.organizationId,
     conversationId: input.conversationId,
     channel: input.channel ?? 'demo_chat',
-    locale: resolveMvpResponseLanguage(input.question),
+    locale: activationLocale,
     latestUserMessage: input.question,
-    recentMessages: input.conversationHistory,
-    conversationState: readTypedConversationStateFromDiagnostics(currentResult.diagnostics),
+    recentMessages: activationHistory,
+    conversationState: readTypedConversationStateFromDiagnostics(currentResult.diagnostics) ?? activationConversationState,
     settings: input.settings,
     sourcePriorityGroups: input.sourcePriorityGroups,
     observedResult: currentResult,
