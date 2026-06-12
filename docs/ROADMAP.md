@@ -1,5 +1,11 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-06-12):** A production-only Demo Chat UI rerun tested 14 prior low-score questions and a fresh non-overlapping random 100 through clean browser conversations on the new LLM-first File Search path. The prior-failure cohort improved to `7.50/10` with `7/14` at 8-10, while the random cohort remained effectively flat at `7.07/10` with `53` at 8-10 and `22` at 1-5. Table fee/quota facts improved, but the run exposed release-blocking repeat inconsistency and claim-evidence gaps: the same Medicine duration question returned both the correct 6 years and an incorrect 4 years, and related clinical/campus evidence was sometimes converted into unsupported hospital, lab, device-use, or location claims. The next generic RAG phase is direct subject/facet entailment selection, contradiction-aware retry, authority-aware reranking, targeted no-info clarification, and a three-repeat critical-fact consistency gate (`docs/evaluations/yiu-live-ui-post-hardening-random-100-2026-06-12.md`).
+
+- [ ] Require direct subject-and-facet evidence entailment before customer-facing factual claims.
+- [ ] Add contradiction-aware retrieval retry and abstention for protected facts.
+- [ ] Add critical-question repeat-consistency acceptance (`>=95%` agreement across three clean runs).
+
 > **Update Note (2026-06-12):** The simplified LLM-first File Search path now follows a recall-before-refusal RAG rule. Search plans carry a primary query plus complementary retrieval formulations, and the pipeline runs one expanded File Search retry when the first evidence set cannot support an answer before returning no-info. For table-like facts, the retry adds generic column/header labels such as price, quota, rank, base score, point type, and code; row-only admission snippets returned by File Search are parsed against the same approved column shape. Metadata source scopes can restrict retrieval for high-signal fact classes such as program table facts and education durations without hardcoding the answer. Retry evidence is merged, deduped, re-validated through the same table/evidence composer, and surfaced in diagnostics as `evidenceRetry`; this is tenant-independent and keeps Skills unchanged.
 
 - [x] Add generic multi-query recall retry before no-info in the LLM-first File Search pipeline.
