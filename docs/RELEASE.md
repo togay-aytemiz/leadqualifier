@@ -8,6 +8,8 @@
 
 ### Added
 
+- Added the approved design for a simpler non-Skill RAG path: explicit state and history-aware standalone query rewriting, one direct OpenAI Vector Store Search request, one grounded answer generator, and a small mechanical grounding guard. The design defers multi-query retry, table fast paths, separate composer/polish, and runtime LLM judges until evaluation proves they are necessary (`docs/superpowers/specs/2026-06-13-simple-standalone-query-rag-design.md`).
+
 - Added a production Demo Chat UI post-hardening evaluation over 14 prior low-score questions and a fresh random 100. The run used clean UI conversations only, recorded `7.50/10` on the prior-failure cohort and `7.07/10` on the random cohort, and documents remaining generic RAG gaps around repeat consistency, direct subject/facet entailment, unsupported clinical/campus claims, broad web-fact recall, and actionable clarification/no-info behavior (`docs/evaluations/yiu-live-ui-post-hardening-random-100-2026-06-12.md`).
 
 - Added a generic markdown-table fact extractor inside the LLM-first File Search path. Concrete program metric questions can now answer from retrieved brochure tables before the answer-composer LLM runs, preserving matching variants for facts such as quota, rank, base score, price, point type, and program code (`src/lib/knowledge-base/llm-first/table-facts.ts`, `src/lib/knowledge-base/llm-first/pipeline.ts`).

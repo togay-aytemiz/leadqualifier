@@ -1,5 +1,11 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Design Decision (2026-06-13):** The approved next RAG iteration removes the optional layers from the YIU demo non-Skill path and adopts a simple standalone-query pipeline: explicit state plus recent history and the latest message feed one query rewriter; only the resulting standalone query is sent to direct OpenAI Vector Store Search; one grounded answer generator receives the top chunks plus state/history; a small non-LLM grounding guard validates chunk IDs and protected values. Multi-query expansion, retry, table fast paths, separate composer/polish, and runtime LLM judging are deferred until a measured evaluation proves they are needed. Initial retrieval uses `ranker:auto`, `score_threshold:0.1`, `max_num_results:12`, and disables the provider's second query rewrite (`docs/superpowers/specs/2026-06-13-simple-standalone-query-rag-design.md`).
+
+- [ ] Replace the YIU demo non-Skill path with the simple standalone-query Vector Store Search pipeline.
+- [ ] Remove polish, multi-query retry, table fast-path, and runtime judge calls from the active simple path.
+- [ ] Add a three-repeat critical-fact consistency gate before customer approval.
+
 > **Update Note (2026-06-12):** A production-only Demo Chat UI rerun tested 14 prior low-score questions and a fresh non-overlapping random 100 through clean browser conversations on the new LLM-first File Search path. The prior-failure cohort improved to `7.50/10` with `7/14` at 8-10, while the random cohort remained effectively flat at `7.07/10` with `53` at 8-10 and `22` at 1-5. Table fee/quota facts improved, but the run exposed release-blocking repeat inconsistency and claim-evidence gaps: the same Medicine duration question returned both the correct 6 years and an incorrect 4 years, and related clinical/campus evidence was sometimes converted into unsupported hospital, lab, device-use, or location claims. The next generic RAG phase is direct subject/facet entailment selection, contradiction-aware retry, authority-aware reranking, targeted no-info clarification, and a three-repeat critical-fact consistency gate (`docs/evaluations/yiu-live-ui-post-hardening-random-100-2026-06-12.md`).
 
 - [ ] Require direct subject-and-facet evidence entailment before customer-facing factual claims.
