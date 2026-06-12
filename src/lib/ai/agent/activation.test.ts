@@ -217,6 +217,57 @@ describe('runInternalAgentActivatedTurn', () => {
     })
   })
 
+  it('treats strict catalog refusal boundaries as supported approved evidence', async () => {
+    const executeCurrent = vi.fn(async () => ({
+      answer: 'Hukuk Fakültesi onaylı program ve fakülte listesinde yer almıyor.',
+      refusal: true,
+      citations: [{ providerSourceId: 'catalog', title: 'Program Kataloğu' }],
+      diagnostics: { strictVerdict: 'catalog_unsupported_existence' },
+    }))
+
+    const result = await runInternalAgentActivatedTurn({
+      request: request({ latestUserMessage: 'Hukuk Fakülteniz var mı?' }),
+      executeCurrent,
+      createPlannerCompletion: completionWith({
+        decision: 'research',
+        claims: [
+          {
+            id: 'claim-1',
+            question: 'Does the requested faculty exist in the approved catalog?',
+            required_evidence: 'Approved structured catalog evidence or absence boundary',
+            risk: 'medium',
+          },
+        ],
+        steps: [
+          {
+            id: 'step-1',
+            tool: 'internal.catalog',
+            claim_ids: ['claim-1'],
+            args: { source_groups: ['structured_catalog'], query: 'Hukuk Fakültesi var mı?' },
+            depends_on: [],
+          },
+        ],
+        stop_conditions: ['supported'],
+        reason: 'Need catalog evidence.',
+        confidence: 0.88,
+      }),
+      enabled: true,
+    })
+
+    expect(executeCurrent).toHaveBeenCalledTimes(1)
+    expect(result.result.answer).toContain('yer almıyor')
+    expect(result.diagnostics).toMatchObject({
+      status: 'completed',
+      decision: 'answer',
+      activated: true,
+      controller: {
+        trace: {
+          stopReason: 'all_claims_supported',
+        },
+      },
+    })
+  })
+
   it('falls open to the current provider when activation planning cannot produce a plan', async () => {
     const executeCurrent = vi.fn(async () => ({
       answer: 'Mevcut güvenli cevap.',

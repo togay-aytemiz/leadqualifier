@@ -28,6 +28,10 @@ export type InternalAgentActivationDiagnostics = {
     trace: ControllerResult['trace']
     verifiedPartialClaimIds: string[]
   }
+  clarification?: {
+    question: string
+    missingSlots: string[]
+  }
   usage?: {
     inputTokens: number
     outputTokens: number
@@ -114,7 +118,12 @@ function usageFromCurrent(current: InternalAgentActivatedCurrentResult) {
 }
 
 function currentLooksSupported(current: InternalAgentActivatedCurrentResult) {
-  return hasText(current.answer) && current.refusal !== true
+  if (!hasText(current.answer)) return false
+  if (current.refusal !== true) return true
+
+  const strictVerdict = String(current.diagnostics?.strictVerdict ?? '')
+  return strictVerdict === 'catalog_unsupported_existence' ||
+    /^catalog_.+(?:scope|guard|boundary|fact|existence)$/i.test(strictVerdict)
 }
 
 function createCurrentEvidenceTool<T extends InternalAgentActivatedCurrentResult>(input: {
@@ -447,6 +456,14 @@ export async function runInternalAgentActivatedTurn<T extends InternalAgentActiv
       trace: controller.trace,
       verifiedPartialClaimIds: controller.verifiedPartialClaimIds,
     },
+    ...(controller.plan?.clarification
+      ? {
+          clarification: {
+            question: controller.plan.clarification.question,
+            missingSlots: controller.plan.clarification.missingSlots,
+          },
+        }
+      : {}),
     usage: controller.usage,
   }
 

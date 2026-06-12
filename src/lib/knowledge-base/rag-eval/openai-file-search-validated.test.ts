@@ -366,6 +366,67 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
     })
   })
 
+  it('persists pending clarification metadata for controller-owned clarifications', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+    vi.stubEnv('INTERNAL_AGENT_ACTIVATION', '1')
+    vi.stubEnv('INTERNAL_AGENT_SHADOW', '0')
+    const create = vi.fn()
+    const internalAgentPlannerCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              decision: 'clarify',
+              claims: [
+                {
+                  id: 'claim-1',
+                  question: 'Which program is needed for the requested price?',
+                  required_evidence: 'Missing program slot',
+                  risk: 'medium',
+                },
+              ],
+              steps: [],
+              stop_conditions: ['clarification required'],
+              clarification: {
+                question: 'Hangi program için fiyat öğrenmek istiyorsunuz?',
+                missing_slots: ['program'],
+              },
+              reason: 'Program is required.',
+              confidence: 0.84,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 120, completion_tokens: 28, total_tokens: 148 },
+    }))
+    const presentationCreateCompletion = vi.fn(async () => ({
+      choices: [{ message: { content: 'Hangi program için fiyat öğrenmek istiyorsunuz?' } }],
+      usage: { prompt_tokens: 40, completion_tokens: 8, total_tokens: 48 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      organizationId: 'org-1',
+      conversationId: 'conversation-1',
+      channel: 'demo_chat',
+      model: 'gpt-4.1-mini',
+      vectorStoreId: 'vs_123',
+      question: 'kaç para',
+      internalAgentPlannerCreateCompletion,
+      presentationCreateCompletion,
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result.answer).toBe('Hangi program için fiyat öğrenmek istiyorsunuz?')
+    expect(result.diagnostics?.pendingClarification).toMatchObject({
+      originalQuestion: 'kaç para',
+      clarificationQuestion: 'Hangi program için fiyat öğrenmek istiyorsunuz?',
+      missingSlots: ['program'],
+      requestedMetric: 'price',
+      retrievalIntent: 'price',
+    })
+  })
+
   it('uses recent conversation history to clarify ambiguous continuation messages before retrieval', async () => {
     const create = vi.fn()
     const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
@@ -3162,6 +3223,66 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
     expect(result.answer).toContain('720.000 TL')
     expect(result.answer).toContain('360.000 TL')
     expect(result.answer).not.toContain('Ücret bilgisi veremem')
+    expect(result.diagnostics).toMatchObject({
+      contextualOrchestration: 'refuse',
+      contextualRefusalOverriddenByCatalog: true,
+      strictVerdict: 'catalog_program_fee_fact',
+    })
+  })
+
+  it('answers discounted program variant existence from catalog despite contextual refusal', async () => {
+    const create = vi.fn()
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'new_question',
+              action: 'refuse',
+              route: 'unsupported_boundary',
+              domain_relevance: 'in_scope',
+              reason: 'mistakenly refused discounted program availability',
+              should_retrieve: false,
+              refusal_answer: 'İndirimli programlar hakkında bilgi veremem.',
+              confidence: 0.9,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 130, completion_tokens: 28, total_tokens: 158 },
+    }))
+    const presentationCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer:
+                'Evet, Tıp Fakültesi için %50 indirimli program bulunur. 2025 ücreti 360.000 TL olarak listelenmiştir.',
+              engagement_question: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 80, completion_tokens: 20, total_tokens: 100 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Tıp Fakültesinde %50 indirimli program var mı?',
+      qualityMode: 'strict',
+      contextualOrchestratorMode: 'always',
+      contextualOrchestratorCreateCompletion,
+      presentationCreateCompletion,
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(result.refusal).toBe(false)
+    expect(result.answer).toContain('%50')
+    expect(result.answer).toContain('360.000 TL')
     expect(result.diagnostics).toMatchObject({
       contextualOrchestration: 'refuse',
       contextualRefusalOverriddenByCatalog: true,

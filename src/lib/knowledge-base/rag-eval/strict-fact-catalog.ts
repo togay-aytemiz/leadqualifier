@@ -1787,7 +1787,10 @@ function resolveProgramFeeFact(search: string): StrictCatalogAnswer | null {
     /(?:ucret(?:i|ler|leri)?\b|kac para|kac tl|ne kadar|fiyat(?:i|lar|lari)?\b|(?:^|\s)tl(?:\s|$)|₺)/.test(
       search
     )
-  if (!asksPrice) return null
+  const asksDiscountedProgramVariant =
+    /(?:% ?50|yuzde ?50|indirimli)/.test(search) &&
+    /(?:program|bolum|bölüm|var mi|varmi|mevcut|kontenjan)/.test(search)
+  if (!asksPrice && !asksDiscountedProgramVariant) return null
 
   const program = PROGRAM_FEE_FACTS.find((fact) => includesAlias(search, fact.aliases))
   if (program) {
@@ -1799,7 +1802,9 @@ function resolveProgramFeeFact(search: string): StrictCatalogAnswer | null {
           : program.name
 
     return {
-      answer: `${displayName} için 2025 broşüründe Ücretli fiyat ${program.paid}, %50 indirimli fiyat ${program.discounted50} olarak listelenir. Burslu kontenjan satırında fiyat alanı "-" olarak gösterilir.`,
+      answer: asksDiscountedProgramVariant && !asksPrice
+        ? `Evet. ${displayName} için %50 indirimli program satırı bulunur; 2025 fiyatı ${program.discounted50} olarak listelenir.`
+        : `${displayName} için 2025 broşüründe Ücretli fiyat ${program.paid}, %50 indirimli fiyat ${program.discounted50} olarak listelenir. Burslu kontenjan satırında fiyat alanı "-" olarak gösterilir.`,
       citations: [PROGRAM_FEE_CITATION],
       refusal: false,
       reason: 'catalog_program_fee_fact',

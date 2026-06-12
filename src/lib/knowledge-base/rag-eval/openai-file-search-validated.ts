@@ -170,6 +170,54 @@ function readTypedConversationStateFromDiagnostics(
   return state && typeof state === 'object' ? (state as RagTypedConversationState) : null
 }
 
+function readActivationPendingClarification(input: {
+  question: string
+  diagnostics: RagProviderResult['diagnostics'] | undefined
+}): RagPendingClarificationState | null {
+  const diagnostics = input.diagnostics as Record<string, unknown> | undefined
+  const activation = diagnostics?.internalAgentActivation as Record<string, unknown> | undefined
+  if (activation?.decision !== 'clarify') return null
+
+  const clarification = activation.clarification as Record<string, unknown> | undefined
+  const question = typeof clarification?.question === 'string' ? clarification.question.trim() : ''
+  if (!question) return null
+
+  const missingSlots = Array.isArray(clarification?.missingSlots)
+    ? clarification.missingSlots.filter(
+        (slot): slot is string => typeof slot === 'string' && Boolean(slot.trim())
+      )
+    : undefined
+  const requestedMetric = inferRequestedMetricFromText(input.question)
+
+  return buildRagPendingClarificationState({
+    originalQuestion: input.question,
+    clarificationQuestion: question,
+    ...(missingSlots?.length ? { missingSlots } : {}),
+    ...(requestedMetric ? { requestedMetric, retrievalIntent: requestedMetric } : {}),
+  })
+}
+
+function withActivationPendingClarification(
+  result: RagProviderResult,
+  question: string
+): RagProviderResult {
+  if (normalizeRagPendingClarificationState(result.diagnostics?.pendingClarification)) return result
+
+  const pendingClarification = readActivationPendingClarification({
+    question,
+    diagnostics: result.diagnostics,
+  })
+  if (!pendingClarification) return result
+
+  return {
+    ...result,
+    diagnostics: {
+      ...result.diagnostics,
+      pendingClarification,
+    },
+  }
+}
+
 const TURKISH_CHAR_MAP: Record<string, string> = {
   ı: 'i',
   İ: 'i',
@@ -3659,8 +3707,9 @@ export async function runOpenAiFileSearchValidatedQuestion(
     pendingClarification: input.pendingClarification,
   })
   const currentResult = input.organizationId && isInternalAgentActivationEnabled(input.organizationId)
-    ? (
-      await runInternalAgentActivatedTurn<RagProviderResult>({
+    ? withActivationPendingClarification(
+      (
+        await runInternalAgentActivatedTurn<RagProviderResult>({
         request: buildInternalAgentActivationRequest({
           organizationId: input.organizationId,
           conversationId: input.conversationId,
@@ -3677,8 +3726,10 @@ export async function runOpenAiFileSearchValidatedQuestion(
         createPresenterCompletion: input.presentationCreateCompletion,
         plannerModel: input.internalAgentPlannerModel,
         presenterModel: input.answerModel,
-      })
-    ).result
+        })
+      ).result,
+      input.question
+    )
     : await runCurrent()
 
   if (!input.organizationId || !isInternalAgentShadowEnabled(input.organizationId)) {
