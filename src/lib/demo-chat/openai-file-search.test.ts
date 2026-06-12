@@ -97,9 +97,13 @@ describe('buildOpenAiFileSearchDemoReply', () => {
             supabase: {},
             channel,
             message: 'tip kaç para',
+            conversationId: 'conv-1',
         })
 
         expect(runOpenAiFileSearchValidatedQuestionMock).toHaveBeenCalledWith(expect.objectContaining({
+            organizationId: 'org-1',
+            conversationId: 'conv-1',
+            channel: 'demo_chat',
             question: 'tip kaç para',
             contextualOrchestratorMode: 'always',
             settings: {

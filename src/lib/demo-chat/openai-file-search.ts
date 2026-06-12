@@ -239,6 +239,9 @@ export async function buildOpenAiFileSearchDemoReply(input: {
             ?? findLatestRagPendingClarificationState(input.conversationHistory ?? [])
         const result = await runOpenAiFileSearchValidatedQuestion({
             client: openai,
+            organizationId: input.channel.organizationId,
+            conversationId: input.conversationId ?? undefined,
+            channel: 'demo_chat',
             model: retrievalModel,
             answerModel,
             vectorStoreId,

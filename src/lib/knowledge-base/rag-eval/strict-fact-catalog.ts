@@ -1789,6 +1789,23 @@ function resolveProgramFeeFact(search: string): StrictCatalogAnswer | null {
     )
   if (!asksPrice) return null
 
+  const program = PROGRAM_FEE_FACTS.find((fact) => includesAlias(search, fact.aliases))
+  if (program) {
+    const displayName =
+      program.name === 'Tıp Fakültesi' && /(?:ingilizce|english)/.test(search)
+        ? 'İngilizce Tıp'
+        : program.name === 'Tıp Fakültesi' && /(?:turkce|türkçe|turkish)/.test(search)
+          ? 'Türkçe Tıp'
+          : program.name
+
+    return {
+      answer: `${displayName} için 2025 broşüründe Ücretli fiyat ${program.paid}, %50 indirimli fiyat ${program.discounted50} olarak listelenir. Burslu kontenjan satırında fiyat alanı "-" olarak gösterilir.`,
+      citations: [PROGRAM_FEE_CITATION],
+      refusal: false,
+      reason: 'catalog_program_fee_fact',
+    }
+  }
+
   const asksBroadProgramFees =
     /(?:2025|ucretleri|ucretler|fiyatlari|fiyatlar)/.test(search) &&
     !/(?:yurt|servis|yemek|staj|basvuru|kimlik|onluk|yaz okulu|tek ders|ek sinav|yatay gecis|kira|kiralar|kiralik ev|konaklama)/.test(
@@ -1807,15 +1824,7 @@ function resolveProgramFeeFact(search: string): StrictCatalogAnswer | null {
     }
   }
 
-  const program = PROGRAM_FEE_FACTS.find((fact) => includesAlias(search, fact.aliases))
-  if (!program) return null
-
-  return {
-    answer: `${program.name} için 2025 broşüründe Ücretli fiyat ${program.paid}, %50 indirimli fiyat ${program.discounted50} olarak listelenir. Burslu kontenjan satırında fiyat alanı "-" olarak gösterilir.`,
-    citations: [PROGRAM_FEE_CITATION],
-    refusal: false,
-    reason: 'catalog_program_fee_fact',
-  }
+  return null
 }
 
 function resolvePreparationScopeFact(search: string): StrictCatalogAnswer | null {

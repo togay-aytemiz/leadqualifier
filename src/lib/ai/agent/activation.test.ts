@@ -156,6 +156,67 @@ describe('runInternalAgentActivatedTurn', () => {
     })
   })
 
+  it('does not treat typed conversation state as factual support by itself', async () => {
+    const executeCurrent = vi.fn(async () => ({
+      answer: 'Current provider refusal should not be approved.',
+      refusal: true,
+      citations: [],
+      diagnostics: { queryIntent: 'contextual_followup' },
+    }))
+
+    const result = await runInternalAgentActivatedTurn({
+      request: request({
+        latestUserMessage: 'ingilizcesi?',
+        recentMessages: [
+          { role: 'user', content: 'tıp kaç para' },
+          { role: 'assistant', content: 'Tıp Fakültesi ücreti 720.000 TL.' },
+        ],
+      }),
+      executeCurrent,
+      createPlannerCompletion: completionWith({
+        decision: 'research',
+        claims: [
+          {
+            id: 'claim-1',
+            question: 'Resolve the short follow-up against recent context.',
+            required_evidence: 'Conversation state plus approved table evidence',
+            risk: 'medium',
+          },
+        ],
+        steps: [
+          {
+            id: 'step-1',
+            tool: 'internal.typed_state',
+            claim_ids: ['claim-1'],
+            args: { source_groups: ['conversation_state'], latest_message: 'ingilizcesi?' },
+            depends_on: [],
+          },
+          {
+            id: 'step-2',
+            tool: 'internal.table',
+            claim_ids: ['claim-1'],
+            args: { source_groups: ['brochure'], query: 'resolved follow-up' },
+            depends_on: ['step-1'],
+          },
+        ],
+        stop_conditions: ['supported'],
+        reason: 'Need state then table evidence.',
+        confidence: 0.86,
+      }),
+      enabled: true,
+    })
+
+    expect(executeCurrent).toHaveBeenCalledTimes(1)
+    expect(result.result.answer).not.toBe('Current provider refusal should not be approved.')
+    expect(result.diagnostics).toMatchObject({
+      status: 'completed',
+      decision: 'no_info',
+      activated: true,
+      fallbackToCurrent: false,
+      plannedTools: ['internal.typed_state', 'internal.table'],
+    })
+  })
+
   it('falls open to the current provider when activation planning cannot produce a plan', async () => {
     const executeCurrent = vi.fn(async () => ({
       answer: 'Mevcut güvenli cevap.',
@@ -182,4 +243,3 @@ describe('runInternalAgentActivatedTurn', () => {
     })
   })
 })
-

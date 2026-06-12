@@ -2967,6 +2967,211 @@ describe('runOpenAiFileSearchValidatedQuestion', () => {
     expect(specialStudent.answer).toContain('Özel Öğrenci Yönergesi')
   })
 
+  it('lets safe direct catalog facts override a mistaken contextual refusal', async () => {
+    const create = vi.fn()
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'new_question',
+              action: 'refuse',
+              route: 'safety_refusal',
+              domain_relevance: 'in_scope',
+              reason: 'mistakenly treated a program fee question as payment collection',
+              resolved_user_intent: 'Tıp Fakültesi ücret bilgisi',
+              should_retrieve: false,
+              safety_class: 'payment',
+              answer_policy: 'refuse_payment_collection',
+              refusal_answer: 'Ücret bilgisi veremem.',
+              confidence: 0.92,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 150, completion_tokens: 38, total_tokens: 188 },
+    }))
+    const presentationCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer:
+                'Tıp Fakültesi için 2025 ücretli program ücreti 720.000 TL, %50 indirimli ücret 360.000 TL. Burslu kontenjanlarda ücret alınmamaktadır.',
+              engagement_question: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 90, completion_tokens: 24, total_tokens: 114 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'Tıp Fakültesi ücreti ne kadar?',
+      qualityMode: 'strict',
+      contextualOrchestratorMode: 'always',
+      contextualOrchestratorCreateCompletion,
+      presentationCreateCompletion,
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(contextualOrchestratorCreateCompletion).toHaveBeenCalledOnce()
+    expect(presentationCreateCompletion).toHaveBeenCalledOnce()
+    expect(result.refusal).toBe(false)
+    expect(result.answer).toContain('720.000 TL')
+    expect(result.answer).toContain('360.000 TL')
+    expect(result.answer).not.toContain('Ücret bilgisi veremem')
+    expect(result.diagnostics).toMatchObject({
+      contextualOrchestration: 'refuse',
+      contextualRefusalOverriddenByCatalog: true,
+      strictVerdict: 'catalog_program_fee_fact',
+    })
+  })
+
+  it('lets safe direct catalog facts override an unnecessary contextual clarification', async () => {
+    const create = vi.fn()
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'new_question',
+              action: 'clarify',
+              route: 'clarify_missing_slots',
+              domain_relevance: 'in_scope',
+              reason: 'mistakenly asked for a row variant even though the catalog can answer',
+              should_retrieve: false,
+              missing_slots: ['program_variant'],
+              requested_metric: 'price',
+              clarification_question: 'Hangi tıp programının fiyatını öğrenmek istiyorsunuz?',
+              confidence: 0.86,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 150, completion_tokens: 38, total_tokens: 188 },
+    }))
+    const presentationCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer:
+                'Tıp Fakültesi için 2025 ücretli program ücreti 720.000 TL, %50 indirimli ücret 360.000 TL. Burslu kontenjanlarda ücret alınmamaktadır.',
+              engagement_question: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 90, completion_tokens: 24, total_tokens: 114 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'tıp kaç para',
+      qualityMode: 'strict',
+      contextualOrchestratorMode: 'always',
+      contextualOrchestratorCreateCompletion,
+      presentationCreateCompletion,
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(contextualOrchestratorCreateCompletion).toHaveBeenCalledOnce()
+    expect(presentationCreateCompletion).toHaveBeenCalledOnce()
+    expect(result.refusal).toBe(false)
+    expect(result.answer).toContain('720.000 TL')
+    expect(result.answer).toContain('360.000 TL')
+    expect(result.answer).not.toContain('Hangi tıp programının')
+    expect(result.diagnostics).toMatchObject({
+      contextualOrchestration: 'clarify',
+      contextualClarificationOverriddenByCatalog: true,
+      strictVerdict: 'catalog_program_fee_fact',
+    })
+  })
+
+  it('rewrites short referential follow-ups from recent history before strict catalog lookup', async () => {
+    const create = vi.fn()
+    const contextualOrchestratorCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              turn_type: 'off_topic',
+              action: 'refuse',
+              route: 'off_topic_boundary',
+              domain_relevance: 'out_of_scope',
+              reason: 'misread the short follow-up as a translation request',
+              should_retrieve: false,
+              answer_policy: 'redirect_to_supported_scope',
+              refusal_answer: 'Çeviri konusunda yardımcı olamam.',
+              confidence: 0.91,
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 170, completion_tokens: 42, total_tokens: 212 },
+    }))
+    const presentationCreateCompletion = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              answer:
+                'İngilizce Tıp için 2025 ücretli program ücreti 720.000 TL, %50 indirimli ücret 360.000 TL. Burslu kontenjanlarda ücret alınmamaktadır.',
+              engagement_question: '',
+              engagement_evidence: '',
+            }),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 90, completion_tokens: 24, total_tokens: 114 },
+    }))
+
+    const result = await runOpenAiFileSearchValidatedQuestion({
+      client: { responses: { create } },
+      model: 'gpt-4.1-mini',
+      answerModel: 'gpt-4o-mini',
+      vectorStoreId: 'vs_123',
+      question: 'ingilizcesi?',
+      qualityMode: 'strict',
+      contextualOrchestratorMode: 'always',
+      contextualOrchestratorCreateCompletion,
+      presentationCreateCompletion,
+      conversationHistory: [
+        { role: 'user', content: 'tıp kaç para' },
+        {
+          role: 'assistant',
+          content:
+            "Tıp Fakültesi için 2025 yılı ücretleri, ücretli olarak 720.000 TL, %50 indirimli olarak ise 360.000 TL'dir.",
+        },
+      ],
+    })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(contextualOrchestratorCreateCompletion).toHaveBeenCalledOnce()
+    expect(presentationCreateCompletion).toHaveBeenCalledOnce()
+    expect(result.refusal).toBe(false)
+    expect(result.answer).toContain('720.000 TL')
+    expect(result.answer).toContain('360.000 TL')
+    expect(result.answer).not.toContain('Çeviri konusunda')
+    expect(result.diagnostics).toMatchObject({
+      contextualOrchestration: 'rewrite',
+      contextualReason: 'referential_followup_history_rewrite',
+      contextualTurnType: 'referential_followup',
+      contextualRequestedMetric: 'price',
+      strictVerdict: 'catalog_program_fee_fact',
+    })
+  })
+
   it('strict mode normalizes colloquial program price questions before direct catalog answers', async () => {
     const create = vi.fn(async () => ({
       output_text: 'retrieval complete',

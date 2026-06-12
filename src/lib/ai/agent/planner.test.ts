@@ -179,6 +179,8 @@ describe('planInternalAgentTurn', () => {
     expect(system).toContain('Clarification must be an object')
     expect(system).toContain('If typed_state is pending_clarification and the latest message plausibly fills a missing slot')
     expect(system).toContain('Short selections and one-word entity answers can fill missing slots')
+    expect(system).toContain('short referential follow-up')
+    expect(system).toContain('Do not treat a short in-scope follow-up such as "ingilizcesi?" as translation')
     expect(system).toContain('If the latest message is a fresh standalone question')
     expect(system).toContain('Fresh-turn signals such as okay, peki, hayir, no, never mind')
     expect(system).toContain('Do not clarify off-topic requests')
@@ -198,6 +200,7 @@ describe('planInternalAgentTurn', () => {
       pending_missing_slots: ['program'],
       pending_requested_metric: 'duration',
       latest_message_should_be_checked_against_pending_state: true,
+      has_recent_turns: true,
     })
     expect(user).toContain(request.latestUserMessage)
     expect(user).toContain('pending_clarification')
@@ -560,6 +563,102 @@ describe('planInternalAgentTurn', () => {
       decision: 'refuse',
       steps: [],
       claims: [{ risk: 'low' }],
+    })
+  })
+
+  it('repairs short referential follow-ups against recent conversation context', async () => {
+    const misplacedClarification = JSON.stringify(
+      researchPlan({
+        decision: 'clarify',
+        steps: [],
+        clarification: {
+          question: 'Do you want an English translation?',
+          missing_slots: ['translation_target'],
+        },
+        reason: 'Latest message asks for a translation.',
+      })
+    )
+    const createCompletion = completionSequence([misplacedClarification, misplacedClarification])
+
+    const result = await planInternalAgentTurn({
+      request: buildRequest({
+        latestUserMessage: 'ingilizcesi?',
+        recentMessages: [
+          { role: 'user', content: 'tıp kaç para' },
+          {
+            role: 'assistant',
+            content:
+              'Tıp Fakültesi için ücret 720.000 TL, %50 indirimli fiyat 360.000 TL.',
+          },
+        ],
+        conversationState: null,
+        sourcePolicy: {
+          allowedSourceGroups: [
+            'conversation_state',
+            'brochure',
+            'structured_catalog',
+            'knowledge_base',
+          ],
+          priority: ['brochure', 'structured_catalog', 'knowledge_base'],
+        },
+      }),
+      toolDescriptors: buildCommonDescriptors(),
+      createCompletion,
+    })
+
+    expect(result.reason).toBe('contract_repaired: referential_followup_missing_typed_state')
+    expect(result.plan).toMatchObject({
+      decision: 'research',
+      steps: [
+        { tool: 'internal.typed_state', dependsOn: [] },
+        { tool: 'internal.table', dependsOn: ['step-1'] },
+      ],
+    })
+  })
+
+  it('does not force recent context for short standalone in-scope questions', async () => {
+    const validStandalonePlan = JSON.stringify(
+      researchPlan({
+        steps: [
+          {
+            id: 'step-1',
+            tool: 'internal.file_search',
+            claim_ids: ['claim-1'],
+            args: { source_groups: ['brochure'], query: 'yurt var mı' },
+            depends_on: [],
+          },
+        ],
+        reason: 'Latest message is a standalone housing question.',
+      })
+    )
+    const createCompletion = completionWith(validStandalonePlan)
+
+    const result = await planInternalAgentTurn({
+      request: buildRequest({
+        latestUserMessage: 'yurt var mı',
+        recentMessages: [
+          { role: 'user', content: 'tıp kaç para' },
+          {
+            role: 'assistant',
+            content:
+              'Tıp Fakültesi için ücret 720.000 TL, %50 indirimli fiyat 360.000 TL.',
+          },
+        ],
+        conversationState: null,
+        sourcePolicy: {
+          allowedSourceGroups: ['brochure', 'website_html', 'approved_pdf', 'knowledge_base'],
+          priority: ['brochure', 'website_html', 'approved_pdf', 'knowledge_base'],
+        },
+      }),
+      toolDescriptors: buildCommonDescriptors(),
+      createCompletion,
+    })
+
+    expect(createCompletion).toHaveBeenCalledTimes(1)
+    expect(result.reason).toBe('Latest message is a standalone housing question.')
+    expect(result.plan).toMatchObject({
+      decision: 'research',
+      steps: [{ tool: 'internal.file_search' }],
     })
   })
 

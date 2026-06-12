@@ -20,7 +20,7 @@ export type AgentBudget = {
 export const DEFAULT_AGENT_BUDGET: AgentBudget = {
   maxRounds: 3,
   maxToolCalls: 6,
-  maxLatencyMs: 15_000,
+  maxLatencyMs: 30_000,
   maxInputTokens: 20_000,
   maxOutputTokens: 2_000,
   maxEstimatedCredits: 50,
@@ -223,7 +223,7 @@ export function normalizeAgentBudget(value: Partial<AgentBudget> = {}): AgentBud
   return {
     maxRounds: clampBudget(value.maxRounds, DEFAULT_AGENT_BUDGET.maxRounds, 3),
     maxToolCalls: clampBudget(value.maxToolCalls, DEFAULT_AGENT_BUDGET.maxToolCalls, 6),
-    maxLatencyMs: clampBudget(value.maxLatencyMs, DEFAULT_AGENT_BUDGET.maxLatencyMs, 15_000),
+    maxLatencyMs: clampBudget(value.maxLatencyMs, DEFAULT_AGENT_BUDGET.maxLatencyMs, 30_000),
     maxInputTokens: clampBudget(value.maxInputTokens, DEFAULT_AGENT_BUDGET.maxInputTokens, 20_000),
     maxOutputTokens: clampBudget(
       value.maxOutputTokens,

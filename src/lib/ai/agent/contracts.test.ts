@@ -26,7 +26,7 @@ describe('internal agent contracts', () => {
     ).toEqual({
       maxRounds: 3,
       maxToolCalls: 6,
-      maxLatencyMs: 15_000,
+      maxLatencyMs: 30_000,
       maxInputTokens: 20_000,
       maxOutputTokens: 2_000,
       maxEstimatedCredits: 50,
@@ -45,7 +45,7 @@ describe('internal agent contracts', () => {
     ).toEqual({
       maxRounds: 1,
       maxToolCalls: 1,
-      maxLatencyMs: 15_000,
+      maxLatencyMs: 30_000,
       maxInputTokens: 20_000,
       maxOutputTokens: 2_000,
       maxEstimatedCredits: 1,

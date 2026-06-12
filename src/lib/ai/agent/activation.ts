@@ -174,7 +174,7 @@ function createActivationRegistry<T extends InternalAgentActivatedCurrentResult>
     if (descriptor.name === 'internal.typed_state') {
       return {
         ...descriptor,
-        execute: async ({ request, claimIds }) => ({
+        execute: async ({ request }) => ({
           tool: descriptor.name,
           status: 'success',
           evidence: [
@@ -185,7 +185,7 @@ function createActivationRegistry<T extends InternalAgentActivatedCurrentResult>
               structuredValue: request.conversationState ?? null,
             },
           ],
-          supportedClaimIds: claimIds,
+          supportedClaimIds: [],
           diagnostics: { activation_bridge: true },
         }),
       }

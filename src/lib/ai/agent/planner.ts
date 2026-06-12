@@ -315,6 +315,9 @@ function buildPlannerMessages(input: {
     'Recent assistant messages are context and never retrieval queries.',
     'If typed_state is pending_clarification and the latest message plausibly fills a missing slot, choose research with internal.typed_state plus the appropriate evidence tool; do not repeat the same clarification.',
     'Short selections and one-word entity answers can fill missing slots: all/both/paid/scholarship/undergraduate/associate, program names, abbreviations, and typo variants may be enough.',
+    'If there is no pending clarification but the latest message is a short referential follow-up, resolve it against recent user and assistant turns with internal.typed_state before evidence lookup.',
+    'Short referential follow-ups include variants, facets, confirmations, and subjectless metrics such as "English one?", "burslusu?", "%50?", "kaç para?", "tümü", or "olur kontrol et" after an assistant offered to check.',
+    'Do not treat a short in-scope follow-up such as "ingilizcesi?" as translation or off-topic when recent turns contain a program, product, service, fee, quota, or other business fact; preserve the prior subject and requested metric.',
     'If the latest message is a fresh standalone question, ignore stale pending clarification state and plan for the latest question.',
     'Fresh-turn signals such as okay, peki, hayir, no, never mind, disregard that, or a new topic after a pending clarification usually mean the user changed topic.',
     'Choose clarify when a required slot cannot be safely inferred.',
@@ -338,6 +341,7 @@ function buildPlannerMessages(input: {
     'Valid refusal example: {"decision":"refuse","claims":[{"id":"claim-1","question":"Can the assistant collect sensitive payment credentials?","required_evidence":"Safety boundary","risk":"critical"}],"steps":[],"stop_conditions":["unsafe request refused"],"clarification":null,"reason":"Sensitive data must not be collected.","confidence":0.95}.',
     'Valid clarification example: {"decision":"clarify","claims":[{"id":"claim-1","question":"Which program is needed for the requested metric?","required_evidence":"Missing slot resolution","risk":"medium"}],"steps":[],"stop_conditions":["clarification required"],"clarification":{"question":"Hangi program için öğrenmek istiyorsunuz?","missing_slots":["program"]},"reason":"Program is required before lookup.","confidence":0.78}.',
     'Valid pending follow-up example: latest_message "all" with pending scope clarification -> {"decision":"research","claims":[{"id":"claim-1","question":"Resolve the pending scope and retrieve the requested list","required_evidence":"Conversation state plus approved catalog evidence","risk":"low"}],"steps":[{"id":"step-1","tool":"internal.typed_state","claim_ids":["claim-1"],"args":{"source_groups":["conversation_state"]},"depends_on":[]},{"id":"step-2","tool":"internal.catalog","claim_ids":["claim-1"],"args":{"source_groups":["structured_catalog"],"query":"resolved requested list"},"depends_on":["step-1"]}],"stop_conditions":["claim supported"],"clarification":null,"reason":"Latest message fills pending clarification.","confidence":0.86}.',
+    'Valid referential follow-up example: recent user asked "medicine price", assistant answered the fee, latest_message "English one?" -> {"decision":"research","claims":[{"id":"claim-1","question":"Resolve the short follow-up against recent conversation and retrieve the requested variant of the prior fee","required_evidence":"Conversation state plus approved table evidence","risk":"medium"}],"steps":[{"id":"step-1","tool":"internal.typed_state","claim_ids":["claim-1"],"args":{"source_groups":["conversation_state"]},"depends_on":[]},{"id":"step-2","tool":"internal.table","claim_ids":["claim-1"],"args":{"source_groups":["brochure"],"query":"resolved prior subject and latest variant"},"depends_on":["step-1"]}],"stop_conditions":["claim supported"],"clarification":null,"reason":"Latest message depends on recent conversation context.","confidence":0.84}.',
   ].join(' ')
 
   const userPayload = {
@@ -374,8 +378,14 @@ function buildConversationContextHints(request: AgentRequest) {
     pending_requested_metric: state?.requestedMetric ?? state?.requestedFacet ?? null,
     pending_active_intent: state?.activeIntent ?? null,
     pending_original_question: state?.originalQuestion ?? null,
+    has_recent_turns: request.recentMessages.length > 0,
     latest_message_is_short: latest.length > 0 && latest.length <= 40,
     latest_message_should_be_checked_against_pending_state: status === 'pending_clarification',
+    latest_message_should_be_checked_against_recent_context:
+      status !== 'pending_clarification' &&
+      request.recentMessages.length > 0 &&
+      latest.length > 0 &&
+      latest.length <= 80,
   }
 }
 
@@ -395,6 +405,7 @@ function buildPlanRepairMessages(input: {
     'Every decision must include at least one atomic claim.',
     'Research decisions must include at least one tool step. Clarify, refuse, direct, and no_info decisions must not include tool steps.',
     'When pending clarification state is used, include internal.typed_state before the evidence tool.',
+    'When a short referential follow-up depends on recent conversation, include internal.typed_state before the evidence tool.',
     'When a stale pending state is irrelevant to the latest standalone question, plan for the latest question instead.',
     'Return JSON only with keys: decision, claims, steps, stop_conditions, clarification, reason, confidence.',
   ].join(' ')
@@ -485,6 +496,7 @@ function firstContractRepairIssue(issues: AgentPlanReviewIssue[]) {
     'off_topic_clarified',
     'pending_state_reasked',
     'pending_state_missing_typed_state',
+    'referential_followup_missing_typed_state',
     'stale_pending_state_clarified',
     'document_evidence_tool_missing',
     'facility_or_policy_refused',
@@ -543,7 +555,13 @@ function chooseContractEvidenceTool(input: {
       .join(' ')
   )
   const latestText = normalizeContractText(input.request.latestUserMessage)
-  const combined = `${latestText} ${stateText}`.trim()
+  const recentText = normalizeContractText(
+    input.request.recentMessages
+      .slice(-6)
+      .map((turn) => turn.content)
+      .join(' ')
+  )
+  const combined = `${latestText} ${stateText} ${recentText}`.trim()
 
   if (
     hasIssue(input.issues, 'document_evidence_tool_missing') ||
@@ -561,7 +579,8 @@ function chooseContractEvidenceTool(input: {
 
   if (
     hasIssue(input.issues, 'pending_state_reasked') ||
-    hasIssue(input.issues, 'pending_state_missing_typed_state')
+    hasIssue(input.issues, 'pending_state_missing_typed_state') ||
+    hasIssue(input.issues, 'referential_followup_missing_typed_state')
   ) {
     if (normalizedIncludesAny(combined, TABLE_FACT_TERMS) && available.has('internal.table')) {
       return 'internal.table'
@@ -579,6 +598,29 @@ function chooseContractEvidenceTool(input: {
     return 'internal.catalog'
   }
   return available.has('internal.file_search') ? 'internal.file_search' : null
+}
+
+function buildContractEvidenceQuery(input: {
+  request: AgentRequest
+  issue: AgentPlanReviewIssue
+}) {
+  if (input.issue.code !== 'referential_followup_missing_typed_state') {
+    return input.request.latestUserMessage
+  }
+
+  const recent = input.request.recentMessages
+    .slice(-4)
+    .map((turn) => `${turn.role}: ${turn.content}`)
+    .join('\n')
+    .slice(0, 1_200)
+
+  return [
+    'Resolve this short follow-up against the recent conversation.',
+    `Latest: ${input.request.latestUserMessage}`,
+    recent ? `Recent context:\n${recent}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 function buildContractClaim(input: {
@@ -650,7 +692,8 @@ function buildContractFallbackPlan(input: {
 
   if (
     (issue.code === 'pending_state_reasked' ||
-      issue.code === 'pending_state_missing_typed_state') &&
+      issue.code === 'pending_state_missing_typed_state' ||
+      issue.code === 'referential_followup_missing_typed_state') &&
     input.registeredToolNames.has('internal.typed_state')
   ) {
     const typedStateGroups = selectSourceGroups({
@@ -666,6 +709,11 @@ function buildContractFallbackPlan(input: {
         args: {
           source_groups: typedStateGroups,
           latest_message: input.request.latestUserMessage,
+          ...(issue.code === 'referential_followup_missing_typed_state'
+            ? {
+                recent_turns: input.request.recentMessages.slice(-5),
+              }
+            : {}),
         },
         dependsOn: [],
       })
@@ -679,7 +727,7 @@ function buildContractFallbackPlan(input: {
     claimIds: [claim.id],
     args: {
       source_groups: evidenceSourceGroups,
-      query: input.request.latestUserMessage,
+      query: buildContractEvidenceQuery({ request: input.request, issue }),
     },
     dependsOn: evidenceDependsOn,
   })

@@ -346,7 +346,15 @@ function normalizeQuestionText(question: string, entities: StrictQuestionEntity[
   const asksDiscountedVariant = /(?:% ?50|yuzde ?50|indirimli)/.test(search)
 
   if (entity) {
-    if (asksPrice) return `${entity.canonicalName} ücreti ne kadar?`
+    if (asksPrice) {
+      if (entity.canonicalName === 'Tıp Fakültesi' && /(?:ingilizce|english)/.test(search)) {
+        return 'İngilizce Tıp ücreti ne kadar?'
+      }
+      if (entity.canonicalName === 'Tıp Fakültesi' && /(?:turkce|türkçe|turkish)/.test(search)) {
+        return 'Türkçe Tıp ücreti ne kadar?'
+      }
+      return `${entity.canonicalName} ücreti ne kadar?`
+    }
     if (asksExistence && asksDiscountedVariant) {
       return `${entity.canonicalName} %50 indirimli program var mı?`
     }

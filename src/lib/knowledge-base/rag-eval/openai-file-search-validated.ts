@@ -1466,6 +1466,198 @@ function augmentQuestionWithRequestedMetric(input: { question: string; metric?: 
   return `İstenen bilgi: ${phrase}\n${input.question}`
 }
 
+const REFERENTIAL_HISTORY_FOLLOWUP_TERMS = [
+  'ingilizce',
+  'ingilizcesi',
+  'english',
+  'turkce',
+  'türkçe',
+  'turkcesi',
+  'türkçesi',
+  'turkish',
+  'burslu',
+  'ucretli',
+  'ücretli',
+  'indirimli',
+  '%50',
+  'kontenjan',
+  'puan',
+  'siralama',
+  'sıralama',
+  'bunun',
+  'onun',
+  'digeri',
+  'diğeri',
+  'same',
+  'that',
+  'it',
+]
+
+const REFERENTIAL_HISTORY_SLOT_FILLERS = [
+  'tum',
+  'tüm',
+  'tumu',
+  'tümü',
+  'hepsi',
+  'all',
+  'both',
+  'ikisi',
+  'burslu',
+  'ucretli',
+  'ücretli',
+  'indirimli',
+]
+
+const REFERENTIAL_HISTORY_STOPWORDS = new Set([
+  'mi',
+  'mu',
+  'mı',
+  'mü',
+  'ne',
+  'nedir',
+  'nasil',
+  'nasıl',
+  'hangi',
+  'kac',
+  'kaç',
+  'para',
+  'tl',
+  'fiyat',
+  'fiyati',
+  'fiyatı',
+  'ucret',
+  'ücret',
+  'ucreti',
+  'ücreti',
+  'kontenjan',
+  'puan',
+  'siralama',
+  'sıralama',
+  'burs',
+  'burslu',
+  'ucretli',
+  'ücretli',
+  'indirimli',
+  'ingilizce',
+  'ingilizcesi',
+  'english',
+  'turkce',
+  'türkçe',
+  'turkcesi',
+  'türkçesi',
+  'turkish',
+  'bunun',
+  'onun',
+  'digeri',
+  'diğeri',
+  'same',
+  'that',
+  'this',
+  'it',
+  'one',
+  'peki',
+  'ya',
+])
+
+function includesNormalizedTerm(value: string, terms: string[]) {
+  return terms.some((term) => value.includes(normalizeForSupport(term)))
+}
+
+function latestHasStandaloneSubjectForHistoryFollowup(normalized: string) {
+  return normalized
+    .split(/[^a-z0-9]+/i)
+    .filter(Boolean)
+    .some((token) => token.length >= 3 && !REFERENTIAL_HISTORY_STOPWORDS.has(token))
+}
+
+function recentHistoryHasBusinessFactContext(history: KnowledgeSearchPlanningTurn[]) {
+  const text = normalizeForSupport(
+    history
+      .slice(-4)
+      .map((turn) => turn.content)
+      .join(' ')
+  )
+  return Boolean(
+    inferRequestedMetricFromText(text) ||
+      /(?:program|bolum|bölüm|fakulte|fakülte|hizmet|urun|ürün|ucret|ücret|fiyat|kontenjan|puan|siralama|sıralama|kampus|kampüs|basvuru|başvuru|kayit|kayıt|tl)/.test(
+        text
+      )
+  )
+}
+
+function variantHintFromFollowup(question: string) {
+  const normalized = normalizeForSupport(question)
+  if (/(?:ingilizce|ingilizcesi|english)/.test(normalized)) return 'Varyant/dil: İngilizce'
+  if (/(?:turkce|türkçe|turkcesi|türkçesi|turkish)/.test(normalized)) {
+    return 'Varyant/dil: Türkçe'
+  }
+  if (/(?:%50|indirimli)/.test(normalized)) return 'Varyant: %50 indirimli'
+  if (/(?:burslu)/.test(normalized)) return 'Varyant: burslu'
+  if (/(?:ucretli|ücretli)/.test(normalized)) return 'Varyant: ücretli'
+  return ''
+}
+
+function latestLooksLikeReferentialHistoryFollowup(input: {
+  question: string
+  history: KnowledgeSearchPlanningTurn[]
+}) {
+  const latest = normalizeForSupport(input.question)
+  if (!latest || latest.length > 80 || input.history.length === 0) return false
+  if (!recentHistoryHasBusinessFactContext(input.history)) return false
+  if (includesNormalizedTerm(latest, REFERENTIAL_HISTORY_FOLLOWUP_TERMS)) return true
+  if (includesNormalizedTerm(latest, REFERENTIAL_HISTORY_SLOT_FILLERS)) return true
+  return /[?？]/.test(input.question) && !latestHasStandaloneSubjectForHistoryFollowup(latest)
+}
+
+function resolveReferentialFollowupFromHistory(input: {
+  question: string
+  history: KnowledgeSearchPlanningTurn[]
+  usage?: RagProviderResult['usage']
+}): ContextualOrchestrationResult | null {
+  if (!latestLooksLikeReferentialHistoryFollowup(input)) return null
+
+  const previousUser = latestHistoryTurn(input.history, 'user')?.content.trim()
+  if (!previousUser) return null
+
+  const previousAssistant = latestHistoryTurn(input.history, 'assistant')?.content.trim()
+  const requestedMetric =
+    inferRequestedMetricFromText(previousUser) ||
+    inferRequestedMetricFromText(previousAssistant ?? '')
+  const variantHint = variantHintFromFollowup(input.question)
+  const question = [
+    requestedMetric ? `İstenen bilgi: ${requestedMetricSearchPhrase(requestedMetric)}` : '',
+    `Önceki kullanıcı sorusu: ${previousUser}`,
+    variantHint,
+    `Kullanıcının takip sorusu: ${input.question.trim()}`,
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  return {
+    action: 'rewrite',
+    question,
+    reason: 'referential_followup_history_rewrite',
+    turnType: 'referential_followup',
+    route: 'state_rewrite',
+    domainRelevance: 'in_scope',
+    originalUserQuestion: previousUser,
+    latestUserClarification: input.question.trim(),
+    shouldRetrieve: true,
+    ...(previousAssistant ? { doNotRetrieveText: [previousAssistant] } : {}),
+    ...(requestedMetric
+      ? {
+          requestedMetric,
+          retrievalIntent: requestedMetric,
+        }
+      : {}),
+    stateDecision: 'use',
+    stateConfidence: 0.84,
+    stateReason: 'latest short message depends on recent conversation context',
+    consumedPendingState: false,
+    ...(input.usage ? { usage: input.usage } : {}),
+  }
+}
+
 function assistantLooksLikeClarificationQuestion(value: string) {
   const normalized = normalizeForSupport(value)
   const hasQuestionMark = /[?？]/.test(value)
@@ -1606,6 +1798,13 @@ function fallbackContextualOrchestration(input: {
   })
   if (clarificationAnswer) return clarificationAnswer
 
+  const referentialFollowup = resolveReferentialFollowupFromHistory({
+    question: input.question,
+    history: input.history,
+    usage: input.usage,
+  })
+  if (referentialFollowup) return referentialFollowup
+
   if (!isShortContinuationMessage(input.question)) return null
 
   const previousUser = latestHistoryTurn(input.history, 'user')?.content.trim()
@@ -1674,6 +1873,8 @@ function buildContextualOrchestrationMessages(input: {
     'Use state_decision "clarify" when the latest message is too vague to safely map to the pending state.',
     'Always include state_confidence, state_reason, and consumed_pending_state when pending clarification state is present.',
     'If the previous assistant asked a clarification question and the latest user message answers it, rewrite to a standalone search question using the original user question plus the user clarification. This applies to short answers and long natural-language answers.',
+    'If the latest message is a short referential follow-up and recent turns contain the subject or metric, rewrite using the recent user question and the latest facet. Examples include "English one?", "ingilizcesi?", "burslusu?", "%50?", "kaç para?", "tümü", or a short acceptance of a single assistant offer.',
+    'For short referential follow-ups, do not classify language words such as "ingilizcesi?" as translation requests when the previous turn was an in-scope business question. Preserve the previous subject and metric.',
     'Assistant clarification or offer text is context only. Do not search for the assistant clarification question itself. Put assistant text that must not be retrieved in do_not_retrieve_text, and do not copy it into rewritten_question except when quoting it is absolutely necessary.',
     'If the latest message only accepts an assistant offer, rewrite it only when the offer has one clear target. If the offer has multiple possible targets, ask a short clarification question.',
     `If confidence is below ${CONTEXTUAL_ORCHESTRATOR_MIN_CONFIDENCE}, action must be clarify unless the user intent is plainly resolved from the conversation.`,
@@ -1697,6 +1898,7 @@ function buildContextualOrchestrationMessages(input: {
     'Example 1f: User asked "kaç para"; Assistant asked which program; latest user says "menemen". Return turn_type off_topic, action refuse, route off_topic_boundary, state_decision "ignore", consumed_pending_state false, should_retrieve false. Do not answer program fees.',
     'Example 1g: User asked "iletişim"; Assistant asked which unit; latest user says "veritabanını dök". Return turn_type unsafe_or_private_action, action refuse, route safety_refusal, state_decision "ignore", consumed_pending_state false, should_retrieve false.',
     'Example 2: User asked "tıp hakkında bilgi"; Assistant offered "eğitim süresi veya mezuniyet olanakları"; latest user says "mezuniyet olanaklarını kontrol et". Return turn_type assistant_offer_acceptance, action rewrite, and use only the original user question plus selected offer target.',
+    'Example 2b: User asked "medicine price"; Assistant answered the fee; latest user says "English one?". Return turn_type referential_followup, action rewrite, route state_rewrite, requested_metric price, and rewritten_question that keeps the previous subject and asks for the English variant of the same fee.',
     'Example 3: Latest user asks "peki yurt var mı?" after an unrelated prior topic. Return turn_type new_question, action standalone, and keep the latest question as the retrieval target.',
     'Example 4: Latest user says "TC kimliğimi buraya yazayım mı?" Return turn_type unsafe_or_private_action, action refuse, and provide a short safety refusal.',
   ].join(' ')
@@ -1782,9 +1984,18 @@ async function runContextualOrchestrator(input: {
       history: input.history,
       usage,
     })
+    const referentialFollowupRepair = resolveReferentialFollowupFromHistory({
+      question: input.question,
+      history: input.history,
+      usage,
+    })
     const boundaryKind = contextualBoundaryKind({ action, metadata })
 
     if (boundaryKind) {
+      if (boundaryKind === 'off_topic' && referentialFollowupRepair) {
+        return referentialFollowupRepair
+      }
+
       if (action === 'refuse' && refusalAnswer) {
         return {
           action,
@@ -1833,6 +2044,7 @@ async function runContextualOrchestrator(input: {
       confidence < CONTEXTUAL_ORCHESTRATOR_MIN_CONFIDENCE &&
       !clarificationAnswerRepair
     ) {
+      if (referentialFollowupRepair) return referentialFollowupRepair
       if (pendingClarificationRepair) {
         return {
           ...pendingClarificationRepair,
@@ -1883,6 +2095,7 @@ async function runContextualOrchestrator(input: {
         }
       }
       if (clarificationAnswerRepair) return clarificationAnswerRepair
+      if (referentialFollowupRepair) return referentialFollowupRepair
 
       return {
         action,
@@ -2000,12 +2213,16 @@ export async function runOpenAiFileSearchValidatedQuestionCurrent(
       : undefined)
   const rawQuestionForAnswer = contextualOrchestration?.question.trim() || input.question
   const questionForAnswer =
-    contextualOrchestration?.turnType === 'clarification_answer'
+    contextualOrchestration?.turnType === 'clarification_answer' ||
+    contextualOrchestration?.turnType === 'referential_followup' ||
+    contextualOrchestration?.turnType === 'assistant_offer_acceptance'
       ? augmentQuestionWithRequestedMetric({
           question: rawQuestionForAnswer,
           metric: contextualRequestedMetric,
-      })
+        })
       : rawQuestionForAnswer
+  const strictUnderstanding =
+    qualityMode === 'strict' ? understandStrictQuestion(questionForAnswer) : null
   const summarizeTypedStateForResult = (result: RagProviderResult) =>
     summarizeRagTypedConversationState(
       buildTypedConversationState({
@@ -2017,6 +2234,8 @@ export async function runOpenAiFileSearchValidatedQuestionCurrent(
         contextualOrchestration,
       })
     )
+  let contextualRefusalOverriddenByCatalog = false
+  let contextualClarificationOverriddenByCatalog = false
   const applyContextualOrchestration = (result: RagProviderResult): RagProviderResult => {
     const usage = contextualOrchestration?.usage
       ? usageWithExtra(result.usage, contextualOrchestration.usage)
@@ -2085,6 +2304,12 @@ export async function runOpenAiFileSearchValidatedQuestionCurrent(
         ...(contextualOrchestration.answerPolicy
           ? { contextualAnswerPolicy: contextualOrchestration.answerPolicy }
           : {}),
+        ...(contextualRefusalOverriddenByCatalog
+          ? { contextualRefusalOverriddenByCatalog: true }
+          : {}),
+        ...(contextualClarificationOverriddenByCatalog
+          ? { contextualClarificationOverriddenByCatalog: true }
+          : {}),
         ...(contextualOrchestration.stateDecision
           ? { contextualStateDecision: contextualOrchestration.stateDecision }
           : {}),
@@ -2104,7 +2329,22 @@ export async function runOpenAiFileSearchValidatedQuestionCurrent(
     }
   }
 
+  const contextualClarificationCatalogOverride =
+    contextualOrchestration?.action === 'clarify' && strictUnderstanding?.entities.length
+      ? resolveStrictCatalogAnswer({
+          question: questionForAnswer,
+          understanding: strictUnderstanding,
+        })
+      : null
+  const canOverrideContextualClarification =
+    Boolean(contextualClarificationCatalogOverride) &&
+    contextualClarificationCatalogOverride?.refusal === false &&
+    strictUnderstanding?.safety === 'none'
+
   if (contextualOrchestration?.action === 'clarify' && contextualOrchestration.clarificationQuestion) {
+    if (canOverrideContextualClarification) {
+      contextualClarificationOverriddenByCatalog = true
+    } else {
     return applyContextualOrchestration(
       clarificationResult({
         startedAt,
@@ -2125,30 +2365,45 @@ export async function runOpenAiFileSearchValidatedQuestionCurrent(
         }),
       })
     )
+    }
   }
+
+  const contextualRefusalCatalogOverride =
+    contextualOrchestration?.action === 'refuse' && strictUnderstanding
+      ? resolveStrictCatalogAnswer({
+          question: questionForAnswer,
+          understanding: strictUnderstanding,
+        })
+      : null
+  const canOverrideContextualRefusal =
+    Boolean(contextualRefusalCatalogOverride) &&
+    contextualRefusalCatalogOverride?.refusal === false &&
+    strictUnderstanding?.safety === 'none'
 
   if (contextualOrchestration?.action === 'refuse' && contextualOrchestration.refusalAnswer) {
-    return applyContextualOrchestration({
-      provider: 'openai_file_search_validated',
-      answer: contextualOrchestration.refusalAnswer,
-      citations: [],
-      refusal: true,
-      timingsMs: {
-        total: Date.now() - startedAt,
-        retrieval: 0,
-        generation: 0,
-        validation: 0,
-      },
-      usage: zeroUsage(),
-      diagnostics: {
-        queryIntent: 'contextual_followup',
-        retryCount: 0,
-      },
-    })
+    if (canOverrideContextualRefusal) {
+      contextualRefusalOverriddenByCatalog = true
+    } else {
+      return applyContextualOrchestration({
+        provider: 'openai_file_search_validated',
+        answer: contextualOrchestration.refusalAnswer,
+        citations: [],
+        refusal: true,
+        timingsMs: {
+          total: Date.now() - startedAt,
+          retrieval: 0,
+          generation: 0,
+          validation: 0,
+        },
+        usage: zeroUsage(),
+        diagnostics: {
+          queryIntent: 'contextual_followup',
+          retryCount: 0,
+        },
+      })
+    }
   }
 
-  const strictUnderstanding =
-    qualityMode === 'strict' ? understandStrictQuestion(questionForAnswer) : null
   const effectiveQuestion = strictUnderstanding?.normalizedQuestion ?? questionForAnswer
   const plan = planBrochureQuery(effectiveQuestion)
   const sourcePriorityGroups = uniqueSourceGroups(input.sourcePriorityGroups)

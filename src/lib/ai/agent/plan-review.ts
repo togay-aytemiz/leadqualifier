@@ -6,6 +6,7 @@ export type AgentPlanReviewIssueCode =
   | 'pending_state_reasked'
   | 'pending_state_missing_typed_state'
   | 'stale_pending_state_clarified'
+  | 'referential_followup_missing_typed_state'
   | 'off_topic_clarified'
   | 'facility_or_policy_refused'
   | 'document_evidence_tool_missing'
@@ -165,6 +166,180 @@ const DOCUMENT_EVIDENCE_TERMS = [
   'yönetmelik',
 ]
 
+const TABLE_FACT_TERMS = [
+  'fee',
+  'price',
+  'tuition',
+  'cost',
+  'payment',
+  'installment',
+  'discount',
+  'scholarship',
+  'quota',
+  'score',
+  'ranking',
+  'ucret',
+  'ücret',
+  'fiyat',
+  'kac para',
+  'kaç para',
+  'tl',
+  'odeme',
+  'ödeme',
+  'taksit',
+  'indirim',
+  'burs',
+  'kontenjan',
+  'puan',
+  'siralama',
+  'sıralama',
+]
+
+const CATALOG_FACT_TERMS = [
+  'program list',
+  'programs',
+  'departments',
+  'faculties',
+  'schools',
+  'offering',
+  'exists',
+  'bolumler',
+  'bölümler',
+  'bolum var',
+  'bölüm var',
+  'fakulte',
+  'fakülte',
+  'yuksekokul',
+  'yüksekokul',
+  'programlar',
+  'var mi',
+  'var mı',
+]
+
+const REFERENTIAL_FOLLOWUP_TERMS = [
+  'english',
+  'turkish',
+  'ingilizce',
+  'ingilizcesi',
+  'turkce',
+  'türkçe',
+  'turkcesi',
+  'türkçesi',
+  'scholarship',
+  'burs',
+  'burslu',
+  'paid',
+  'ucretli',
+  'ücretli',
+  'discounted',
+  'discount',
+  'indirimli',
+  '%50',
+  'kontenjan',
+  'quota',
+  'score',
+  'puan',
+  'ranking',
+  'siralama',
+  'sıralama',
+  'same',
+  'that',
+  'it',
+  'this one',
+  'digeri',
+  'diğeri',
+  'bunun',
+  'onun',
+]
+
+const SUBJECTLESS_METRIC_WORDS = new Set([
+  'mi',
+  'mu',
+  'mı',
+  'mü',
+  'ne',
+  'nedir',
+  'nasil',
+  'nasıl',
+  'hangi',
+  'kac',
+  'kaç',
+  'para',
+  'tl',
+  'fiyat',
+  'ucret',
+  'ücret',
+  'ucreti',
+  'ücreti',
+  'kontenjan',
+  'quota',
+  'puan',
+  'score',
+  'siralamasi',
+  'sıralaması',
+  'ranking',
+  'burs',
+  'burslu',
+  'ucretli',
+  'ücretli',
+  'indirimli',
+  'english',
+  'ingilizce',
+  'ingilizcesi',
+  'turkish',
+  'turkce',
+  'türkçe',
+  'turkcesi',
+  'türkçesi',
+  'same',
+  'that',
+  'it',
+  'this',
+  'one',
+  'bunun',
+  'onun',
+  'digeri',
+  'diğeri',
+  'peki',
+  'eki',
+  'ya',
+])
+
+const FOLLOWUP_CONFIRMATION_TERMS = [
+  'ok',
+  'okay',
+  'tamam',
+  'evet',
+  'olur',
+  'yes',
+  'sure',
+  'please',
+  'lutfen',
+  'lütfen',
+  'bak',
+  'bakalim',
+  'bakalım',
+  'kontrol et',
+  'devam',
+  'et',
+  'yap',
+]
+
+const ASSISTANT_OFFER_TERMS = [
+  'istersen',
+  'isterseniz',
+  'kontrol edebilirim',
+  'bakabilirim',
+  'paylasabilirim',
+  'paylaşabilirim',
+  'listeleyebilirim',
+  'anlatabilirim',
+  'would you like',
+  'i can check',
+  'i can look',
+  'i can share',
+]
+
 function normalizeText(value: string) {
   return value
     .replace(/[ıİğĞüÜşŞöÖçÇ]/g, (char) => TURKISH_CHAR_MAP[char] ?? char)
@@ -232,6 +407,57 @@ function isOffTopicRequest(request: AgentRequest) {
 function needsDocumentEvidence(request: AgentRequest) {
   const latest = normalizeText(request.latestUserMessage)
   return includesAny(latest, DOCUMENT_EVIDENCE_TERMS)
+}
+
+function recentContextText(request: AgentRequest, roles?: Array<'user' | 'assistant'>) {
+  return request.recentMessages
+    .slice(-6)
+    .filter((turn) => !roles || roles.includes(turn.role))
+    .map((turn) => turn.content)
+    .join(' ')
+}
+
+function hasRecentBusinessContext(request: AgentRequest) {
+  const recentContext = recentContextText(request)
+  if (!recentContext.trim()) return false
+
+  const context = normalizeText(recentContext)
+  return includesAny(context, [
+    ...TABLE_FACT_TERMS,
+    ...CATALOG_FACT_TERMS,
+    ...DOCUMENT_EVIDENCE_TERMS,
+    ...SLOT_FILLER_TERMS,
+  ])
+}
+
+function latestHasExplicitSubject(normalized: string) {
+  const tokens = normalized.split(/\s+/).filter(Boolean)
+  return tokens.some((token) => token.length >= 3 && !SUBJECTLESS_METRIC_WORDS.has(token))
+}
+
+function recentAssistantOfferedFollowUp(request: AgentRequest) {
+  return includesAny(recentContextText(request, ['assistant']), ASSISTANT_OFFER_TERMS)
+}
+
+function latestLikelyReferentialFollowUp(request: AgentRequest) {
+  if (isPending(request)) return false
+  const latest = normalizeText(request.latestUserMessage)
+  if (!latest || latest.length > 80) return false
+  if (isOffTopicRequest(request)) return false
+  if (!hasRecentBusinessContext(request)) return false
+
+  if (includesAny(latest, REFERENTIAL_FOLLOWUP_TERMS)) return true
+  if (includesAny(latest, SLOT_FILLER_TERMS)) return true
+  if (latestLooksLikeQuestion(latest) && !latestHasExplicitSubject(latest)) return true
+  if (
+    latest.length <= 30 &&
+    includesAny(latest, FOLLOWUP_CONFIRMATION_TERMS) &&
+    recentAssistantOfferedFollowUp(request)
+  ) {
+    return true
+  }
+
+  return false
 }
 
 function addIssue(issues: AgentPlanReviewIssue[], code: AgentPlanReviewIssueCode, message: string) {
@@ -304,6 +530,16 @@ export function reviewAgentPlan(input: {
       'off_topic_clarified',
       'Off-topic requests should be refused or redirected, not clarified.'
     )
+  }
+
+  if (latestLikelyReferentialFollowUp(request)) {
+    if (plan.decision !== 'research' || !tools.has('internal.typed_state')) {
+      addIssue(
+        issues,
+        'referential_followup_missing_typed_state',
+        'Short referential follow-ups should be resolved against recent conversation state before evidence lookup.'
+      )
+    }
   }
 
   if (plan.decision === 'refuse' && needsDocumentEvidence(request) && !isOffTopicRequest(request)) {
