@@ -102,4 +102,99 @@ describe('generateSimpleRagAnswer', () => {
 
     expect(result).toMatchObject({ status: 'no_info', reason: 'invalid_chunk_ids' })
   })
+
+  it('rejects speculative facility availability inferred from related evidence', async () => {
+    const result = await generateSimpleRagAnswer({
+      latestUserMessage: 'Röntgen cihazı var mı?',
+      standaloneQuery: 'Üniversite röntgen cihazı var mı?',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      chunks: [
+        {
+          id: 'C1',
+          fileId: 'file_1',
+          filename: 'biomedical.md',
+          title: 'Biyomedikal Cihaz Teknolojisi',
+          score: 0.82,
+          content: 'Biyomedikal cihaz teknikerleri röntgen cihazlarının bakım ve onarım süreçlerinde görev alabilir.',
+        },
+      ],
+      createCompletion: vi.fn(async () =>
+        completion({
+          status: 'answer',
+          answer: 'Bu kapsamda röntgen cihazlarının mevcut olduğu anlaşılmaktadır.',
+          used_chunk_ids: ['C1'],
+        })
+      ),
+    })
+
+    expect(result).toMatchObject({
+      status: 'no_info',
+      reason: 'speculative_facility_availability',
+    })
+  })
+
+  it('rejects positive facility availability when support only describes a related job role', async () => {
+    const result = await generateSimpleRagAnswer({
+      latestUserMessage: 'Röntgen cihazı var mı?',
+      standaloneQuery: 'Üniversite röntgen cihazı var mı?',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      chunks: [
+        {
+          id: 'C1',
+          fileId: 'file_1',
+          filename: 'biomedical.md',
+          title: 'Biyomedikal Cihaz Teknolojisi',
+          score: 0.82,
+          content: 'Biyomedikal cihaz teknikerleri röntgen cihazlarının bakım, onarım, kurulum ve testinden sorumludur.',
+        },
+      ],
+      createCompletion: vi.fn(async () =>
+        completion({
+          status: 'answer',
+          answer: 'Yüksek İhtisas Üniversitesi bünyesinde röntgen cihazı bulunmaktadır.',
+          used_chunk_ids: ['C1'],
+        })
+      ),
+    })
+
+    expect(result).toMatchObject({
+      status: 'no_info',
+      reason: 'unsupported_facility_availability:rontgen',
+    })
+  })
+
+  it('allows positive facility availability when support directly states quantity or availability', async () => {
+    const localChunks = [
+      {
+        id: 'C1',
+        fileId: 'file_1',
+        filename: 'anatomy.md',
+        title: 'Laboratuvar Bilgileri',
+        score: 0.9,
+        content: 'Anatomi laboratuvarında iki adet kadavra ve maketlerle uygulamalar gerçekleştirilmektedir.',
+      },
+    ]
+    const result = await generateSimpleRagAnswer({
+      latestUserMessage: 'Kadavra var mı?',
+      standaloneQuery: 'Üniversite kadavra var mı?',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      chunks: localChunks,
+      createCompletion: vi.fn(async () =>
+        completion({
+          status: 'answer',
+          answer: 'Evet, anatomi laboratuvarında iki adet kadavra bulunmaktadır.',
+          used_chunk_ids: ['C1'],
+        })
+      ),
+    })
+
+    expect(result).toMatchObject({
+      status: 'answer',
+      answer: 'Evet, anatomi laboratuvarında iki adet kadavra bulunmaktadır.',
+      selectedChunks: localChunks,
+    })
+  })
 })

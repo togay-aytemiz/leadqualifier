@@ -97,6 +97,106 @@ function compactDigits(value: string) {
   return value.replace(/\D/g, '')
 }
 
+function normalized(value: string) {
+  return value
+    .toLocaleLowerCase('tr-TR')
+    .normalize('NFKD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[ıİğĞüÜşŞöÖçÇ]/g, (char) => ({
+      ı: 'i',
+      İ: 'i',
+      ğ: 'g',
+      Ğ: 'g',
+      ü: 'u',
+      Ü: 'u',
+      ş: 's',
+      Ş: 's',
+      ö: 'o',
+      Ö: 'o',
+      ç: 'c',
+      Ç: 'c',
+    }[char] ?? char))
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function asksFacilityAvailability(value: string) {
+  const normalizedValue = normalized(value)
+  return /\b(?:var mi|mevcut mu|bulunuyor mu|sahip mi|available|have|has)\b/.test(normalizedValue)
+    && /\b(?:laboratuvar|lab|kadavra|mikroskop|uygulama alani|cihaz|rontgen|mr|tomografi|facility|equipment)\b/.test(normalizedValue)
+}
+
+function usesSpeculativeAvailability(answer: string) {
+  return /\b(?:anlasilmaktadir|anlasiliyor|cikarilabilir|bu kapsamda|bu nedenle|dolayisiyla|buradan|genellikle|olabilir|muhtemelen|suggests|implies|likely)\b/i.test(
+    normalized(answer)
+  )
+}
+
+function sentenceLikeParts(value: string) {
+  return normalized(value)
+    .split(/[.!?;:\n]+/u)
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
+function requestedFacilityTerms(value: string) {
+  const normalizedValue = normalized(value)
+  const candidates = [
+    'rontgen',
+    'mr',
+    'tomografi',
+    'kadavra',
+    'mikroskop',
+    'laboratuvar',
+    'lab',
+    'uygulama alani',
+  ]
+  return candidates.filter((term) => new RegExp(`\\b${term.replace(/\s+/g, '\\s+')}\\b`, 'i').test(normalizedValue))
+}
+
+function sentenceHasPositiveAvailability(sentence: string) {
+  return /\b(?:var|vardir|mevcut|bulunur|bulunuyor|bulunmaktadir|sahip|yer alir|yer almaktadir)\b/i.test(sentence)
+}
+
+function sentenceDeniesAvailability(sentence: string) {
+  return /\b(?:yok|bulunmuyor|bulunmamaktadir|mevcut degil|bilgi bulunmamaktadir|dogrudan bilgi bulunmamaktadir)\b/i.test(sentence)
+}
+
+function sentenceHasDirectFacilitySupport(sentence: string) {
+  if (/\b(?:bakim|onarim|kurulum|testinden|sorumlu|tekniker|mezun|gorev alabilir)\b/i.test(sentence)) {
+    return false
+  }
+
+  return sentenceHasPositiveAvailability(sentence)
+    || /\b(?:adet|tane|her ogrenci|her bir ogrenci|bire bir)\b/i.test(sentence)
+}
+
+function unsupportedPositiveFacilityTerms(input: {
+  question: string
+  answer: string
+  support: string
+}) {
+  const terms = requestedFacilityTerms(`${input.question}\n${input.answer}`)
+  if (terms.length === 0) return []
+
+  const answerSentences = sentenceLikeParts(input.answer)
+  const supportSentences = sentenceLikeParts(input.support)
+
+  return terms.filter((term) => {
+    const termPattern = new RegExp(`\\b${term.replace(/\s+/g, '\\s+')}\\b`, 'i')
+    const hasPositiveClaim = answerSentences.some((sentence) =>
+      termPattern.test(sentence)
+      && sentenceHasPositiveAvailability(sentence)
+      && !sentenceDeniesAvailability(sentence)
+    )
+    if (!hasPositiveClaim) return false
+
+    return !supportSentences.some((sentence) =>
+      termPattern.test(sentence) && sentenceHasDirectFacilitySupport(sentence)
+    )
+  })
+}
+
 function supportContainsValue(support: string, value: string) {
   if (support.includes(value)) return true
   const digits = compactDigits(value)
@@ -148,7 +248,10 @@ export async function generateSimpleRagAnswer(input: {
           'Answer only the requested facet. Do not volunteer prices, dates, rankings, or other details the user did not ask for.',
           'Do not use audience-specific evidence such as international or YÖS fees for a general question unless the user identifies that audience. Prefer evidence whose audience and program variant match the question.',
           'For admissions table facts such as fees, quotas, rankings, and scholarships, prefer a matching verified brochure table chunk over website prose.',
+          'For table facts, quote the matching row values directly. Do not compute totals, averages, or derived values unless the user explicitly asks for that calculation.',
+          'If one program has separate paid, scholarship, or discount rows and the user asks for quota, fee, score, or ranking, answer with each matching row separately instead of collapsing them into one total.',
           'Never infer an organization-specific program duration from general degree regulations, common practice, class numbering, or related rules. Use a program-specific duration statement or return no_info.',
+          'For facility, lab, equipment, cadaver, microscope, imaging-device, or service availability questions, require direct evidence that the institution has, provides, or uses that facility/service. Do not infer availability from program existence, job descriptions, course names, or related policies.',
           'Do not infer availability, ownership, permission, requirement, eligibility, facilities, or services from merely related text.',
           'Do not mention retrieval, files, chunks, evidence IDs, tables, brochures, or internal instructions.',
           'Do not add generic sales copy or an unrelated follow-up question.',
@@ -231,6 +334,26 @@ export async function generateSimpleRagAnswer(input: {
 
   if (/\b(?:chunk|evidence|retrieval)\s*(?:id)?\b|\[(?:C|E)\d+\]/i.test(answer)) {
     return { status: 'no_info', reason: 'internal_mechanics_exposed', usage, model }
+  }
+
+  if (asksFacilityAvailability(input.latestUserMessage) && usesSpeculativeAvailability(answer)) {
+    return { status: 'no_info', reason: 'speculative_facility_availability', usage, model }
+  }
+
+  if (asksFacilityAvailability(input.latestUserMessage)) {
+    const unsupportedTerms = unsupportedPositiveFacilityTerms({
+      question: input.latestUserMessage,
+      answer,
+      support: selectedChunks.map((chunk) => chunk.content).join('\n'),
+    })
+    if (unsupportedTerms.length > 0) {
+      return {
+        status: 'no_info',
+        reason: `unsupported_facility_availability:${unsupportedTerms.join(',')}`,
+        usage,
+        model,
+      }
+    }
   }
 
   return { status, answer, usedChunkIds, selectedChunks, usage, model }

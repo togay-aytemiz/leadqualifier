@@ -152,8 +152,15 @@ export type RagProviderResult = {
     strictVerdict?: string
     simpleRag?: {
       standaloneQuery?: string
+      retryQuery?: string
+      retryReason?: string
+      retryScoreThreshold?: number
       stateUsed: boolean
+      rawResultCount?: number
       resultCount: number
+      droppedChunkCount?: number
+      droppedChunkReasons?: string[]
+      droppedChunkMatches?: string[]
       topScores: number[]
       selectedChunkIds: string[]
       selectedFilenames: string[]

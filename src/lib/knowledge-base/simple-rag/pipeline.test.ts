@@ -164,6 +164,81 @@ describe('runSimpleRagPipeline', () => {
     expect(result.diagnostics?.strictVerdict).toBe('no_verified_evidence')
   })
 
+  it('retries once when the first retrieval only returns filtered evidence', async () => {
+    const vectorSearch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: [
+          {
+            file_id: 'file_wrong',
+            filename: 'news.md',
+            score: 0.93,
+            attributes: null,
+            content: [
+              {
+                type: 'text' as const,
+                text: 'Ankara Yıldırım Beyazıt Üniversitesi Tıp Fakültesi töreni yapıldı.',
+              },
+            ],
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            file_id: 'file_right',
+            filename: 'brochure.md',
+            score: 0.88,
+            attributes: null,
+            content: [
+              {
+                type: 'text' as const,
+                text: 'Yüksek İhtisas Üniversitesi Tıp Fakültesi programı bulunmaktadır.',
+              },
+            ],
+          },
+        ],
+      })
+
+    const result = await runSimpleRagPipeline({
+      client: { vectorStores: { search: vectorSearch } },
+      vectorStoreId: 'vs_yiu',
+      answerModel: 'gpt-4o-mini',
+      latestUserMessage: 'Sağlık alanında ne okuyabilirim?',
+      recentMessages: [],
+      organizationContext: 'Yüksek İhtisas Üniversitesi',
+      responseLanguage: 'tr',
+      rewriteCreateCompletion: vi.fn(async () =>
+        completion({
+          status: 'search',
+          standalone_query: 'Yüksek İhtisas Üniversitesi sağlık alanı programları',
+          response_language: 'tr',
+        })
+      ),
+      answerCreateCompletion: vi.fn(async () =>
+        completion({
+          status: 'answer',
+          answer: 'Yüksek İhtisas Üniversitesi’nde Tıp Fakültesi programı bulunmaktadır.',
+          used_chunk_ids: ['C1'],
+        })
+      ),
+    })
+
+    expect(vectorSearch).toHaveBeenCalledTimes(2)
+    expect(result.answer).toContain('Yüksek İhtisas Üniversitesi')
+    expect(result.diagnostics).toMatchObject({
+      retryCount: 1,
+      simpleRag: {
+        retryReason: 'all_chunks_filtered',
+        droppedChunkCount: 1,
+        droppedChunkReasons: ['other_organization'],
+        droppedChunkMatches: ['Ankara Yıldırım Beyazıt Üniversitesi'],
+        selectedFilenames: ['brochure.md'],
+        answerStatus: 'answer',
+      },
+    })
+  })
+
   it('preserves a real safety refusal from the rewriter', async () => {
     const result = await runSimpleRagPipeline({
       client: { vectorStores: { search: vi.fn() } },

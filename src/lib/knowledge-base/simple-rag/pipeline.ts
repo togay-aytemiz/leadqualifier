@@ -19,6 +19,12 @@ import {
   type SimpleRagChunk,
   type SimpleRagVectorSearchClient,
 } from './vector-search'
+import {
+  answerViolatesOrganizationScope,
+  buildSimpleRagRetryQuery,
+  filterSimpleRagChunks,
+  type SimpleRagDroppedChunk,
+} from './retrieval-guards'
 
 type CitationSource = { title?: string; url?: string }
 type Usage = { inputTokens?: number; outputTokens?: number; totalTokens?: number }
@@ -69,6 +75,13 @@ function appendCitationUrls(answer: string, citations: RagProviderCitation[]) {
 
 function stateWasUsed(state: RagPendingClarificationState | null | undefined) {
   return Boolean(state && (state.originalQuestion || state.clarificationQuestion))
+}
+
+type RetrievalAttempt = {
+  query: string
+  chunks: SimpleRagChunk[]
+  rawChunks: SimpleRagChunk[]
+  droppedChunks: SimpleRagDroppedChunk[]
 }
 
 export async function runSimpleRagPipeline(input: {
@@ -172,24 +185,92 @@ export async function runSimpleRagPipeline(input: {
     }
   }
 
-  const retrievalStartedAt = Date.now()
-  const retrieval = await searchSimpleRagVectorStore({
-    client: input.client,
-    vectorStoreId: input.vectorStoreId,
-    standaloneQuery: rewrite.plan.standaloneQuery,
+  const standaloneQuery = rewrite.plan.standaloneQuery
+  let retrievalMs = 0
+  const droppedChunksAcrossAttempts: SimpleRagDroppedChunk[] = []
+  const runRetrievalAttempt = async (args: {
+    query: string
+    maxResults?: number
+    scoreThreshold?: number
+  }): Promise<RetrievalAttempt> => {
+    const retrievalStartedAt = Date.now()
+    const retrieval = await searchSimpleRagVectorStore({
+      client: input.client,
+      vectorStoreId: input.vectorStoreId,
+      standaloneQuery: args.query,
+      maxResults: args.maxResults,
+      scoreThreshold: args.scoreThreshold,
+      citationSourcesByFilename: input.citationSourcesByFilename,
+    })
+    retrievalMs += Date.now() - retrievalStartedAt
+    const filtered = filterSimpleRagChunks({
+      chunks: retrieval.chunks,
+      organizationContext: input.organizationContext,
+      latestUserMessage: input.latestUserMessage,
+      standaloneQuery: args.query,
+    })
+    droppedChunksAcrossAttempts.push(...filtered.dropped)
+    return {
+      query: args.query,
+      chunks: filtered.chunks,
+      rawChunks: retrieval.chunks,
+      droppedChunks: filtered.dropped,
+    }
+  }
+  const retryQuery = buildSimpleRagRetryQuery({
+    organizationContext: input.organizationContext,
+    latestUserMessage: input.latestUserMessage,
+    standaloneQuery,
+    responseLanguage: rewrite.plan.responseLanguage,
+  })
+  const retryMaxResults = Math.max(input.maxResults ?? 0, 30)
+  const retryScoreThreshold = Math.min(input.scoreThreshold ?? 0.1, 0.02)
+  let attempt = await runRetrievalAttempt({
+    query: standaloneQuery,
     maxResults: input.maxResults,
     scoreThreshold: input.scoreThreshold,
-    citationSourcesByFilename: input.citationSourcesByFilename,
   })
-  const retrievalMs = Date.now() - retrievalStartedAt
+  let retryCount = 0
+  let retryReason: string | undefined
+
+  const runRetry = async (reason: string) => {
+    retryReason = reason
+    retryCount = 1
+    attempt = await runRetrievalAttempt({
+      query: retryQuery,
+      maxResults: retryMaxResults,
+      scoreThreshold: retryScoreThreshold,
+    })
+  }
+
+  if (attempt.chunks.length === 0) {
+    await runRetry(attempt.rawChunks.length > 0 ? 'all_chunks_filtered' : 'no_chunks')
+  }
+
   const baseDiagnostics = {
     queryIntent: 'simple_rag_search',
     contextualQuestion: input.latestUserMessage,
-    contextualRetrievalIntent: rewrite.plan.standaloneQuery,
-    retryCount: 0,
+    contextualRetrievalIntent: standaloneQuery,
+    retryCount,
   } as const
 
-  if (retrieval.chunks.length === 0) {
+  const commonSimpleDiagnostics = () => ({
+    standaloneQuery,
+    retryQuery: retryCount ? retryQuery : undefined,
+    retryReason,
+    retryScoreThreshold: retryCount ? retryScoreThreshold : undefined,
+    stateUsed: stateWasUsed(input.pendingClarification),
+    rawResultCount: attempt.rawChunks.length,
+    resultCount: attempt.chunks.length,
+    droppedChunkCount: droppedChunksAcrossAttempts.length,
+    droppedChunkReasons: droppedChunksAcrossAttempts.map((chunk) => chunk.reason),
+    droppedChunkMatches: droppedChunksAcrossAttempts
+      .map((chunk) => chunk.matchedText)
+      .filter((value): value is string => Boolean(value)),
+    topScores: attempt.chunks.slice(0, 5).map((chunk) => chunk.score),
+  })
+
+  if (attempt.chunks.length === 0) {
     return {
       provider: 'openai_file_search_validated',
       answer: noInformationAnswer(rewrite.plan.responseLanguage),
@@ -201,10 +282,7 @@ export async function runSimpleRagPipeline(input: {
         ...baseDiagnostics,
         strictVerdict: 'no_verified_evidence',
         simpleRag: {
-          standaloneQuery: rewrite.plan.standaloneQuery,
-          stateUsed: stateWasUsed(input.pendingClarification),
-          resultCount: 0,
-          topScores: [],
+          ...commonSimpleDiagnostics(),
           selectedChunkIds: [],
           selectedFilenames: [],
           answerStatus: 'no_info',
@@ -216,44 +294,86 @@ export async function runSimpleRagPipeline(input: {
   const generationStartedAt = Date.now()
   const generated = await generateSimpleRagAnswer({
     latestUserMessage: input.latestUserMessage,
-    standaloneQuery: rewrite.plan.standaloneQuery,
+    standaloneQuery: attempt.query,
     recentMessages: input.recentMessages,
     pendingClarification: input.pendingClarification,
     responseLanguage: rewrite.plan.responseLanguage,
-    chunks: retrieval.chunks,
+    chunks: attempt.chunks,
     settings: input.settings,
     model: input.answerModel,
     createCompletion: input.answerCreateCompletion,
   })
   const generationMs = Date.now() - generationStartedAt
-  const usage = addUsage(rewrite.usage, generated.usage)
-  const commonSimpleDiagnostics = {
-    standaloneQuery: rewrite.plan.standaloneQuery,
-    stateUsed: stateWasUsed(input.pendingClarification),
-    resultCount: retrieval.chunks.length,
-    topScores: retrieval.chunks.slice(0, 5).map((chunk) => chunk.score),
+  let usage = addUsage(rewrite.usage, generated.usage)
+  let finalGenerated = generated
+  let finalGenerationMs = generationMs
+  const organizationViolation =
+    generated.status === 'answer'
+      ? answerViolatesOrganizationScope({
+          answer: generated.answer,
+          organizationContext: input.organizationContext,
+        })
+      : { violates: false as const }
+
+  if (
+    retryCount === 0 &&
+    (generated.status === 'no_info' || organizationViolation.violates)
+  ) {
+    const retryCause = organizationViolation.violates
+      ? `answer_other_organization:${organizationViolation.matchedText}`
+      : generated.status === 'no_info'
+        ? `answer_${generated.reason}`
+        : 'answer_rejected'
+    await runRetry(retryCause)
+    if (attempt.chunks.length > 0) {
+      const retryGenerationStartedAt = Date.now()
+      finalGenerated = await generateSimpleRagAnswer({
+        latestUserMessage: input.latestUserMessage,
+        standaloneQuery: attempt.query,
+        recentMessages: input.recentMessages,
+        pendingClarification: input.pendingClarification,
+        responseLanguage: rewrite.plan.responseLanguage,
+        chunks: attempt.chunks,
+        settings: input.settings,
+        model: input.answerModel,
+        createCompletion: input.answerCreateCompletion,
+      })
+      finalGenerationMs += Date.now() - retryGenerationStartedAt
+      usage = addUsage(rewrite.usage, generated.usage, finalGenerated.usage)
+    }
+  }
+  const finalOrganizationViolation =
+    finalGenerated.status === 'answer'
+      ? answerViolatesOrganizationScope({
+          answer: finalGenerated.answer,
+          organizationContext: input.organizationContext,
+        })
+      : { violates: false as const }
+  const finalBaseDiagnostics = {
+    ...baseDiagnostics,
+    retryCount,
   }
 
-  if (generated.status === 'clarify') {
+  if (finalGenerated.status === 'clarify') {
     return {
       provider: 'openai_file_search_validated',
-      answer: generated.clarificationQuestion,
+      answer: finalGenerated.clarificationQuestion,
       citations: [],
       refusal: false,
-      timingsMs: { total: Date.now() - startedAt, retrieval: retrievalMs, generation: generationMs },
+      timingsMs: { total: Date.now() - startedAt, retrieval: retrievalMs, generation: finalGenerationMs },
       usage,
       diagnostics: {
-        ...baseDiagnostics,
-        clarification: generated.clarificationQuestion,
+        ...finalBaseDiagnostics,
+        clarification: finalGenerated.clarificationQuestion,
         pendingClarification: {
           originalQuestion: input.latestUserMessage,
-          clarificationQuestion: generated.clarificationQuestion,
-          missingSlots: [generated.missingSlot],
-          retrievalIntent: rewrite.plan.standaloneQuery,
+          clarificationQuestion: finalGenerated.clarificationQuestion,
+          missingSlots: [finalGenerated.missingSlot],
+          retrievalIntent: attempt.query,
         },
         strictVerdict: 'clarification_required',
         simpleRag: {
-          ...commonSimpleDiagnostics,
+          ...commonSimpleDiagnostics(),
           selectedChunkIds: [],
           selectedFilenames: [],
           answerStatus: 'clarify',
@@ -262,19 +382,19 @@ export async function runSimpleRagPipeline(input: {
     }
   }
 
-  if (generated.status === 'refuse') {
+  if (finalGenerated.status === 'refuse') {
     return {
       provider: 'openai_file_search_validated',
-      answer: generated.refusalResponse,
+      answer: finalGenerated.refusalResponse,
       citations: [],
       refusal: true,
-      timingsMs: { total: Date.now() - startedAt, retrieval: retrievalMs, generation: generationMs },
+      timingsMs: { total: Date.now() - startedAt, retrieval: retrievalMs, generation: finalGenerationMs },
       usage,
       diagnostics: {
-        ...baseDiagnostics,
+        ...finalBaseDiagnostics,
         strictVerdict: 'safety_refusal',
         simpleRag: {
-          ...commonSimpleDiagnostics,
+          ...commonSimpleDiagnostics(),
           selectedChunkIds: [],
           selectedFilenames: [],
           answerStatus: 'refuse',
@@ -283,20 +403,25 @@ export async function runSimpleRagPipeline(input: {
     }
   }
 
-  if (generated.status === 'no_info') {
+  if (finalGenerated.status === 'no_info' || finalOrganizationViolation.violates) {
+    const rejectionReason = finalOrganizationViolation.violates
+      ? `answer_other_organization:${finalOrganizationViolation.matchedText}`
+      : finalGenerated.status === 'no_info'
+        ? finalGenerated.reason
+        : 'answer_rejected'
     return {
       provider: 'openai_file_search_validated',
       answer: noInformationAnswer(rewrite.plan.responseLanguage),
       citations: [],
       refusal: false,
-      timingsMs: { total: Date.now() - startedAt, retrieval: retrievalMs, generation: generationMs },
+      timingsMs: { total: Date.now() - startedAt, retrieval: retrievalMs, generation: finalGenerationMs },
       usage,
       diagnostics: {
-        ...baseDiagnostics,
-        contextualReason: generated.reason,
+        ...finalBaseDiagnostics,
+        contextualReason: rejectionReason,
         strictVerdict: 'grounded_generation_rejected',
         simpleRag: {
-          ...commonSimpleDiagnostics,
+          ...commonSimpleDiagnostics(),
           selectedChunkIds: [],
           selectedFilenames: [],
           answerStatus: 'no_info',
@@ -305,21 +430,21 @@ export async function runSimpleRagPipeline(input: {
     }
   }
 
-  const citations = selectedCitations(generated.selectedChunks)
+  const citations = selectedCitations(finalGenerated.selectedChunks)
   return {
     provider: 'openai_file_search_validated',
-    answer: appendCitationUrls(generated.answer, citations),
+    answer: appendCitationUrls(finalGenerated.answer, citations),
     citations,
     refusal: false,
-    timingsMs: { total: Date.now() - startedAt, retrieval: retrievalMs, generation: generationMs },
+    timingsMs: { total: Date.now() - startedAt, retrieval: retrievalMs, generation: finalGenerationMs },
     usage,
     diagnostics: {
-      ...baseDiagnostics,
+      ...finalBaseDiagnostics,
       strictVerdict: 'verified_evidence_answer',
       simpleRag: {
-        ...commonSimpleDiagnostics,
-        selectedChunkIds: generated.usedChunkIds,
-        selectedFilenames: generated.selectedChunks.map((chunk) => chunk.filename),
+        ...commonSimpleDiagnostics(),
+        selectedChunkIds: finalGenerated.usedChunkIds,
+        selectedFilenames: finalGenerated.selectedChunks.map((chunk) => chunk.filename),
         answerStatus: 'answer',
       },
     },
