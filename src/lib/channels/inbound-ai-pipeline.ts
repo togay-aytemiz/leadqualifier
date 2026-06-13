@@ -54,6 +54,7 @@ import {
     isInternalAgentActivationEnabled,
     runInternalAgentActivatedTurn
 } from '@/lib/ai/agent/activation'
+import type { SkillMatch } from '@/types/database'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 const RAG_REASONING_MAX_COMPLETION_TOKENS = 1024
@@ -293,6 +294,7 @@ export interface InboundAiPipelineInput {
     inboundMessageIdMetadataKey: string
     inboundMessageMetadata: Record<string, unknown>
     reprocessExistingInbound?: boolean
+    preferredSkillMatch?: SkillMatch
     inboundActionSelection?: {
         kind: 'skill_action'
         sourceSkillId: string
@@ -1400,18 +1402,20 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         }
     }
 
-    const skillMatchResult = await matchSkillsWithStatus({
-        matcher: () => matchSkills(options.text, orgId, matchThreshold, 5, options.supabase),
-        context: {
-            organization_id: orgId,
-            conversation_id: conversation.id,
-            source: options.source
-        },
-        intentGate: {
-            message: options.text,
-            threshold: matchThreshold
-        }
-    })
+    const skillMatchResult = options.preferredSkillMatch
+        ? { status: 'matched' as const, matches: [options.preferredSkillMatch] }
+        : await matchSkillsWithStatus({
+            matcher: () => matchSkills(options.text, orgId, matchThreshold, 5, options.supabase),
+            context: {
+                organization_id: orgId,
+                conversation_id: conversation.id,
+                source: options.source
+            },
+            intentGate: {
+                message: options.text,
+                threshold: matchThreshold
+            }
+        })
     if (skillMatchResult.status === 'error') {
         console.warn(`${options.logPrefix}: Skill matching failed; routing to human attention without fallback`, {
             organization_id: orgId,
@@ -1461,7 +1465,9 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             imageMimeType: matchedSkillDetails?.image_mime_type,
             imageOriginalFilename: matchedSkillDetails?.image_original_filename,
             metadata: {
-                skill_match_source: 'semantic_top_match'
+                skill_match_source: options.preferredSkillMatch
+                    ? 'verified_preferred_match'
+                    : 'semantic_top_match'
             }
         })
 

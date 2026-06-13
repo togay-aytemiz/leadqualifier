@@ -22,6 +22,7 @@ const {
     matchExactSkillTriggersMock,
     matchSkillsMock,
     rewriteDemoSkillQueryMock,
+    verifyDemoSkillCandidatesMock,
     searchKnowledgeBaseFocusedEvidenceMock,
     searchKnowledgeBaseMock,
 } = vi.hoisted(() => ({
@@ -40,6 +41,7 @@ const {
     matchExactSkillTriggersMock: vi.fn(),
     matchSkillsMock: vi.fn(),
     rewriteDemoSkillQueryMock: vi.fn(),
+    verifyDemoSkillCandidatesMock: vi.fn(),
     searchKnowledgeBaseFocusedEvidenceMock: vi.fn(),
     searchKnowledgeBaseMock: vi.fn(),
 }))
@@ -59,6 +61,10 @@ vi.mock('@/lib/demo-chat/openai-file-search', () => ({
 
 vi.mock('@/lib/demo-chat/skill-query-rewriter', () => ({
     rewriteDemoSkillQuery: rewriteDemoSkillQueryMock,
+}))
+
+vi.mock('@/lib/demo-chat/skill-candidate-verifier', () => ({
+    verifyDemoSkillCandidates: verifyDemoSkillCandidatesMock,
 }))
 
 vi.mock('@/lib/channels/inbound-ai-pipeline', () => ({
@@ -312,6 +318,7 @@ describe('demo chat API route', () => {
         matchExactSkillTriggersMock.mockResolvedValue([])
         matchSkillsMock.mockResolvedValue([])
         rewriteDemoSkillQueryMock.mockResolvedValue(null)
+        verifyDemoSkillCandidatesMock.mockResolvedValue(null)
         buildRagContextMock.mockReturnValue({ context: '', chunks: [], tokenCount: 0 })
         repairLinkOnlyRagAnswerMock.mockReturnValue(null)
         appendCanonicalRagSourceLinksMock.mockImplementation((response: string) => response)
@@ -534,14 +541,35 @@ describe('demo chat API route', () => {
     })
 
     it('answers semantic skill matches during POST when exact trigger matching misses', async () => {
+        vi.stubEnv('OPENAI_API_KEY', 'sk-test')
         matchExactSkillTriggersMock.mockResolvedValueOnce([])
-        matchSkillsMock.mockResolvedValueOnce([{
+        const campusMatch = {
             skill_id: 'skill-campus',
             title: 'YİÜ Intent - 03 kampusler_genel_adres',
             response_text: 'Yüksek İhtisas Üniversitesi için kaynaklarda şu yerleşkeler yer alıyor.',
             trigger_text: 'Kampüsler nerede?',
             similarity: 0.91,
-        }])
+        }
+        rewriteDemoSkillQueryMock.mockResolvedValueOnce({
+            query: 'Yüksek İhtisas Üniversitesi kampüsleri nerede?',
+            subject: 'Yüksek İhtisas Üniversitesi kampüsleri',
+            facet: 'konum',
+            needsClarification: false,
+            usedHistory: false,
+            decision: 'standalone',
+            reason: 'Standalone location question.',
+            model: 'gpt-4.1-mini',
+            usage: { inputTokens: 80, outputTokens: 20, totalTokens: 100 },
+        })
+        matchSkillsMock.mockResolvedValueOnce([campusMatch])
+        verifyDemoSkillCandidatesMock.mockResolvedValueOnce({
+            decision: 'skill',
+            match: campusMatch,
+            confidence: 0.98,
+            reason: 'Subject and location facet match.',
+            model: 'gpt-4.1-mini',
+            usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 },
+        })
         processInboundAiPipelineMock.mockImplementationOnce(async (input) => {
             await input.sendOutbound('Yüksek İhtisas Üniversitesi için kaynaklarda şu yerleşkeler yer alıyor.')
         })
@@ -558,20 +586,75 @@ describe('demo chat API route', () => {
             skillImage: null,
         })
         expect(matchSkillsMock).toHaveBeenCalledWith(
-            'kampüsler nerede acaba',
+            'Yüksek İhtisas Üniversitesi kampüsleri nerede?',
             demoChannel.organizationId,
             0.6,
-            1,
+            3,
             expect.anything()
         )
         expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
             text: 'kampüsler nerede acaba',
+            preferredSkillMatch: campusMatch,
             inboundMessageId: expect.any(String),
             platform: 'demo_chat',
             source: 'demo_chat',
         }))
         expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalled()
         expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
+    })
+
+    it('rejects an unrelated semantic skill candidate and continues to RAG', async () => {
+        vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+        matchExactSkillTriggersMock.mockResolvedValueOnce([])
+        const unrelatedMatch = {
+            skill_id: 'skill-dormitory',
+            title: 'YİÜ Intent - konaklama_yurt_bilgisi',
+            response_text: 'Üniversitenin yurt ve konaklama bilgileri.',
+            trigger_text: 'Yurt var mı?',
+            similarity: 0.86,
+        }
+        rewriteDemoSkillQueryMock.mockResolvedValueOnce({
+            query: 'Yüksek İhtisas Üniversitesinin dezavantajları nelerdir?',
+            subject: 'Yüksek İhtisas Üniversitesi',
+            facet: 'dezavantajlar',
+            needsClarification: false,
+            usedHistory: false,
+            decision: 'standalone',
+            reason: 'Standalone evaluation question.',
+            model: 'gpt-4.1-mini',
+            usage: { inputTokens: 80, outputTokens: 20, totalTokens: 100 },
+        })
+        matchSkillsMock.mockResolvedValueOnce([unrelatedMatch])
+        verifyDemoSkillCandidatesMock.mockResolvedValueOnce({
+            decision: 'no_skill',
+            match: null,
+            confidence: 0.94,
+            reason: 'The candidate answers accommodation, not disadvantages.',
+            model: 'gpt-4.1-mini',
+            usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 },
+        })
+
+        const res = await POST(createRequest({
+            sessionId: 'session-1',
+            message: 'Üniversitenin eksileri ne?',
+        }), createContext())
+
+        expect(res.status).toBe(202)
+        await expect(res.json()).resolves.toEqual({
+            pending: true,
+            messageId: expect.any(String),
+        })
+        expect(verifyDemoSkillCandidatesMock).toHaveBeenCalledWith(expect.objectContaining({
+            candidates: [unrelatedMatch],
+            facet: 'dezavantajlar',
+        }))
+        expect(processInboundAiPipelineMock).toHaveBeenCalledTimes(1)
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            skipAutomation: true,
+        }))
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalledWith(expect.objectContaining({
+            preferredSkillMatch: unrelatedMatch,
+        }))
     })
 
     it('rewrites accepted assistant offers before falling back to RAG', async () => {
@@ -584,23 +667,31 @@ describe('demo chat API route', () => {
             },
         ])
         createClientMock.mockReturnValueOnce(fakeSupabase)
-        matchExactSkillTriggersMock
-            .mockResolvedValueOnce([])
-            .mockResolvedValueOnce([])
-        matchSkillsMock
-            .mockResolvedValueOnce([])
-            .mockResolvedValueOnce([{
-                skill_id: 'skill-scholarships',
-                title: 'YİÜ Intent - 49 burs_ve_indirimler_genel',
-                response_text: 'Yüksek İhtisas Üniversitesi için burs seçenekleri şunlardır.',
-                trigger_text: 'Burs seçenekleri neler?',
-                similarity: 0.94,
-            }])
+        matchExactSkillTriggersMock.mockResolvedValueOnce([])
+        const scholarshipMatch = {
+            skill_id: 'skill-scholarships',
+            title: 'YİÜ Intent - 49 burs_ve_indirimler_genel',
+            response_text: 'Yüksek İhtisas Üniversitesi için burs seçenekleri şunlardır.',
+            trigger_text: 'Burs seçenekleri neler?',
+            similarity: 0.94,
+        }
+        matchSkillsMock.mockResolvedValueOnce([scholarshipMatch])
         rewriteDemoSkillQueryMock.mockResolvedValueOnce({
             query: 'Yüksek İhtisas Üniversitesi burs seçenekleri',
+            subject: 'Yüksek İhtisas Üniversitesi bursları',
+            facet: 'burs seçenekleri',
+            needsClarification: false,
             usedHistory: true,
             decision: 'accepted_previous_offer',
             reason: 'User accepted the assistant offer.',
+            model: 'gpt-4.1-mini',
+            usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 },
+        })
+        verifyDemoSkillCandidatesMock.mockResolvedValueOnce({
+            decision: 'skill',
+            match: scholarshipMatch,
+            confidence: 0.98,
+            reason: 'The candidate answers the offered burs options.',
             model: 'gpt-4.1-mini',
             usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 },
         })
@@ -632,12 +723,12 @@ describe('demo chat API route', () => {
             'Yüksek İhtisas Üniversitesi burs seçenekleri',
             demoChannel.organizationId,
             0.6,
-            1,
+            3,
             fakeSupabase
         )
         expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
-            text: 'Yüksek İhtisas Üniversitesi burs seçenekleri',
-            reprocessExistingInbound: true,
+            text: 'Evet, lütfen devam etmeni rica ediyorum.',
+            preferredSkillMatch: scholarshipMatch,
             inboundMessageId: expect.any(String),
             platform: 'demo_chat',
             source: 'demo_chat',

@@ -11,6 +11,7 @@ import { verifyDemoChatAccessToken } from '@/lib/demo-chat/access'
 import { buildDemoChatContactId, resolveDemoChatChannel } from '@/lib/demo-chat/channel'
 import { buildOpenAiFileSearchDemoReply } from '@/lib/demo-chat/openai-file-search'
 import { rewriteDemoSkillQuery, type DemoSkillQueryRewriteResult } from '@/lib/demo-chat/skill-query-rewriter'
+import { verifyDemoSkillCandidates } from '@/lib/demo-chat/skill-candidate-verifier'
 import {
     DEMO_MAINTENANCE_BYPASS_COOKIE,
     shouldServeDemoMaintenance,
@@ -29,6 +30,7 @@ import { microPolishDeterministicRagAnswer } from '@/lib/knowledge-base/rag-answ
 import { polishGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-polish'
 import { generateGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-generate'
 import { appendCanonicalRagSourceLinks } from '@/lib/knowledge-base/rag-source-links'
+import type { SkillMatch } from '@/types/database'
 
 export const runtime = 'nodejs'
 
@@ -36,12 +38,14 @@ const MAX_MESSAGE_CHARS = 2000
 const MAX_SESSION_ID_CHARS = 128
 const DEFAULT_SYNC_REPLY_TIMEOUT_MS = 5000
 const DEFAULT_SKILL_QUERY_REWRITE_TIMEOUT_MS = 1800
+const DEFAULT_SKILL_CANDIDATE_VERIFY_TIMEOUT_MS = 1800
 const DEFAULT_FAST_RAG_REPLY_TIMEOUT_MS = 10000
 const DEFAULT_FAST_RAG_GENERATE_TIMEOUT_MS = 3500
 const DEFAULT_CONTEXTUAL_FAST_RAG_GENERATE_TIMEOUT_MS = 5500
 const DEFAULT_FAST_RAG_POLISH_TIMEOUT_MS = 1800
 const MAX_SYNC_REPLY_TIMEOUT_MS = 6000
 const MAX_SKILL_QUERY_REWRITE_TIMEOUT_MS = 3000
+const MAX_SKILL_CANDIDATE_VERIFY_TIMEOUT_MS = 3000
 const MAX_FAST_RAG_REPLY_TIMEOUT_MS = 12000
 const MAX_FAST_RAG_GENERATE_TIMEOUT_MS = 5000
 const MAX_CONTEXTUAL_FAST_RAG_GENERATE_TIMEOUT_MS = 8000
@@ -173,6 +177,14 @@ function readSkillQueryRewriteTimeoutMs() {
     const raw = Number.parseInt(process.env.DEMO_CHAT_SKILL_QUERY_REWRITE_TIMEOUT_MS ?? '', 10)
     if (Number.isFinite(raw) && raw >= 500) return Math.min(raw, MAX_SKILL_QUERY_REWRITE_TIMEOUT_MS)
     return DEFAULT_SKILL_QUERY_REWRITE_TIMEOUT_MS
+}
+
+function readSkillCandidateVerifyTimeoutMs() {
+    const raw = Number.parseInt(process.env.DEMO_CHAT_SKILL_CANDIDATE_VERIFY_TIMEOUT_MS ?? '', 10)
+    if (Number.isFinite(raw) && raw >= 500) {
+        return Math.min(raw, MAX_SKILL_CANDIDATE_VERIFY_TIMEOUT_MS)
+    }
+    return DEFAULT_SKILL_CANDIDATE_VERIFY_TIMEOUT_MS
 }
 
 function readFastRagReplyTimeoutMs() {
@@ -696,8 +708,17 @@ async function runDemoChatPipeline(input: {
     message: string
     inboundMessageId: string
     reprocessExistingInbound?: boolean
+    preferredSkillMatch?: SkillMatch
 }): Promise<DemoChatPipelineResult> {
-    const { supabase, channel, sessionId, message, inboundMessageId, reprocessExistingInbound } = input
+    const {
+        supabase,
+        channel,
+        sessionId,
+        message,
+        inboundMessageId,
+        reprocessExistingInbound,
+        preferredSkillMatch,
+    } = input
     let replyText = ''
     let skillImage: DemoChatSkillImage | null = null
 
@@ -718,6 +739,7 @@ async function runDemoChatPipeline(input: {
             demo_chat_session_id: sessionId,
         },
         reprocessExistingInbound,
+        preferredSkillMatch,
         sendOutbound: async (content) => {
             const isImage = isOutboundImageMessage(content)
             const text = readTextReply(content)
@@ -1690,95 +1712,86 @@ async function tryImmediateDemoSkillReply(input: {
     message: string
     inboundMessageId: string
 }): Promise<DemoChatPipelineResult | null | 'pending'> {
-    const skillMatchResult = await matchImmediateDemoSkill({
-        supabase: input.supabase,
-        organizationId: input.channel.organizationId,
-        query: input.message,
-        gateMessage: input.message,
-        source: 'demo_chat_post'
-    })
-
-    if (skillMatchResult.status === 'matched') {
-        const pipelinePromise = runDemoChatPipeline(input)
-        const pipelineResult = await waitForPipelineResult(pipelinePromise, readSyncReplyTimeoutMs())
-        if (pipelineResult.status === 'timeout') {
-            void pipelinePromise.catch((error) => {
-                console.error('Demo Chat: Timed-out immediate skill reply failed', error)
-            })
-            return 'pending'
-        }
-
-        const result = pipelineResult.result
-        if (result.replyText || result.skillImage) return result
-        return null
-    }
-
-    const rewrittenReply = await tryRewrittenDemoSkillReply(input)
-    if (rewrittenReply) return rewrittenReply
-    return null
-}
-
-async function matchImmediateDemoSkill(input: {
-    supabase: DemoChatServiceClient
-    organizationId: string
-    query: string
-    gateMessage: string
-    source: string
-}) {
-    let skillMatchResult = await matchSkillsWithStatus({
+    const exactMatchResult = await matchSkillsWithStatus({
         matcher: () => matchExactSkillTriggers(
-            input.query,
-            input.organizationId,
+            input.message,
+            input.channel.organizationId,
             1,
             input.supabase
         ),
         context: {
-            organization_id: input.organizationId,
-            source: input.source
+            organization_id: input.channel.organizationId,
+            source: 'demo_chat_post_exact'
         }
     })
 
-    if (skillMatchResult.status !== 'matched') {
-        skillMatchResult = await matchSkillsWithStatus({
-            matcher: () => matchSkills(
-                input.query,
-                input.organizationId,
-                DEMO_CHAT_IMMEDIATE_SKILL_MATCH_THRESHOLD,
-                1,
-                input.supabase
-            ),
-            context: {
-                organization_id: input.organizationId,
-                source: `${input.source}_semantic`
-            },
-            intentGate: {
-                message: input.gateMessage,
-                threshold: DEMO_CHAT_IMMEDIATE_SKILL_MATCH_THRESHOLD
-            }
-        })
+    const exactMatch = exactMatchResult.matches[0]
+    if (exactMatchResult.status === 'matched' && exactMatch) {
+        return runMatchedDemoSkillReply(input, exactMatch, 'exact')
     }
 
-    return skillMatchResult
+    return tryIntentAwareDemoSkillReply(input)
 }
 
-async function tryRewrittenDemoSkillReply(input: {
+async function runMatchedDemoSkillReply(
+    input: {
+        supabase: DemoChatServiceClient
+        channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+        sessionId: string
+        message: string
+        inboundMessageId: string
+    },
+    preferredSkillMatch: SkillMatch,
+    source: 'exact' | 'verified'
+): Promise<DemoChatPipelineResult | null | 'pending'> {
+    const pipelinePromise = runDemoChatPipeline({
+        ...input,
+        preferredSkillMatch,
+    })
+    const pipelineResult = await waitForPipelineResult(pipelinePromise, readSyncReplyTimeoutMs())
+    if (pipelineResult.status === 'timeout') {
+        void pipelinePromise.catch((error) => {
+            console.error(`Demo Chat: Timed-out ${source} skill reply failed`, error)
+        })
+        return 'pending'
+    }
+
+    const result = pipelineResult.result
+    return result.replyText || result.skillImage ? result : null
+}
+
+async function readDemoSkillRewriteHistory(input: {
+    supabase: DemoChatServiceClient
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    sessionId: string
+    inboundMessageId: string
+}) {
+    try {
+        const conversationId = await findDemoChatConversationId(input)
+        return readRecentDemoChatHistory({
+            supabase: input.supabase,
+            conversationId,
+            messageId: input.inboundMessageId
+        })
+    } catch (error) {
+        console.warn('Demo Chat: skill rewrite history unavailable; continuing without history.', {
+            organization_id: input.channel.organizationId,
+            error
+        })
+        return []
+    }
+}
+
+async function tryIntentAwareDemoSkillReply(input: {
     supabase: DemoChatServiceClient
     channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
     sessionId: string
     message: string
     inboundMessageId: string
-}): Promise<DemoChatPipelineResult | null> {
+}): Promise<DemoChatPipelineResult | null | 'pending'> {
     if (!process.env.OPENAI_API_KEY?.trim()) return null
 
-    const conversationId = await findDemoChatConversationId(input)
-    if (!conversationId) return null
-
-    const conversationHistory = await readRecentDemoChatHistory({
-        supabase: input.supabase,
-        conversationId,
-        messageId: input.inboundMessageId
-    })
-    if (conversationHistory.length === 0) return null
+    const conversationHistory = await readDemoSkillRewriteHistory(input)
 
     let rewrite: DemoSkillQueryRewriteResult | null = null
     try {
@@ -1812,6 +1825,7 @@ async function tryRewrittenDemoSkillReply(input: {
 
     const rewrittenQuery = rewrite?.query.trim()
     if (!rewrite || !rewrittenQuery) return null
+    if (rewrite.needsClarification) return null
     if (
         rewrite.decision === 'unresolved'
         && demoKnowledgeQueryKey(rewrittenQuery) === demoKnowledgeQueryKey(input.message)
@@ -1819,31 +1833,57 @@ async function tryRewrittenDemoSkillReply(input: {
         return null
     }
 
-    const rewrittenSkillMatchResult = await matchImmediateDemoSkill({
-        supabase: input.supabase,
-        organizationId: input.channel.organizationId,
-        query: rewrittenQuery,
-        gateMessage: rewrittenQuery,
-        source: 'demo_chat_post_rewritten'
+    const candidateResult = await matchSkillsWithStatus({
+        matcher: () => matchSkills(
+            rewrittenQuery,
+            input.channel.organizationId,
+            DEMO_CHAT_IMMEDIATE_SKILL_MATCH_THRESHOLD,
+            3,
+            input.supabase
+        ),
+        context: {
+            organization_id: input.channel.organizationId,
+            source: 'demo_chat_post_intent_candidates'
+        },
+        intentGate: {
+            message: rewrittenQuery,
+            threshold: DEMO_CHAT_IMMEDIATE_SKILL_MATCH_THRESHOLD
+        }
     })
-    if (rewrittenSkillMatchResult.status !== 'matched') return null
+    if (candidateResult.status !== 'matched') return null
 
-    await persistDemoChatInboundMessageOnly(input)
-    const pipelinePromise = runDemoChatPipeline({
-        ...input,
-        message: rewrittenQuery,
-        reprocessExistingInbound: true
-    })
-    const pipelineResult = await waitForPipelineResult(pipelinePromise, readSyncReplyTimeoutMs())
-    if (pipelineResult.status === 'timeout') {
-        void pipelinePromise.catch((error) => {
-            console.error('Demo Chat: Timed-out rewritten skill reply failed', error)
+    try {
+        const verificationPromise = verifyDemoSkillCandidates({
+            latestUserMessage: input.message,
+            standaloneQuery: rewrittenQuery,
+            subject: rewrite.subject,
+            facet: rewrite.facet,
+            candidates: candidateResult.matches,
+        })
+        const verificationResult = await waitForPipelineResult(
+            verificationPromise,
+            readSkillCandidateVerifyTimeoutMs()
+        )
+        if (verificationResult.status === 'timeout') {
+            void verificationPromise.catch((error) => {
+                console.warn('Demo Chat: timed-out skill candidate verification failed later.', {
+                    organization_id: input.channel.organizationId,
+                    error
+                })
+            })
+            return null
+        }
+
+        const verification = verificationResult.result
+        if (verification?.decision !== 'skill' || !verification.match) return null
+        return runMatchedDemoSkillReply(input, verification.match, 'verified')
+    } catch (error) {
+        console.warn('Demo Chat: skill candidate verification failed; continuing with RAG fallback.', {
+            organization_id: input.channel.organizationId,
+            error
         })
         return null
     }
-
-    const result = pipelineResult.result
-    return result.replyText || result.skillImage ? result : null
 }
 
 export async function POST(req: NextRequest, context: RouteContext) {

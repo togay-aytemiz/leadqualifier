@@ -20,6 +20,9 @@ export type DemoSkillQueryRewriteDecision =
 
 export type DemoSkillQueryRewriteResult = {
     query: string
+    subject: string
+    facet: string
+    needsClarification: boolean
     usedHistory: boolean
     decision: DemoSkillQueryRewriteDecision
     reason: string
@@ -84,6 +87,9 @@ function parseRewritePayload(
 
     return {
         query,
+        subject: normalizeText(record.subject, 180),
+        facet: normalizeText(record.facet, 180),
+        needsClarification: Boolean(record.needs_clarification ?? record.needsClarification),
         usedHistory: Boolean(record.used_history ?? record.usedHistory),
         decision,
         reason: normalizeText(record.reason, MAX_REASON_CHARS) || 'No reason provided.',
@@ -109,12 +115,14 @@ function systemPrompt(responseLanguage: MvpResponseLanguage) {
         'If the latest message accepts or requests the assistant previous offer, rewrite it as the concrete topic, fact, or program offered by the assistant.',
         'If the latest message provides a missing slot requested by the assistant, combine it with the original requested fact. Example: assistant asks "hangi program?" and user says "Hemşirelik" -> "Hemşirelik ücret, kontenjan ve taban puan bilgileri" when the original request asked for those facts.',
         'If the latest message asks a new standalone question, preserve its meaning and requested facet.',
+        'Extract the main subject or entity and the requested facet, such as existence, fee, quota, location, duration, curriculum, laboratory, internship, career, or policy.',
+        'Set needs_clarification true only when the missing subject or facet prevents a useful Skill search. Do not request clarification merely because the user used informal wording.',
         'If the latest message cannot be resolved from history, return the original latest message with decision "unresolved".',
         'Never return vague queries like "evet", "devam", "onu göster", "bilgi ver", or "paylaş". If the resolved query would still be vague, return the original message with decision "unresolved".',
         'Prefer the user language. Use Turkish for Turkish conversations.',
         `Default response language: ${responseLanguage}.`,
         'Return JSON only:',
-        '{"query":"...","used_history":true|false,"decision":"accepted_previous_offer|standalone|unresolved","reason":"short reason"}',
+        '{"query":"...","subject":"...","facet":"...","needs_clarification":true|false,"used_history":true|false,"decision":"accepted_previous_offer|standalone|unresolved","reason":"short reason"}',
     ].join('\n')
 }
 
@@ -127,7 +135,7 @@ export async function rewriteDemoSkillQuery(input: {
     createCompletion?: DemoSkillQueryCreateCompletion
 }): Promise<DemoSkillQueryRewriteResult | null> {
     const latestUserMessage = input.latestUserMessage.trim()
-    if (!latestUserMessage || input.recentMessages.length === 0) return null
+    if (!latestUserMessage) return null
     if (!input.createCompletion && !process.env.OPENAI_API_KEY?.trim()) return null
 
     const model = input.model?.trim() || DEFAULT_MODEL

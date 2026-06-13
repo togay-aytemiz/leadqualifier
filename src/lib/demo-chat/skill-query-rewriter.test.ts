@@ -78,6 +78,9 @@ describe('rewriteDemoSkillQuery', () => {
                 message: {
                     content: JSON.stringify({
                         query: 'Tıp Fakültesi ücreti ne kadar?',
+                        subject: 'Tıp Fakültesi',
+                        facet: 'ücret',
+                        needs_clarification: false,
                         used_history: false,
                         decision: 'standalone',
                         reason: 'Latest message is already a complete question.',
@@ -89,12 +92,15 @@ describe('rewriteDemoSkillQuery', () => {
         const result = await rewriteDemoSkillQuery({
             latestUserMessage: 'Tıp Fakültesi ücreti ne kadar?',
             responseLanguage: 'tr',
-            recentMessages: [{ role: 'assistant', content: 'Kampüsleri de sorabilirsin.' }],
+            recentMessages: [],
             createCompletion,
         })
 
         expect(result).toMatchObject({
             query: 'Tıp Fakültesi ücreti ne kadar?',
+            subject: 'Tıp Fakültesi',
+            facet: 'ücret',
+            needsClarification: false,
             usedHistory: false,
             decision: 'standalone',
         })

@@ -708,6 +708,56 @@ describe('processInboundAiPipeline guardrails', () => {
         }))
     })
 
+    it('uses a verified preferred skill without running semantic matching again', async () => {
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation({
+            platform: 'demo_chat',
+            contact_phone: 'demo:demo-channel-1:session-1',
+        }))
+        const inboundInsert = createInsertBuilder()
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: false })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            skills: [skillDetails.builder],
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound, {
+            platform: 'demo_chat',
+            source: 'demo_chat',
+            contactId: 'demo:demo-channel-1:session-1',
+            inboundMessageId: 'demo-message-verified',
+            inboundMessageIdMetadataKey: 'demo_chat_message_id',
+            inboundMessageMetadata: {
+                demo_chat_message_id: 'demo-message-verified',
+                demo_chat_channel_id: 'demo-channel-1',
+                demo_chat_session_id: 'session-1',
+            },
+            preferredSkillMatch: {
+                skill_id: 'skill-anesthesia',
+                title: 'Anestezi uygulama olanakları',
+                response_text: 'Anestezi programının uygulama olanakları şunlardır.',
+                trigger_text: 'Anestezi laboratuvarı var mı?',
+                similarity: 0.84,
+            },
+            logPrefix: 'Demo Chat',
+        } as never))
+
+        expect(matchSkillsSafelyMock).not.toHaveBeenCalled()
+        expect(sendOutbound).toHaveBeenCalledWith('Anestezi programının uygulama olanakları şunlardır.')
+        expect(botInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({
+            metadata: expect.objectContaining({
+                skill_id: 'skill-anesthesia',
+                skill_match_source: 'verified_preferred_match',
+            }),
+        }))
+    })
+
     it('reprocesses a stored demo_chat inbound message without duplicating the contact row', async () => {
         const sendOutbound = vi.fn(async () => undefined)
         const dedupe = createDedupeBuilder('contact-message-1')
