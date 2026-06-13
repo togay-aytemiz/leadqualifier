@@ -18,7 +18,7 @@ import { resolveMvpResponseLanguage, type MvpResponseLanguage } from '@/lib/ai/l
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { searchKnowledgeBase, searchKnowledgeBaseFocusedEvidence } from '@/lib/knowledge-base/actions'
-import { matchExactSkillTriggers } from '@/lib/skills/actions'
+import { matchExactSkillTriggers, matchSkills } from '@/lib/skills/actions'
 import { matchSkillsWithStatus } from '@/lib/skills/match-safe'
 import type { KnowledgeSearchPlanningTurn } from '@/lib/knowledge-base/query-planner'
 import { buildRagContext, type RagChunk } from '@/lib/knowledge-base/rag'
@@ -52,6 +52,7 @@ const MIN_CONTEXTUAL_ANCHOR_TOKEN_COVERAGE = 2
 const DEMO_MAINTENANCE_RETRY_AFTER_SECONDS = 15 * 60
 const DEMO_CHAT_RAG_HISTORY_TURN_LIMIT = 10
 const DEMO_CHAT_RAG_HISTORY_QUERY_LIMIT = DEMO_CHAT_RAG_HISTORY_TURN_LIMIT + 2
+const DEMO_CHAT_IMMEDIATE_SKILL_MATCH_THRESHOLD = 0.6
 
 type RouteContext = {
     params: Promise<{ slug: string }>
@@ -1594,7 +1595,7 @@ async function tryImmediateDemoSkillReply(input: {
     message: string
     inboundMessageId: string
 }): Promise<DemoChatPipelineResult | null | 'pending'> {
-    const skillMatchResult = await matchSkillsWithStatus({
+    let skillMatchResult = await matchSkillsWithStatus({
         matcher: () => matchExactSkillTriggers(
             input.message,
             input.channel.organizationId,
@@ -1606,6 +1607,26 @@ async function tryImmediateDemoSkillReply(input: {
             source: 'demo_chat_post'
         }
     })
+
+    if (skillMatchResult.status !== 'matched') {
+        skillMatchResult = await matchSkillsWithStatus({
+            matcher: () => matchSkills(
+                input.message,
+                input.channel.organizationId,
+                DEMO_CHAT_IMMEDIATE_SKILL_MATCH_THRESHOLD,
+                1,
+                input.supabase
+            ),
+            context: {
+                organization_id: input.channel.organizationId,
+                source: 'demo_chat_post_semantic'
+            },
+            intentGate: {
+                message: input.message,
+                threshold: DEMO_CHAT_IMMEDIATE_SKILL_MATCH_THRESHOLD
+            }
+        })
+    }
 
     if (skillMatchResult.status !== 'matched') return null
 

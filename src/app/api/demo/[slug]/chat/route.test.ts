@@ -20,6 +20,7 @@ const {
     repairLinkOnlyRagAnswerMock,
     resolveDemoChatChannelMock,
     matchExactSkillTriggersMock,
+    matchSkillsMock,
     searchKnowledgeBaseFocusedEvidenceMock,
     searchKnowledgeBaseMock,
 } = vi.hoisted(() => ({
@@ -36,6 +37,7 @@ const {
     repairLinkOnlyRagAnswerMock: vi.fn(),
     resolveDemoChatChannelMock: vi.fn(),
     matchExactSkillTriggersMock: vi.fn(),
+    matchSkillsMock: vi.fn(),
     searchKnowledgeBaseFocusedEvidenceMock: vi.fn(),
     searchKnowledgeBaseMock: vi.fn(),
 }))
@@ -59,6 +61,7 @@ vi.mock('@/lib/channels/inbound-ai-pipeline', () => ({
 
 vi.mock('@/lib/skills/actions', () => ({
     matchExactSkillTriggers: matchExactSkillTriggersMock,
+    matchSkills: matchSkillsMock,
 }))
 
 vi.mock('@/lib/ai/settings', () => ({
@@ -223,6 +226,7 @@ describe('demo chat API route', () => {
         vi.unstubAllEnvs()
         vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co')
         vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-role-key')
+        vi.stubEnv('DEMO_CHAT_RATE_LIMIT_PER_MINUTE', '1000')
         createClientMock.mockReturnValue({ from: vi.fn() })
         resolveDemoChatChannelMock.mockResolvedValue(demoChannel)
         buildDemoChatContactIdMock.mockImplementation((channelId: string, sessionId: string) => (
@@ -254,6 +258,7 @@ describe('demo chat API route', () => {
         searchKnowledgeBaseFocusedEvidenceMock.mockResolvedValue([])
         buildOpenAiFileSearchDemoReplyMock.mockResolvedValue(null)
         matchExactSkillTriggersMock.mockResolvedValue([])
+        matchSkillsMock.mockResolvedValue([])
         buildRagContextMock.mockReturnValue({ context: '', chunks: [], tokenCount: 0 })
         repairLinkOnlyRagAnswerMock.mockReturnValue(null)
         appendCanonicalRagSourceLinksMock.mockImplementation((response: string) => response)
@@ -467,6 +472,47 @@ describe('demo chat API route', () => {
         })
         expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
             text: 'Merhaba',
+            inboundMessageId: expect.any(String),
+            platform: 'demo_chat',
+            source: 'demo_chat',
+        }))
+        expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalled()
+        expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
+    })
+
+    it('answers semantic skill matches during POST when exact trigger matching misses', async () => {
+        matchExactSkillTriggersMock.mockResolvedValueOnce([])
+        matchSkillsMock.mockResolvedValueOnce([{
+            skill_id: 'skill-campus',
+            title: 'YİÜ Intent - 03 kampusler_genel_adres',
+            response_text: 'Yüksek İhtisas Üniversitesi için kaynaklarda şu yerleşkeler yer alıyor.',
+            trigger_text: 'Kampüsler nerede?',
+            similarity: 0.91,
+        }])
+        processInboundAiPipelineMock.mockImplementationOnce(async (input) => {
+            await input.sendOutbound('Yüksek İhtisas Üniversitesi için kaynaklarda şu yerleşkeler yer alıyor.')
+        })
+
+        const res = await POST(createRequest({
+            sessionId: 'session-1',
+            message: 'kampüsler nerede acaba',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: 'Yüksek İhtisas Üniversitesi için kaynaklarda şu yerleşkeler yer alıyor.',
+            skillImage: null,
+        })
+        expect(matchSkillsMock).toHaveBeenCalledWith(
+            'kampüsler nerede acaba',
+            demoChannel.organizationId,
+            0.6,
+            1,
+            expect.anything()
+        )
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            text: 'kampüsler nerede acaba',
             inboundMessageId: expect.any(String),
             platform: 'demo_chat',
             source: 'demo_chat',
