@@ -10,6 +10,7 @@ import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
 import { verifyDemoChatAccessToken } from '@/lib/demo-chat/access'
 import { buildDemoChatContactId, resolveDemoChatChannel } from '@/lib/demo-chat/channel'
 import { buildOpenAiFileSearchDemoReply } from '@/lib/demo-chat/openai-file-search'
+import { rewriteDemoSkillQuery, type DemoSkillQueryRewriteResult } from '@/lib/demo-chat/skill-query-rewriter'
 import {
     DEMO_MAINTENANCE_BYPASS_COOKIE,
     shouldServeDemoMaintenance,
@@ -34,11 +35,13 @@ export const runtime = 'nodejs'
 const MAX_MESSAGE_CHARS = 2000
 const MAX_SESSION_ID_CHARS = 128
 const DEFAULT_SYNC_REPLY_TIMEOUT_MS = 5000
+const DEFAULT_SKILL_QUERY_REWRITE_TIMEOUT_MS = 1800
 const DEFAULT_FAST_RAG_REPLY_TIMEOUT_MS = 10000
 const DEFAULT_FAST_RAG_GENERATE_TIMEOUT_MS = 3500
 const DEFAULT_CONTEXTUAL_FAST_RAG_GENERATE_TIMEOUT_MS = 5500
 const DEFAULT_FAST_RAG_POLISH_TIMEOUT_MS = 1800
 const MAX_SYNC_REPLY_TIMEOUT_MS = 6000
+const MAX_SKILL_QUERY_REWRITE_TIMEOUT_MS = 3000
 const MAX_FAST_RAG_REPLY_TIMEOUT_MS = 12000
 const MAX_FAST_RAG_GENERATE_TIMEOUT_MS = 5000
 const MAX_CONTEXTUAL_FAST_RAG_GENERATE_TIMEOUT_MS = 8000
@@ -164,6 +167,12 @@ function readSyncReplyTimeoutMs() {
     const raw = Number.parseInt(process.env.DEMO_CHAT_SYNC_REPLY_TIMEOUT_MS ?? '', 10)
     if (Number.isFinite(raw) && raw >= 1000) return Math.min(raw, MAX_SYNC_REPLY_TIMEOUT_MS)
     return DEFAULT_SYNC_REPLY_TIMEOUT_MS
+}
+
+function readSkillQueryRewriteTimeoutMs() {
+    const raw = Number.parseInt(process.env.DEMO_CHAT_SKILL_QUERY_REWRITE_TIMEOUT_MS ?? '', 10)
+    if (Number.isFinite(raw) && raw >= 500) return Math.min(raw, MAX_SKILL_QUERY_REWRITE_TIMEOUT_MS)
+    return DEFAULT_SKILL_QUERY_REWRITE_TIMEOUT_MS
 }
 
 function readFastRagReplyTimeoutMs() {
@@ -800,6 +809,92 @@ async function findDemoChatConversationId(input: {
 
     const conversationRow = conversation as DemoChatConversationRow | null
     return conversationRow?.id ?? null
+}
+
+async function ensureDemoChatConversationId(input: {
+    supabase: DemoChatServiceClient
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    sessionId: string
+}) {
+    const existingConversationId = await findDemoChatConversationId(input)
+    if (existingConversationId) return existingConversationId
+
+    const contactId = buildDemoChatContactId(input.channel.id, input.sessionId)
+    const { data: newConversation, error: createConversationError } = await input.supabase
+        .from('conversations')
+        .insert({
+            id: uuidv4(),
+            organization_id: input.channel.organizationId,
+            platform: 'demo_chat',
+            contact_name: 'Demo ziyaretçi',
+            contact_phone: contactId,
+            status: 'open',
+            unread_count: 0,
+            tags: [],
+        })
+        .select('id')
+        .single()
+
+    if (createConversationError) {
+        if (createConversationError.code === '23505') {
+            return findDemoChatConversationId(input)
+        }
+        throw createConversationError
+    }
+
+    return (newConversation as DemoChatConversationRow | null)?.id ?? null
+}
+
+async function persistDemoChatInboundMessageOnly(input: {
+    supabase: DemoChatServiceClient
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    sessionId: string
+    message: string
+    inboundMessageId: string
+}) {
+    const conversationId = await ensureDemoChatConversationId(input)
+    if (!conversationId) return null
+
+    const { data: existingInbound, error: existingInboundError } = await input.supabase
+        .from('messages')
+        .select('id')
+        .eq('conversation_id', conversationId)
+        .eq('sender_type', 'contact')
+        .eq('metadata->>demo_chat_message_id', input.inboundMessageId)
+        .maybeSingle()
+
+    if (existingInboundError) throw existingInboundError
+    if ((existingInbound as { id?: string } | null)?.id) return conversationId
+
+    const now = new Date().toISOString()
+    const { error: insertError } = await input.supabase
+        .from('messages')
+        .insert({
+            id: uuidv4(),
+            conversation_id: conversationId,
+            organization_id: input.channel.organizationId,
+            sender_type: 'contact',
+            content: input.message,
+            metadata: {
+                demo_chat_message_id: input.inboundMessageId,
+                demo_chat_channel_id: input.channel.id,
+                demo_chat_slug: input.channel.slug,
+                demo_chat_session_id: input.sessionId,
+            },
+        })
+
+    if (insertError && insertError.code !== '23505') throw insertError
+
+    const { error: updateError } = await input.supabase
+        .from('conversations')
+        .update({
+            last_message_at: now,
+            updated_at: now,
+        })
+        .eq('id', conversationId)
+
+    if (updateError) throw updateError
+    return conversationId
 }
 
 async function findPendingDemoChatInboundMessage(input: {
@@ -1595,53 +1690,160 @@ async function tryImmediateDemoSkillReply(input: {
     message: string
     inboundMessageId: string
 }): Promise<DemoChatPipelineResult | null | 'pending'> {
+    const skillMatchResult = await matchImmediateDemoSkill({
+        supabase: input.supabase,
+        organizationId: input.channel.organizationId,
+        query: input.message,
+        gateMessage: input.message,
+        source: 'demo_chat_post'
+    })
+
+    if (skillMatchResult.status === 'matched') {
+        const pipelinePromise = runDemoChatPipeline(input)
+        const pipelineResult = await waitForPipelineResult(pipelinePromise, readSyncReplyTimeoutMs())
+        if (pipelineResult.status === 'timeout') {
+            void pipelinePromise.catch((error) => {
+                console.error('Demo Chat: Timed-out immediate skill reply failed', error)
+            })
+            return 'pending'
+        }
+
+        const result = pipelineResult.result
+        if (result.replyText || result.skillImage) return result
+        return null
+    }
+
+    const rewrittenReply = await tryRewrittenDemoSkillReply(input)
+    if (rewrittenReply) return rewrittenReply
+    return null
+}
+
+async function matchImmediateDemoSkill(input: {
+    supabase: DemoChatServiceClient
+    organizationId: string
+    query: string
+    gateMessage: string
+    source: string
+}) {
     let skillMatchResult = await matchSkillsWithStatus({
         matcher: () => matchExactSkillTriggers(
-            input.message,
-            input.channel.organizationId,
+            input.query,
+            input.organizationId,
             1,
             input.supabase
         ),
         context: {
-            organization_id: input.channel.organizationId,
-            source: 'demo_chat_post'
+            organization_id: input.organizationId,
+            source: input.source
         }
     })
 
     if (skillMatchResult.status !== 'matched') {
         skillMatchResult = await matchSkillsWithStatus({
             matcher: () => matchSkills(
-                input.message,
-                input.channel.organizationId,
+                input.query,
+                input.organizationId,
                 DEMO_CHAT_IMMEDIATE_SKILL_MATCH_THRESHOLD,
                 1,
                 input.supabase
             ),
             context: {
-                organization_id: input.channel.organizationId,
-                source: 'demo_chat_post_semantic'
+                organization_id: input.organizationId,
+                source: `${input.source}_semantic`
             },
             intentGate: {
-                message: input.message,
+                message: input.gateMessage,
                 threshold: DEMO_CHAT_IMMEDIATE_SKILL_MATCH_THRESHOLD
             }
         })
     }
 
-    if (skillMatchResult.status !== 'matched') return null
+    return skillMatchResult
+}
 
-    const pipelinePromise = runDemoChatPipeline(input)
+async function tryRewrittenDemoSkillReply(input: {
+    supabase: DemoChatServiceClient
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    sessionId: string
+    message: string
+    inboundMessageId: string
+}): Promise<DemoChatPipelineResult | null> {
+    if (!process.env.OPENAI_API_KEY?.trim()) return null
+
+    const conversationId = await findDemoChatConversationId(input)
+    if (!conversationId) return null
+
+    const conversationHistory = await readRecentDemoChatHistory({
+        supabase: input.supabase,
+        conversationId,
+        messageId: input.inboundMessageId
+    })
+    if (conversationHistory.length === 0) return null
+
+    let rewrite: DemoSkillQueryRewriteResult | null = null
+    try {
+        const rewritePromise = rewriteDemoSkillQuery({
+            latestUserMessage: input.message,
+            recentMessages: conversationHistory,
+            organizationContext: input.channel.displayName || input.channel.slug,
+            responseLanguage: resolveMvpResponseLanguage(input.message),
+        })
+        const rewriteResult = await waitForPipelineResult(
+            rewritePromise,
+            readSkillQueryRewriteTimeoutMs()
+        )
+        if (rewriteResult.status === 'timeout') {
+            void rewritePromise.catch((error) => {
+                console.warn('Demo Chat: timed-out skill query rewrite failed later.', {
+                    organization_id: input.channel.organizationId,
+                    error
+                })
+            })
+            return null
+        }
+        rewrite = rewriteResult.result
+    } catch (error) {
+        console.warn('Demo Chat: skill query rewrite failed; continuing with RAG fallback.', {
+            organization_id: input.channel.organizationId,
+            error
+        })
+        return null
+    }
+
+    const rewrittenQuery = rewrite?.query.trim()
+    if (!rewrite || !rewrittenQuery) return null
+    if (
+        rewrite.decision === 'unresolved'
+        && demoKnowledgeQueryKey(rewrittenQuery) === demoKnowledgeQueryKey(input.message)
+    ) {
+        return null
+    }
+
+    const rewrittenSkillMatchResult = await matchImmediateDemoSkill({
+        supabase: input.supabase,
+        organizationId: input.channel.organizationId,
+        query: rewrittenQuery,
+        gateMessage: rewrittenQuery,
+        source: 'demo_chat_post_rewritten'
+    })
+    if (rewrittenSkillMatchResult.status !== 'matched') return null
+
+    await persistDemoChatInboundMessageOnly(input)
+    const pipelinePromise = runDemoChatPipeline({
+        ...input,
+        message: rewrittenQuery,
+        reprocessExistingInbound: true
+    })
     const pipelineResult = await waitForPipelineResult(pipelinePromise, readSyncReplyTimeoutMs())
     if (pipelineResult.status === 'timeout') {
         void pipelinePromise.catch((error) => {
-            console.error('Demo Chat: Timed-out immediate skill reply failed', error)
+            console.error('Demo Chat: Timed-out rewritten skill reply failed', error)
         })
-        return 'pending'
+        return null
     }
 
     const result = pipelineResult.result
-    if (result.replyText || result.skillImage) return result
-    return null
+    return result.replyText || result.skillImage ? result : null
 }
 
 export async function POST(req: NextRequest, context: RouteContext) {

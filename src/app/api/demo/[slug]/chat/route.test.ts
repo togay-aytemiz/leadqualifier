@@ -21,6 +21,7 @@ const {
     resolveDemoChatChannelMock,
     matchExactSkillTriggersMock,
     matchSkillsMock,
+    rewriteDemoSkillQueryMock,
     searchKnowledgeBaseFocusedEvidenceMock,
     searchKnowledgeBaseMock,
 } = vi.hoisted(() => ({
@@ -38,6 +39,7 @@ const {
     resolveDemoChatChannelMock: vi.fn(),
     matchExactSkillTriggersMock: vi.fn(),
     matchSkillsMock: vi.fn(),
+    rewriteDemoSkillQueryMock: vi.fn(),
     searchKnowledgeBaseFocusedEvidenceMock: vi.fn(),
     searchKnowledgeBaseMock: vi.fn(),
 }))
@@ -53,6 +55,10 @@ vi.mock('@/lib/demo-chat/channel', () => ({
 
 vi.mock('@/lib/demo-chat/openai-file-search', () => ({
     buildOpenAiFileSearchDemoReply: buildOpenAiFileSearchDemoReplyMock,
+}))
+
+vi.mock('@/lib/demo-chat/skill-query-rewriter', () => ({
+    rewriteDemoSkillQuery: rewriteDemoSkillQueryMock,
 }))
 
 vi.mock('@/lib/channels/inbound-ai-pipeline', () => ({
@@ -220,6 +226,52 @@ function createDemoTextPersistenceMock(conversationIds: Array<string | null> = [
     }
 }
 
+function createHistorySupabaseMock(historyRows: Array<{
+    content: string
+    sender_type: string
+    metadata: Record<string, unknown> | null
+}>) {
+    const conversationUpdateChain = {
+        eq: vi.fn(async () => ({ error: null })),
+    }
+    const fromMock = vi.fn((table: string) => {
+        if (table === 'conversations') {
+            const chain = {
+                select: vi.fn(() => chain),
+                update: vi.fn(() => conversationUpdateChain),
+                eq: vi.fn(() => chain),
+                maybeSingle: vi.fn(async () => ({
+                    data: { id: 'conversation-1' },
+                    error: null,
+                })),
+            }
+            return chain
+        }
+
+        if (table === 'messages') {
+            const chain = {
+                select: vi.fn(() => chain),
+                eq: vi.fn(() => chain),
+                order: vi.fn(() => chain),
+                limit: vi.fn(async () => ({
+                    data: historyRows,
+                    error: null,
+                })),
+                maybeSingle: vi.fn(async () => ({
+                    data: null,
+                    error: null,
+                })),
+                insert: vi.fn(async () => ({ error: null })),
+            }
+            return chain
+        }
+
+        throw new Error(`Unexpected table ${table}`)
+    })
+
+    return { from: fromMock }
+}
+
 describe('demo chat API route', () => {
     beforeEach(() => {
         vi.clearAllMocks()
@@ -259,6 +311,7 @@ describe('demo chat API route', () => {
         buildOpenAiFileSearchDemoReplyMock.mockResolvedValue(null)
         matchExactSkillTriggersMock.mockResolvedValue([])
         matchSkillsMock.mockResolvedValue([])
+        rewriteDemoSkillQueryMock.mockResolvedValue(null)
         buildRagContextMock.mockReturnValue({ context: '', chunks: [], tokenCount: 0 })
         repairLinkOnlyRagAnswerMock.mockReturnValue(null)
         appendCanonicalRagSourceLinksMock.mockImplementation((response: string) => response)
@@ -517,6 +570,79 @@ describe('demo chat API route', () => {
             platform: 'demo_chat',
             source: 'demo_chat',
         }))
+        expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalled()
+        expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
+    })
+
+    it('rewrites accepted assistant offers before falling back to RAG', async () => {
+        vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+        const fakeSupabase = createHistorySupabaseMock([
+            {
+                content: 'İstersen burs seçeneklerini de anlatabilirim.',
+                sender_type: 'bot',
+                metadata: { demo_chat_reply_to_message_id: 'previous-message' },
+            },
+        ])
+        createClientMock.mockReturnValueOnce(fakeSupabase)
+        matchExactSkillTriggersMock
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([])
+        matchSkillsMock
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([{
+                skill_id: 'skill-scholarships',
+                title: 'YİÜ Intent - 49 burs_ve_indirimler_genel',
+                response_text: 'Yüksek İhtisas Üniversitesi için burs seçenekleri şunlardır.',
+                trigger_text: 'Burs seçenekleri neler?',
+                similarity: 0.94,
+            }])
+        rewriteDemoSkillQueryMock.mockResolvedValueOnce({
+            query: 'Yüksek İhtisas Üniversitesi burs seçenekleri',
+            usedHistory: true,
+            decision: 'accepted_previous_offer',
+            reason: 'User accepted the assistant offer.',
+            model: 'gpt-4.1-mini',
+            usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 },
+        })
+        processInboundAiPipelineMock.mockImplementationOnce(async (input) => {
+            await input.sendOutbound('Yüksek İhtisas Üniversitesi için burs seçenekleri şunlardır.')
+        })
+
+        const res = await POST(createRequest({
+            sessionId: 'session-1',
+            message: 'Evet, lütfen devam etmeni rica ediyorum.',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: 'Yüksek İhtisas Üniversitesi için burs seçenekleri şunlardır.',
+            skillImage: null,
+        })
+        expect(rewriteDemoSkillQueryMock).toHaveBeenCalledWith(expect.objectContaining({
+            latestUserMessage: 'Evet, lütfen devam etmeni rica ediyorum.',
+            organizationContext: demoChannel.displayName,
+            recentMessages: [expect.objectContaining({
+                role: 'assistant',
+                content: 'İstersen burs seçeneklerini de anlatabilirim.',
+            })],
+            responseLanguage: 'tr',
+        }))
+        expect(matchSkillsMock).toHaveBeenLastCalledWith(
+            'Yüksek İhtisas Üniversitesi burs seçenekleri',
+            demoChannel.organizationId,
+            0.6,
+            1,
+            fakeSupabase
+        )
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            text: 'Yüksek İhtisas Üniversitesi burs seçenekleri',
+            reprocessExistingInbound: true,
+            inboundMessageId: expect.any(String),
+            platform: 'demo_chat',
+            source: 'demo_chat',
+        }))
+        expect(buildOpenAiFileSearchDemoReplyMock).not.toHaveBeenCalled()
         expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalled()
         expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
     })
