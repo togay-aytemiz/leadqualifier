@@ -1,5 +1,10 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Implementation Update (2026-06-13):** The YIU source-backed intent pack was revised to V2 and pushed to the production demo Skills DB. V2 keeps 60 active skills but reduces routing confusion by merging close Tıp language/availability, fee, quota, score/rank, and exam-policy intents; it adds missing coverage for SHMYO secondary programs, lisans-vs-onlisans Fizyoterapi ambiguity, diploma/diploma-eki boundaries, registration/resmi kontrol, academic calendar/announcements, and student-life/kütüphane/topluluk questions. The seed script now disables stale `YİÜ Intent - ...` skills that are no longer present in the current pack, rather than leaving old overlapping skills active. Follow-up engagement text is intentionally unchanged for now; a later small pipeline iteration may rewrite short affirmations such as `evet` or `göster` against the previous assistant suggestion and re-run Skill matching.
+
+- [x] Publish YIU intent Skill Pack V2 with stale-skill disable, reduced overlap, and expanded source-backed coverage.
+- [ ] Design short affirmative follow-up rewriting that can resolve `evet/göster` style replies to the prior assistant suggestion before Skill matching.
+
 > **Implementation Update (2026-06-13):** The approved YIU source-backed intent pack was pushed into the production demo organization's Skills DB as 60 enabled skills with the `YİÜ Intent - ` title prefix and 360 refreshed skill-embedding rows. The seed is reproducible and idempotent through `scripts/skills/push-yiu-intent-skill-pack.ts` against demo slug `yiu-tanitim-gunleri-2026`. Public Demo Chat now checks exact skill triggers first and then a semantic `matchSkills` result through the existing intent gate before falling back to pending state or non-Skill RAG, so first-turn natural questions can use approved Skill answers without changing the simpler RAG path.
 
 - [x] Seed the approved YIU source-backed intent pack into the production demo Skills DB and enable exact-then-semantic immediate skill matching for Public Demo Chat.

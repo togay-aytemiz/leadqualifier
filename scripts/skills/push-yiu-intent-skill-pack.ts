@@ -23,7 +23,7 @@ type SkillRow = {
   requires_human_handover: boolean
 }
 
-const DEFAULT_DRAFT_PATH = 'docs/evaluations/yiu-intent-skill-pack-draft-2026-06-13.md'
+const DEFAULT_DRAFT_PATH = 'docs/evaluations/yiu-intent-skill-pack-v2-2026-06-13.md'
 const DEFAULT_DEMO_SLUG = 'yiu-tanitim-gunleri-2026'
 const SKILL_TITLE_PREFIX = 'YİÜ Intent - '
 const EMBEDDING_BATCH_SIZE = 128
@@ -163,17 +163,32 @@ async function main() {
     .from('skills')
     .select('id, title, trigger_examples, response_text, enabled, requires_human_handover')
     .eq('organization_id', channel.organization_id)
-    .in('title', titles)
+    .like('title', `${SKILL_TITLE_PREFIX}%`)
 
   if (existingError) throw new Error(existingError.message)
 
   const existingByTitle = new Map(
     ((existingSkills ?? []) as SkillRow[]).map((skill) => [skill.title, skill])
   )
+  const staleSkills = ((existingSkills ?? []) as SkillRow[])
+    .filter((skill) => skill.enabled && !titles.includes(skill.title))
   const touchedSkills: Array<{ id: string; title: string; triggerExamples: string[] }> = []
   let inserted = 0
   let updated = 0
   let unchanged = 0
+  let disabledStale = 0
+
+  if (staleSkills.length > 0) {
+    const { error } = await supabase
+      .from('skills')
+      .update({ enabled: false })
+      .in('id', staleSkills.map((skill) => skill.id))
+
+    if (error) {
+      throw new Error(`Failed to disable stale YIU intent skills: ${error.message}`)
+    }
+    disabledStale = staleSkills.length
+  }
 
   for (const intent of intents) {
     const existing = existingByTitle.get(intent.title)
@@ -279,6 +294,7 @@ async function main() {
     .from('skills')
     .select('id', { count: 'exact', head: true })
     .eq('organization_id', channel.organization_id)
+    .eq('enabled', true)
     .like('title', `${SKILL_TITLE_PREFIX}%`)
 
   if (verifySkillError) throw new Error(verifySkillError.message)
@@ -298,6 +314,7 @@ async function main() {
     inserted,
     updated,
     unchanged,
+    disabledStale,
     yiuIntentSkillCount: skillCount ?? 0,
     refreshedEmbeddingRows: embeddingCount ?? 0,
   }, null, 2))
