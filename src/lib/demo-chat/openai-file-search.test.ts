@@ -98,12 +98,14 @@ describe('buildOpenAiFileSearchDemoReply', () => {
 
         expect(runSimpleRagPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
             latestUserMessage: 'tip kaç para',
+            organizationContext: 'YIU Demo',
             recentMessages: [{ role: 'user', content: 'Tıp Fakültesini soruyorum.' }],
             pendingClarification: expect.objectContaining({
                 originalQuestion: 'Tıp ücreti nedir?',
             }),
             responseLanguage: 'tr',
-            maxResults: 12,
+            answerModel: 'gpt-4.1-mini',
+            maxResults: 20,
             scoreThreshold: 0.1,
             settings: {
                 bot_name: 'Qualy',
@@ -114,7 +116,7 @@ describe('buildOpenAiFileSearchDemoReply', () => {
         expect(result?.replyText).toContain('https://example.edu.tr/brochure.pdf')
         expect(result?.metadata.rag_file_search).toMatchObject({
             pipeline_version: 'simple_standalone_query_v1',
-            max_results: 12,
+            max_results: 20,
             score_threshold: 0.1,
         })
         expect(result?.metadata.rag_file_search).not.toHaveProperty('final_polish')
@@ -177,7 +179,9 @@ describe('buildOpenAiFileSearchDemoReply', () => {
         })
 
         expect(result).not.toBeNull()
-        expect(result?.replyText).toBe('Bu bilgiye onaylı kaynaklarda ulaşamadım.')
+        expect(result?.replyText).toBe(
+            'Şu anda bilgi kaynağına erişemiyorum. Lütfen kısa süre sonra tekrar deneyin.'
+        )
         expect(result?.metadata).toMatchObject({
             demo_chat_reply_source: 'simple_standalone_query_rag',
             rag_file_search: {

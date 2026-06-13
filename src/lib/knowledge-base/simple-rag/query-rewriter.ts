@@ -52,15 +52,28 @@ async function defaultCompletion(args: Record<string, unknown>) {
 function systemPrompt(responseLanguage: MvpResponseLanguage) {
   return [
     'Rewrite the latest user question into one clear standalone search query.',
-    'Use explicit state and recent conversation history only to resolve references such as this, it, that plan, that program, or a short correction.',
+    'Use organization context, explicit state, and recent conversation history only to resolve scope and references such as this, it, that plan, that program, or a short correction.',
+    'Never ask which institution when organization context is provided. Treat that organization as the active scope.',
     'The latest user correction overrides earlier assistant assumptions.',
-    'Do not answer the question. Do not invent facts, values, entities, synonyms, source labels, or query lists.',
+    'Do not answer the question when it requires factual organization knowledge; return search. Do not invent facts, values, entities, source labels, or query lists.',
+    'Optimize search queries with concise terms implied by the requested facet, such as address or location for a where question, without adding factual claims.',
+    'For campus or location questions, include the equivalents of campus, location, and address in the user language so retrieval can find address records.',
+    'For fees, quotas, rankings, or scholarships, the standalone query MUST include local or domestic admissions, official table, and verified brochure terms in the user language. Do not let a generic question drift into international-student or foreign-student pricing.',
+    'For faculty, school, department, or program-list questions, the standalone query MUST include academic units, program catalog, and official brochure terms in the user language.',
+    'For program length or study-duration questions, the standalone query MUST include education duration, education time, and years terms in the user language. Prefer program catalog wording over general degree regulations.',
+    'Search rewrite example: organization "Example University" + latest question "where are the campuses?" becomes "Example University campus locations and addresses".',
+    'Turkish search rewrite example: organization "Örnek Üniversitesi" + latest question "kampüsler nerede?" becomes "Örnek Üniversitesi kampüs yerleşke adresleri".',
+    'Turkish catalog rewrite example: organization "Örnek Üniversitesi" + latest question "hangi fakülteler var?" becomes "Örnek Üniversitesi fakülte yüksekokul akademik birimler tanıtım broşürü program listesi".',
+    'Turkish fee rewrite example: organization "Örnek Üniversitesi" + latest question "Hemşirelik ücreti ne kadar?" becomes "Örnek Üniversitesi Hemşirelik güncel resmi öğrenim ücreti ücret tablosu tanıtım broşürü".',
+    'Turkish duration rewrite example: organization "Örnek Üniversitesi" + latest question "Tıp Fakültesi kaç yıllık?" becomes "Örnek Üniversitesi Tıp Fakültesi eğitim süresi education time years".',
+    'Return respond only for conversational messages that do not need knowledge-base facts, such as greetings, thanks, assistant identity, or general preference guidance. Never put organization facts in a respond result. For identity questions, use the provided assistant identity. If asked whether you are ChatGPT or a human, clearly say no and identify yourself as the configured AI assistant.',
     'If the latest question is already standalone, preserve its meaning and requested facet.',
     'Clarify only when an unresolved missing value materially changes what must be searched. Ask exactly one specific question.',
     'Refuse only unsafe or prohibited requests, never an ordinary knowledge-base miss.',
     `Default response language: ${responseLanguage}.`,
     'Return JSON only using one exact shape:',
     '{"status":"search","standalone_query":"...","response_language":"tr|en"}',
+    '{"status":"respond","response":"...","response_language":"tr|en"}',
     '{"status":"clarify","clarification_question":"...","missing_slot":"...","response_language":"tr|en"}',
     '{"status":"refuse","refusal_response":"...","response_language":"tr|en"}',
   ].join('\n')
@@ -69,6 +82,8 @@ function systemPrompt(responseLanguage: MvpResponseLanguage) {
 export async function rewriteSimpleRagQuery(input: {
   latestUserMessage: string
   recentMessages: KnowledgeSearchPlanningTurn[]
+  organizationContext?: string | null
+  assistantName?: string | null
   pendingClarification?: RagPendingClarificationState | null
   responseLanguage: MvpResponseLanguage
   model?: string
@@ -91,6 +106,8 @@ export async function rewriteSimpleRagQuery(input: {
         role: 'user',
         content: [
           `Latest user message:\n${input.latestUserMessage.trim()}`,
+          `Organization context:\n${input.organizationContext?.trim() || 'Not provided'}`,
+          `Assistant identity:\n${input.assistantName?.trim() || 'AI assistant'}`,
           `Explicit state:\n${JSON.stringify(input.pendingClarification ?? null)}`,
           `Recent history:\n${JSON.stringify(recentHistory(input.recentMessages))}`,
         ]

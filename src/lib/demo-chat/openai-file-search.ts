@@ -24,8 +24,8 @@ export type OpenAiFileSearchDemoReply = {
 
 const DEFAULT_FILE_SEARCH_DEMO_SLUGS = ['yiu-tanitim-gunleri-2026']
 const DEFAULT_REWRITE_MODEL = 'gpt-4.1-mini'
-const DEFAULT_ANSWER_MODEL = 'gpt-4o-mini'
-const DEFAULT_MAX_RESULTS = 12
+const DEFAULT_ANSWER_MODEL = 'gpt-4.1-mini'
+const DEFAULT_MAX_RESULTS = 20
 const DEFAULT_SCORE_THRESHOLD = 0.1
 
 function readEnabledSlugs() {
@@ -119,8 +119,8 @@ function buildSimpleRagUnavailableReply(input: {
 
     return {
         replyText: input.responseLanguage === 'tr'
-            ? 'Bu bilgiye onaylı kaynaklarda ulaşamadım.'
-            : 'I could not find this information in the approved sources.',
+            ? 'Şu anda bilgi kaynağına erişemiyorum. Lütfen kısa süre sonra tekrar deneyin.'
+            : 'I cannot access the knowledge source right now. Please try again shortly.',
         metadata: {
             is_rag: true,
             rag_extractive: false,
@@ -185,6 +185,7 @@ export async function buildOpenAiFileSearchDemoReply(input: {
             vectorStoreId,
             latestUserMessage: input.message,
             recentMessages: input.conversationHistory ?? [],
+            organizationContext: input.channel.displayName,
             pendingClarification: input.pendingClarification,
             responseLanguage,
             citationSourcesByFilename: sourceManifest.sourcesByFilename,

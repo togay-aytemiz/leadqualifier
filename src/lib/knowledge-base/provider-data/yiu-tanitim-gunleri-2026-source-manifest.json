@@ -1,7 +1,7 @@
 {
   "corpusScope": "yiu-tanitim-gunleri-2026-approved-corpus",
-  "vectorStoreId": "vs_6a213186dd6c81919ec51dca2a9913d5",
-  "generatedAt": "2026-06-04T13:38:50.835Z",
+  "vectorStoreId": "vs_6a2cfa3598b88191ad8a77ab9a9c6a09",
+  "generatedAt": "2026-06-13T06:37:35.718Z",
   "sourceCount": 135,
   "sourcesByFilename": {
     "yiu-website-academic-001.md": {

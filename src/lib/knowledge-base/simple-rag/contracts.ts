@@ -7,6 +7,11 @@ export type SimpleRagRewritePlan =
       responseLanguage: MvpResponseLanguage
     }
   | {
+      status: 'respond'
+      response: string
+      responseLanguage: MvpResponseLanguage
+    }
+  | {
       status: 'clarify'
       clarificationQuestion: string
       missingSlot: string
@@ -45,6 +50,11 @@ export function parseSimpleRagRewritePlan(value: unknown): SimpleRagRewritePlan 
   if (status === 'search') {
     const standaloneQuery = text(input.standalone_query ?? input.standaloneQuery)
     return standaloneQuery ? { status, standaloneQuery, responseLanguage } : null
+  }
+
+  if (status === 'respond') {
+    const response = text(input.response)
+    return response ? { status, response, responseLanguage } : null
   }
 
   if (status === 'clarify') {

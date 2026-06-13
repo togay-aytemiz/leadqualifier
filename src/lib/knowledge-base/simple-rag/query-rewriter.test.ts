@@ -69,6 +69,96 @@ describe('rewriteSimpleRagQuery', () => {
     })
   })
 
+  it('passes the known organization scope so a concrete demo question does not re-ask the institution', async () => {
+    const createCompletion = vi.fn(async (_args: Record<string, unknown>) =>
+      completion({
+        status: 'search',
+        standalone_query: 'Yüksek İhtisas Üniversitesi kampüsleri nerede?',
+        response_language: 'tr',
+      })
+    )
+
+    await rewriteSimpleRagQuery({
+      latestUserMessage: 'kampüsler nerede',
+      recentMessages: [],
+      organizationContext: 'Yüksek İhtisas Üniversitesi',
+      responseLanguage: 'tr',
+      createCompletion,
+    })
+
+    const request = createCompletion.mock.calls[0]?.[0] as {
+      messages: Array<{ role: string; content: string }>
+    }
+    expect(request.messages[0]?.content).toContain(
+      'Never ask which institution when organization context is provided'
+    )
+    expect(request.messages[0]?.content).toContain(
+      'Optimize search queries with concise terms implied by the requested facet'
+    )
+    expect(request.messages[0]?.content).toContain(
+      'For campus or location questions, include the equivalents of campus, location, and address'
+    )
+    expect(request.messages[0]?.content).toContain(
+      'Example University campus locations and addresses'
+    )
+    expect(request.messages[0]?.content).toContain(
+      'Örnek Üniversitesi kampüs yerleşke adresleri'
+    )
+    expect(request.messages[0]?.content).toContain(
+      'Örnek Üniversitesi fakülte yüksekokul akademik birimler tanıtım broşürü program listesi'
+    )
+    expect(request.messages[0]?.content).toContain(
+      'Örnek Üniversitesi Hemşirelik güncel resmi öğrenim ücreti ücret tablosu tanıtım broşürü'
+    )
+    expect(request.messages[0]?.content).toContain(
+      'Örnek Üniversitesi Tıp Fakültesi eğitim süresi education time years'
+    )
+    expect(request.messages[0]?.content).toContain(
+      'MUST include local or domestic admissions, official table, and verified brochure terms'
+    )
+    expect(request.messages[0]?.content).toContain(
+      'MUST include academic units, program catalog, and official brochure terms'
+    )
+    expect(request.messages[0]?.content).toContain(
+      'MUST include education duration, education time, and years terms'
+    )
+    expect(request.messages[1]?.content).toContain(
+      'Organization context:\nYüksek İhtisas Üniversitesi'
+    )
+  })
+
+  it('allows a direct conversational response without searching the knowledge base', async () => {
+    const createCompletion = vi.fn(async () =>
+      completion({
+        status: 'respond',
+        response: 'Ben Qualy tarafından desteklenen bir yapay zeka asistanıyım.',
+        response_language: 'tr',
+      })
+    )
+    const result = await rewriteSimpleRagQuery({
+      latestUserMessage: 'sen chatgpt misin',
+      recentMessages: [],
+      organizationContext: 'Yüksek İhtisas Üniversitesi',
+      assistantName: 'Qualy',
+      responseLanguage: 'tr',
+      createCompletion,
+    })
+
+    expect(result.plan).toEqual({
+      status: 'respond',
+      response: 'Ben Qualy tarafından desteklenen bir yapay zeka asistanıyım.',
+      responseLanguage: 'tr',
+    })
+
+    const request = createCompletion.mock.calls[0]?.[0] as {
+      messages: Array<{ role: string; content: string }>
+    }
+    expect(request.messages[1]?.content).toContain('Assistant identity:\nQualy')
+    expect(request.messages[0]?.content).toContain(
+      'If asked whether you are ChatGPT or a human, clearly say no'
+    )
+  })
+
   it('passes explicit clarification state separately from conversation history', async () => {
     const createCompletion = vi.fn(async (_args: Record<string, unknown>) =>
       completion({

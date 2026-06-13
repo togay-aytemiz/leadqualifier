@@ -50,6 +50,16 @@ describe('generateSimpleRagAnswer', () => {
       messages: Array<{ role: string; content: string }>
     }
     expect(request.messages[0]?.content).toContain('Retrieved chunks are the only factual authority')
+    expect(request.messages[0]?.content).toContain('Answer only the requested facet')
+    expect(request.messages[0]?.content).toContain(
+      'Do not use audience-specific evidence such as international or YÖS fees'
+    )
+    expect(request.messages[0]?.content).toContain(
+      'prefer a matching verified brochure table chunk over website prose'
+    )
+    expect(request.messages[0]?.content).toContain(
+      'Never infer an organization-specific program duration from general degree regulations'
+    )
     expect(request.messages[1]?.content).toContain('Peki kaç yıl?')
     expect(request.messages[1]?.content).toContain('Tıp Fakültesini soruyorum.')
     expect(request.messages[1]?.content).toContain('[C1] Tıp Programı')

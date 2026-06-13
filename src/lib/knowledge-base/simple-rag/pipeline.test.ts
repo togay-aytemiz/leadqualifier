@@ -114,6 +114,33 @@ describe('runSimpleRagPipeline', () => {
     })
   })
 
+  it('returns a direct conversational response without vector search', async () => {
+    const vectorSearch = vi.fn()
+    const answerCreateCompletion = vi.fn()
+    const result = await runSimpleRagPipeline({
+      client: { vectorStores: { search: vectorSearch } },
+      vectorStoreId: 'vs_yiu',
+      answerModel: 'gpt-4o-mini',
+      latestUserMessage: 'sen gerçek insan mısın',
+      recentMessages: [],
+      organizationContext: 'Yüksek İhtisas Üniversitesi',
+      responseLanguage: 'tr',
+      rewriteCreateCompletion: vi.fn(async () =>
+        completion({
+          status: 'respond',
+          response: 'Hayır, ben bir yapay zeka asistanıyım.',
+          response_language: 'tr',
+        })
+      ),
+      answerCreateCompletion,
+    })
+
+    expect(result.answer).toBe('Hayır, ben bir yapay zeka asistanıyım.')
+    expect(result.diagnostics?.queryIntent).toBe('simple_rag_respond')
+    expect(vectorSearch).not.toHaveBeenCalled()
+    expect(answerCreateCompletion).not.toHaveBeenCalled()
+  })
+
   it('returns no-info without marking an ordinary retrieval miss as refusal', async () => {
     const result = await runSimpleRagPipeline({
       client: { vectorStores: { search: vi.fn(async () => ({ data: [] })) } },

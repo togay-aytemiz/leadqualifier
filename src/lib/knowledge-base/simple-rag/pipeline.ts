@@ -78,6 +78,7 @@ export async function runSimpleRagPipeline(input: {
   rewriteModel?: string
   latestUserMessage: string
   recentMessages: KnowledgeSearchPlanningTurn[]
+  organizationContext?: string | null
   pendingClarification?: RagPendingClarificationState | null
   responseLanguage: MvpResponseLanguage
   settings?: { bot_name?: string | null; prompt?: string | null }
@@ -91,11 +92,35 @@ export async function runSimpleRagPipeline(input: {
   const rewrite = await rewriteSimpleRagQuery({
     latestUserMessage: input.latestUserMessage,
     recentMessages: input.recentMessages,
+    organizationContext: input.organizationContext,
+    assistantName: input.settings?.bot_name,
     pendingClarification: input.pendingClarification,
     responseLanguage: input.responseLanguage,
     model: input.rewriteModel,
     createCompletion: input.rewriteCreateCompletion,
   })
+
+  if (rewrite.plan.status === 'respond') {
+    return {
+      provider: 'openai_file_search_validated',
+      answer: rewrite.plan.response,
+      citations: [],
+      refusal: false,
+      timingsMs: { total: Date.now() - startedAt },
+      usage: rewrite.usage,
+      diagnostics: {
+        queryIntent: 'simple_rag_respond',
+        simpleRag: {
+          stateUsed: stateWasUsed(input.pendingClarification),
+          resultCount: 0,
+          topScores: [],
+          selectedChunkIds: [],
+          selectedFilenames: [],
+          answerStatus: 'answer',
+        },
+      },
+    }
+  }
 
   if (rewrite.plan.status === 'clarify') {
     return {
