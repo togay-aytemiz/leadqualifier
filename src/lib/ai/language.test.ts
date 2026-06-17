@@ -50,6 +50,12 @@ describe('ai language helpers', () => {
         expect(resolveMvpResponseLanguageName('ne sorabilirim')).toBe('Turkish')
     })
 
+    it('treats ascii Turkish assistant identity questions as Turkish', () => {
+        expect(resolveMvpResponseLanguage('sen kimsin')).toBe('tr')
+        expect(resolveMvpResponseLanguage('nesin sen')).toBe('tr')
+        expect(resolveMvpResponseLanguageName('asistan misin')).toBe('Turkish')
+    })
+
     it('uses history when current message language is ambiguous', () => {
         expect(isMvpResponseLanguageAmbiguous('ok')).toBe(true)
         expect(resolveMvpResponseLanguage('ok', {

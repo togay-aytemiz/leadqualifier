@@ -269,6 +269,7 @@
 
 ### Fixed
 
+- Fixed Public Demo assistant identity replies for ASCII Turkish prompts. Messages such as `sen kimsin` and `nesin sen` now resolve to Turkish, use the configured bot name/demo context, and avoid mentioning ChatGPT unless the user explicitly asks about ChatGPT (`src/lib/ai/language.ts`, `src/app/api/demo/[slug]/chat/route.ts`, related tests).
 - Fixed a production-wide YİÜ retrieval outage caused by the approved OpenAI vector store expiring after seven days. The 135 approved files now live in persistent store `vs_6a2cfa3598b88191ad8a77ab9a9c6a09`, and pipeline/API failures return an explicit temporary source-unavailable reply instead of masquerading as factual no-info.
 - Fixed simple questions losing the demo organization scope or retrieving the wrong source family. The rewriter now uses channel organization context, answers non-factual identity/greeting turns without File Search, and produces stronger generic standalone queries for campus addresses, academic catalogs, domestic admissions tables, and program duration. Grounded generation prefers matching verified brochure rows over international/YÖS pricing and rejects duration inference from generic regulations (`src/lib/knowledge-base/simple-rag/*`, `src/lib/demo-chat/openai-file-search.ts`).
 - Fixed concrete brochure table questions such as Turkish Medicine quota variants falling through to generic no-information or an unnecessary answer-composer call when File Search already returned the relevant markdown table (`src/lib/knowledge-base/llm-first/pipeline.test.ts`).

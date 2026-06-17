@@ -275,10 +275,20 @@ function buildDemoAssistantIdentityReply(input: {
 
     const botName = input.botName?.trim() || 'YİÜ Tanıtım Asistanı'
     const channelName = input.channelDisplayName?.trim() || 'Yüksek İhtisas Üniversitesi Tanıtım Günleri'
+    const asksAboutChatGpt = /\bchatgpt\b/i.test(input.message)
 
     return resolveMvpResponseLanguage(input.message) === 'tr'
-        ? `Ben ${botName}. ${channelName} kapsamında aday öğrenci ve tanıtım sorularına yardımcı olan yapay zeka asistanıyım; gerçek insan veya ChatGPT arayüzü değilim. Programlar, ücretler, kontenjanlar, kampüsler, kayıt süreci ve benzeri konularda yardımcı olabilirim.`
-        : `I am ${botName}, the AI assistant for ${channelName}. I am not a human or the ChatGPT interface. I can help with programs, fees, quotas, campuses, registration steps, and similar admissions questions.`
+        ? [
+            `Ben ${botName}.`,
+            `${channelName} kapsamında aday öğrenci ve tanıtım sorularına yardımcı olan yapay zeka asistanıyım.`,
+            asksAboutChatGpt ? 'ChatGPT değilim; bu demo için yapılandırılmış tanıtım asistanıyım.' : '',
+            'Programlar, ücretler, kontenjanlar, kampüsler, kayıt süreci ve benzeri konularda yardımcı olabilirim.',
+        ].filter(Boolean).join(' ')
+        : [
+            `I am ${botName}, the AI assistant for ${channelName}.`,
+            asksAboutChatGpt ? 'I am not ChatGPT; I am the configured assistant for this demo.' : '',
+            'I can help with programs, fees, quotas, campuses, registration steps, and similar admissions questions.',
+        ].filter(Boolean).join(' ')
 }
 
 function buildDemoScopeHelpReply(message: string) {

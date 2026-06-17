@@ -909,6 +909,42 @@ describe('demo chat API route', () => {
         }))
     })
 
+    it('answers Turkish assistant identity questions in Turkish without unnecessary ChatGPT wording', async () => {
+        const { botInsertChain, fromMock } = createDemoTextPersistenceMock()
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+        getOrgAiSettingsMock.mockResolvedValueOnce({
+            prompt: 'Yüksek İhtisas Üniversitesi Tanıtım Günleri aday öğrenci asistanı gibi konuş.',
+            bot_name: 'YİÜ Tanıtım Asistanı',
+        })
+        processInboundAiPipelineMock.mockImplementationOnce(async () => undefined)
+
+        const res = await POST(createRequest({
+            sessionId: 'session-1',
+            message: 'sen kimsin',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        const body = await res.json()
+        expect(body).toEqual({
+            pending: false,
+            response: expect.stringContaining('Ben YİÜ Tanıtım Asistanı'),
+            skillImage: null,
+        })
+        expect(body.response).toContain('yapay zeka asistanıyım')
+        expect(body.response).not.toContain('I am')
+        expect(body.response).not.toContain('ChatGPT')
+        expect(getOrgAiSettingsMock).toHaveBeenCalledWith('org-1', expect.objectContaining({
+            locale: 'tr',
+        }))
+        expect(botInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
+            content: body.response,
+            metadata: expect.objectContaining({
+                demo_chat_reply_kind: 'text',
+                demo_chat_reply_source: 'assistant_identity',
+            }),
+        }))
+    })
+
     it('recovers already-pending demo scope-help polls without running RAG or the shared pipeline', async () => {
         const { botInsertChain, fromMock } = createDemoTextPersistenceMock([null, 'conversation-1'])
         createClientMock.mockReturnValueOnce({ from: fromMock })

@@ -1,5 +1,5 @@
 const TURKISH_CHAR_PATTERN = /[ığüşöçİĞÜŞÖÇ]/
-const TURKISH_WORD_PATTERN = /\b(merhaba|selam|fiyat|randevu|teşekkür|tesekkur|lütfen|lutfen|yarın|yarin|bugün|bugun|müsait|musait|kampanya|hizmet|iptal|detay|sadece|yeter|şikayet|sikayet|sorun|memnuniyetsiz|üniversite|universite|fakülte|fakulte|programında|programinda|sınav|sinav|bütünleme|butunleme|staj|telefon|numarası|numarasi|kaç|kac|sana|size|hangi|konu|konuda|konularda|soru|sorabilirim|sorabilirsin|yardımcı|yardimci|olabilirsin)\b/i
+const TURKISH_WORD_PATTERN = /\b(merhaba|selam|fiyat|randevu|teşekkür|tesekkur|lütfen|lutfen|yarın|yarin|bugün|bugun|müsait|musait|kampanya|hizmet|iptal|detay|sadece|yeter|şikayet|sikayet|sorun|memnuniyetsiz|üniversite|universite|fakülte|fakulte|programında|programinda|sınav|sinav|bütünleme|butunleme|staj|telefon|numarası|numarasi|kaç|kac|sana|size|sen|siz|kimsin|nesin|kimdir|asistan|hangi|konu|konuda|konularda|soru|sorabilirim|sorabilirsin|yardımcı|yardimci|olabilirsin)\b/i
 const TURKISH_SUFFIX_PATTERN = /(miyim|miyiz|misin|misiniz|mısın|mısınız|musun|musunuz|müsün|müsünüz|yorum|yoruz|yim|yiz|siniz|sunuz|lar|ler|dır|dir|dur|dür|tir|tır|tur|tür|acak|ecek|abil|ebil|abilir|ebilir|abilirim|ebilirim|abilirsin|ebilirsin|bilir|bilirim|bilirsin|madan|meden|unda|unde|ünde|ında|inda|inde|daki|deki|taki|teki|dan|den|nin|nın|nun|nün)$/
 
 const TURKISH_KEYWORDS = new Set([
@@ -43,6 +43,12 @@ const TURKISH_KEYWORDS = new Set([
     'konularda',
     'sana',
     'size',
+    'sen',
+    'siz',
+    'kimsin',
+    'nesin',
+    'kimdir',
+    'asistan',
     'soru',
     'sorabilirim',
     'sorabilir',

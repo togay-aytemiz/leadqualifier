@@ -1,5 +1,10 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Implementation Update (2026-06-17):** Public Demo assistant-identity replies now resolve ASCII Turkish prompts such as `sen kimsin` and `nesin sen` as Turkish, so the identity boundary no longer falls back to English when the message lacks Turkish-specific characters. The identity copy also no longer mentions ChatGPT unless the user explicitly asks whether the assistant is ChatGPT; ordinary `sen kimsin` prompts answer from the configured bot name and demo context only.
+
+- [x] Fix assistant-identity language detection for ASCII Turkish identity prompts.
+- [x] Remove unnecessary ChatGPT wording from ordinary assistant-identity replies.
+
 > **Implementation Update (2026-06-17):** YİÜ intent Skill Pack V2 customer-facing instructed answers were rewritten across all `60` active skills so replies speak as the university assistant instead of describing sources, brochures, tables, or internal evidence mechanics. The updated pack was pushed to the production demo Skills DB with `60` updated skills and `411` refreshed embedding rows. The simple RAG answer generator now has a broader direct-evidence guard for operational and high-inference claims such as ambulance practice, patient/case exposure, hospital access, dormitory/transport service, job outcomes, accreditation/equivalence, online education, and international validity; related program text or job-role wording is no longer enough to support a positive claim.
 
 - [x] Rewrite all YİÜ intent Skill instructed answers into direct, student-friendly assistant prose while preserving source notes as internal audit context.
