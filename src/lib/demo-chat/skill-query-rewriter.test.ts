@@ -42,6 +42,50 @@ describe('rewriteDemoSkillQuery', () => {
             temperature: 0,
             response_format: { type: 'json_object' },
         }))
+        const request = createCompletion.mock.calls[0]?.[0] as {
+            messages: Array<{ role: string; content: string }>
+        }
+        expect(request.messages[0]?.content).toContain(
+            'Use assistant behavior/scope instructions only to identify the active organization'
+        )
+    })
+
+    it('passes assistant task instructions as scope context instead of answer evidence', async () => {
+        const createCompletion = vi.fn().mockResolvedValue({
+            choices: [{
+                message: {
+                    content: JSON.stringify({
+                        query: 'Yüksek İhtisas Üniversitesi kampüsleri nerede?',
+                        subject: 'Yüksek İhtisas Üniversitesi kampüsleri',
+                        facet: 'konum',
+                        needs_clarification: false,
+                        used_history: false,
+                        decision: 'standalone',
+                        reason: 'The assistant scope identifies the active university.',
+                    }),
+                },
+            }],
+        })
+
+        await rewriteDemoSkillQuery({
+            latestUserMessage: 'kampüsler nerede',
+            responseLanguage: 'tr',
+            organizationContext: 'Yüksek İhtisas Üniversitesi / YIU Demo',
+            assistantInstructionContext:
+                'Assistant name: YİÜ Tanıtım Asistanı\nAssistant task/scope instructions: Yüksek İhtisas Üniversitesi Tanıtım Günleri aday öğrenci asistanı gibi konuş.',
+            recentMessages: [],
+            createCompletion,
+        })
+
+        const request = createCompletion.mock.calls[0]?.[0] as {
+            messages: Array<{ role: string; content: string }>
+        }
+        expect(request.messages[1]?.content).toContain(
+            'Organization context:\nYüksek İhtisas Üniversitesi / YIU Demo'
+        )
+        expect(request.messages[1]?.content).toContain(
+            'Assistant task/scope instructions: Yüksek İhtisas Üniversitesi Tanıtım Günleri'
+        )
     })
 
     it('combines a missing slot answer with the previous requested fact', async () => {

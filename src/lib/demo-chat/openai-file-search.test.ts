@@ -106,7 +106,7 @@ describe('buildOpenAiFileSearchDemoReply', () => {
             responseLanguage: 'tr',
             answerModel: 'gpt-4.1-mini',
             maxResults: 20,
-            scoreThreshold: 0.1,
+            scoreThreshold: 0,
             settings: {
                 bot_name: 'Qualy',
                 prompt: 'Bol emoji kullan, Gen-Z gibi konuş.',
@@ -117,7 +117,7 @@ describe('buildOpenAiFileSearchDemoReply', () => {
         expect(result?.metadata.rag_file_search).toMatchObject({
             pipeline_version: 'simple_standalone_query_v1',
             max_results: 20,
-            score_threshold: 0.1,
+            score_threshold: 0,
         })
         expect(result?.metadata.rag_file_search).not.toHaveProperty('final_polish')
     })
@@ -162,6 +162,33 @@ describe('buildOpenAiFileSearchDemoReply', () => {
             ]),
         }))
         expect(result?.replyText).toContain('English Medicine')
+    })
+
+    it('passes the canonical institution name from AI settings into simple RAG scope', async () => {
+        vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+        getOrgAiSettingsMock.mockResolvedValue({
+            bot_name: 'YİÜ Tanıtım Asistanı',
+            prompt: 'Yüksek İhtisas Üniversitesi Tanıtım Günleri aday öğrenci asistanı gibi konuş.',
+        })
+        runSimpleRagPipelineMock.mockResolvedValue({
+            provider: 'openai_file_search_validated',
+            answer: 'Yüksek İhtisas Üniversitesi fakülteleri listelenmiştir.',
+            citations: [],
+            refusal: false,
+            timingsMs: { total: 10, retrieval: 0, generation: 0, validation: 0 },
+            usage: { inputTokens: 80, outputTokens: 16, totalTokens: 96, toolCalls: 0 },
+            diagnostics: {},
+        })
+
+        await buildOpenAiFileSearchDemoReply({
+            supabase: {},
+            channel,
+            message: 'hangi fakülteler var?',
+        })
+
+        expect(runSimpleRagPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            organizationContext: 'Yüksek İhtisas Üniversitesi / YIU Demo',
+        }))
     })
 
     it('does not fall back to the legacy RAG path when the simple pipeline fails', async () => {

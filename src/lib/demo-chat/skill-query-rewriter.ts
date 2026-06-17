@@ -109,6 +109,8 @@ function systemPrompt(responseLanguage: MvpResponseLanguage) {
     return [
         'Rewrite the latest user message into one standalone query for matching approved Skills.',
         'Your job is to infer what Skill the user is trying to invoke. Do not answer the question.',
+        'Use assistant behavior/scope instructions only to identify the active organization, assistant identity, domain scope, and boundaries.',
+        'Do not copy long assistant instructions into the query. Do not treat those instructions as factual knowledge for the answer.',
         'Use recent conversation only when the latest user message depends on prior context.',
         'A message depends on prior context when it accepts, confirms, asks to continue, asks to show, asks to share, or politely requests something the assistant just offered.',
         'This can be short or long. Examples: "evet", "olur", "evet göster", "olur hadi bana göster", "evet lütfen devam etmeni rica ediyorum", "bana onu anlatır mısın", "tamam paylaşır mısın".',
@@ -130,6 +132,7 @@ export async function rewriteDemoSkillQuery(input: {
     latestUserMessage: string
     recentMessages: KnowledgeSearchPlanningTurn[]
     organizationContext?: string | null
+    assistantInstructionContext?: string | null
     responseLanguage: MvpResponseLanguage
     model?: string
     createCompletion?: DemoSkillQueryCreateCompletion
@@ -152,6 +155,7 @@ export async function rewriteDemoSkillQuery(input: {
                 content: [
                     `Latest user message:\n${latestUserMessage}`,
                     `Organization context:\n${input.organizationContext?.trim() || 'Not provided'}`,
+                    `Assistant behavior/scope instructions:\n${input.assistantInstructionContext?.trim().slice(0, 1200) || 'Not provided'}`,
                     `Recent history:\n${JSON.stringify(recentHistory(input.recentMessages))}`,
                 ].join('\n\n'),
             },

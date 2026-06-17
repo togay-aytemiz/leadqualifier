@@ -6,6 +6,10 @@ import { recordAiUsage } from '@/lib/ai/usage'
 import { runSimpleRagPipeline } from '@/lib/knowledge-base/simple-rag/pipeline'
 import type { KnowledgeSearchPlanningTurn } from '@/lib/knowledge-base/query-planner'
 import type { DemoChatChannel } from '@/lib/demo-chat/channel'
+import {
+    buildDemoAssistantInstructionContext,
+    resolveDemoOrganizationContext,
+} from '@/lib/demo-chat/organization-context'
 import type { RagPendingClarificationState } from '@/lib/knowledge-base/rag-eval/types'
 
 type SupabaseLike = Parameters<typeof recordAiUsage>[0]['supabase']
@@ -26,7 +30,7 @@ const DEFAULT_FILE_SEARCH_DEMO_SLUGS = ['yiu-tanitim-gunleri-2026']
 const DEFAULT_REWRITE_MODEL = 'gpt-4.1-mini'
 const DEFAULT_ANSWER_MODEL = 'gpt-4.1-mini'
 const DEFAULT_MAX_RESULTS = 20
-const DEFAULT_SCORE_THRESHOLD = 0.1
+const DEFAULT_SCORE_THRESHOLD = 0
 
 function readEnabledSlugs() {
     const raw = process.env.DEMO_CHAT_FILE_SEARCH_SLUGS?.trim()
@@ -185,7 +189,11 @@ export async function buildOpenAiFileSearchDemoReply(input: {
             vectorStoreId,
             latestUserMessage: input.message,
             recentMessages: input.conversationHistory ?? [],
-            organizationContext: input.channel.displayName,
+            organizationContext: resolveDemoOrganizationContext({
+                channelDisplayName: input.channel.displayName,
+                settings,
+            }),
+            assistantInstructionContext: buildDemoAssistantInstructionContext(settings),
             pendingClarification: input.pendingClarification,
             responseLanguage,
             citationSourcesByFilename: sourceManifest.sourcesByFilename,

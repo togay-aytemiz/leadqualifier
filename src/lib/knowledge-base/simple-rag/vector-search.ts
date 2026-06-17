@@ -49,7 +49,7 @@ export async function searchSimpleRagVectorStore(input: {
     max_num_results: input.maxResults ?? 12,
     ranking_options: {
       ranker: 'auto',
-      score_threshold: input.scoreThreshold ?? 0.1,
+      score_threshold: input.scoreThreshold ?? 0,
     },
   })
 

@@ -12,6 +12,7 @@ import { parseCustomerEvaluationRows } from '@/lib/knowledge-base/rag-eval/custo
 type Args = {
     mode: 'routing' | 'followup' | 'both'
     routingCount: number
+    routingStartIndex: number
     followupCount: number
     seed: string
     baseUrl: string
@@ -161,6 +162,7 @@ function parseArgs(argv: string[]): Args {
     const args: Args = {
         mode: 'both',
         routingCount: 100,
+        routingStartIndex: 1,
         followupCount: 50,
         seed: 'yiu-routing-followup-2026-06-13',
         baseUrl: process.env.PUBLIC_DEMO_BASE_URL?.trim() || DEFAULT_BASE_URL,
@@ -189,6 +191,8 @@ function parseArgs(argv: string[]): Args {
             args.mode = value as Args['mode']
         } else if (key === 'routing-count') {
             args.routingCount = Number(value)
+        } else if (key === 'routing-start-index') {
+            args.routingStartIndex = Number(value)
         } else if (key === 'followup-count') {
             args.followupCount = Number(value)
         } else if (key === 'seed') {
@@ -210,6 +214,9 @@ function parseArgs(argv: string[]): Args {
 
     if (!Number.isInteger(args.routingCount) || args.routingCount < 1) {
         throw new Error('--routing-count must be a positive integer')
+    }
+    if (!Number.isInteger(args.routingStartIndex) || args.routingStartIndex < 1) {
+        throw new Error('--routing-start-index must be a positive integer')
     }
     if (!Number.isInteger(args.followupCount) || args.followupCount < 1) {
         throw new Error('--followup-count must be a positive integer')
@@ -707,12 +714,14 @@ async function runRoutingEval(input: {
     runId: string
 }) {
     const selected = sampleRows(input.rows, input.args.routingCount, `${input.args.seed}:routing`)
+        .slice(input.args.routingStartIndex - 1)
     const results: RoutingResult[] = []
 
     for (let index = 0; index < selected.length; index += 1) {
         const row = selected[index]!
-        const sessionId = `codex-yiu-routing-${input.runId}-${index + 1}`
-        console.log(`ROUTING ${index + 1}/${selected.length} #${row.no}: ${row.question}`)
+        const displayIndex = input.args.routingStartIndex + index
+        const sessionId = `codex-yiu-routing-${input.runId}-${displayIndex}`
+        console.log(`ROUTING ${displayIndex}/${input.args.routingCount} #${row.no}: ${row.question}`)
         try {
             const turn = await askAndTrace({
                 supabase: input.supabase,
@@ -724,7 +733,7 @@ async function runRoutingEval(input: {
                 message: row.question
             })
             results.push({
-                index: index + 1,
+                index: displayIndex,
                 poolId: row.no,
                 question: row.question,
                 previousScore: row.originalScore,
@@ -740,7 +749,7 @@ async function runRoutingEval(input: {
         } catch (error) {
             const failure = error instanceof Error ? error.message : String(error)
             results.push({
-                index: index + 1,
+                index: displayIndex,
                 poolId: row.no,
                 question: row.question,
                 previousScore: row.originalScore,
@@ -945,6 +954,7 @@ async function main() {
     }))
 
     const routingSelected = sampleRows(rows, args.routingCount, `${args.seed}:routing`)
+        .slice(args.routingStartIndex - 1)
     const followupSelected = sampleRows(rows, args.followupCount, `${args.seed}:followup`)
 
     if (args.dryRun) {

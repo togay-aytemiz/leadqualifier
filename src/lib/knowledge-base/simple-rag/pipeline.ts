@@ -92,6 +92,7 @@ export async function runSimpleRagPipeline(input: {
   latestUserMessage: string
   recentMessages: KnowledgeSearchPlanningTurn[]
   organizationContext?: string | null
+  assistantInstructionContext?: string | null
   pendingClarification?: RagPendingClarificationState | null
   responseLanguage: MvpResponseLanguage
   settings?: { bot_name?: string | null; prompt?: string | null }
@@ -106,6 +107,7 @@ export async function runSimpleRagPipeline(input: {
     latestUserMessage: input.latestUserMessage,
     recentMessages: input.recentMessages,
     organizationContext: input.organizationContext,
+    assistantInstructionContext: input.assistantInstructionContext,
     assistantName: input.settings?.bot_name,
     pendingClarification: input.pendingClarification,
     responseLanguage: input.responseLanguage,
@@ -224,7 +226,7 @@ export async function runSimpleRagPipeline(input: {
     responseLanguage: rewrite.plan.responseLanguage,
   })
   const retryMaxResults = Math.max(input.maxResults ?? 0, 30)
-  const retryScoreThreshold = Math.min(input.scoreThreshold ?? 0.1, 0.02)
+  const retryScoreThreshold = Math.min(input.scoreThreshold ?? 0, 0.02)
   let attempt = await runRetrievalAttempt({
     query: standaloneQuery,
     maxResults: input.maxResults,

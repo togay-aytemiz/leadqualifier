@@ -82,6 +82,8 @@ describe('rewriteSimpleRagQuery', () => {
       latestUserMessage: 'kampüsler nerede',
       recentMessages: [],
       organizationContext: 'Yüksek İhtisas Üniversitesi',
+      assistantInstructionContext:
+        'Assistant task/scope instructions: Yüksek İhtisas Üniversitesi Tanıtım Günleri aday öğrenci asistanı gibi konuş.',
       responseLanguage: 'tr',
       createCompletion,
     })
@@ -91,6 +93,12 @@ describe('rewriteSimpleRagQuery', () => {
     }
     expect(request.messages[0]?.content).toContain(
       'Never ask which institution when organization context is provided'
+    )
+    expect(request.messages[0]?.content).toContain(
+      'Use them only to identify the active organization'
+    )
+    expect(request.messages[0]?.content).toContain(
+      'Do not copy long assistant instructions into the standalone query'
     )
     expect(request.messages[0]?.content).toContain(
       'Optimize search queries with concise terms implied by the requested facet'
@@ -125,6 +133,9 @@ describe('rewriteSimpleRagQuery', () => {
     expect(request.messages[1]?.content).toContain(
       'Organization context:\nYüksek İhtisas Üniversitesi'
     )
+    expect(request.messages[1]?.content).toContain(
+      'Assistant task/scope instructions: Yüksek İhtisas Üniversitesi Tanıtım Günleri'
+    )
   })
 
   it('allows a direct conversational response without searching the knowledge base', async () => {
@@ -157,6 +168,55 @@ describe('rewriteSimpleRagQuery', () => {
     expect(request.messages[0]?.content).toContain(
       'If asked whether you are ChatGPT or a human, clearly say no'
     )
+  })
+
+  it('forces knowledge-seeking respond plans back through retrieval', async () => {
+    const createCompletion = vi.fn(async () =>
+      completion({
+        status: 'respond',
+        response: 'Evet, öğrenciler eğitim sırasında gerçek hasta görür.',
+        response_language: 'tr',
+      })
+    )
+
+    const result = await rewriteSimpleRagQuery({
+      latestUserMessage: 'Öğrenciler gerçek hasta görüyor mu?',
+      recentMessages: [],
+      organizationContext: 'Yüksek İhtisas Üniversitesi',
+      responseLanguage: 'tr',
+      createCompletion,
+    })
+
+    expect(result.plan).toEqual({
+      status: 'search',
+      standaloneQuery: 'Yüksek İhtisas Üniversitesi Öğrenciler gerçek hasta görüyor mu?',
+      responseLanguage: 'tr',
+    })
+  })
+
+  it('bounds off-topic tutoring requests instead of treating them as chat', async () => {
+    const createCompletion = vi.fn(async () =>
+      completion({
+        status: 'respond',
+        response: 'Tabii, TYT matematik çalışabiliriz.',
+        response_language: 'tr',
+      })
+    )
+
+    const result = await rewriteSimpleRagQuery({
+      latestUserMessage: 'TYT matematik çalıştırır mısın?',
+      recentMessages: [],
+      organizationContext: 'Yüksek İhtisas Üniversitesi',
+      responseLanguage: 'tr',
+      createCompletion,
+    })
+
+    expect(result.plan).toEqual({
+      status: 'refuse',
+      refusalResponse:
+        'Bu konuda ders çalıştırma yapamam; Yüksek İhtisas Üniversitesi programları, ücretleri, bursları, kontenjanları, kampüsleri veya kayıt süreciyle ilgili yardımcı olabilirim.',
+      responseLanguage: 'tr',
+    })
   })
 
   it('passes explicit clarification state separately from conversation history', async () => {

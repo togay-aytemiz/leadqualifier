@@ -58,6 +58,12 @@ describe('generateSimpleRagAnswer', () => {
       'prefer a matching verified brochure table chunk over website prose'
     )
     expect(request.messages[0]?.content).toContain(
+      'summarize the directly relevant supported facts from chunks'
+    )
+    expect(request.messages[0]?.content).toContain(
+      'Prefer a useful grounded partial answer over no_info'
+    )
+    expect(request.messages[0]?.content).toContain(
       'Never infer an organization-specific program duration from general degree regulations'
     )
     expect(request.messages[1]?.content).toContain('Peki kaç yıl?')

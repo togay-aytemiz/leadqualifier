@@ -61,6 +61,9 @@ describe('runSimpleRagPipeline', () => {
 
     expect(rewriteCreateCompletion).toHaveBeenCalledOnce()
     expect(vectorSearch).toHaveBeenCalledOnce()
+    expect(vectorSearch).toHaveBeenCalledWith('vs_yiu', expect.objectContaining({
+      ranking_options: expect.objectContaining({ score_threshold: 0 }),
+    }))
     expect(answerCreateCompletion).toHaveBeenCalledOnce()
     expect(JSON.stringify(rewriteCreateCompletion.mock.calls[0]?.[0])).not.toContain(
       settings.prompt

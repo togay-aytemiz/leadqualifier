@@ -542,6 +542,10 @@ describe('demo chat API route', () => {
 
     it('answers semantic skill matches during POST when exact trigger matching misses', async () => {
         vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+        getOrgAiSettingsMock.mockResolvedValueOnce({
+            bot_name: 'YİÜ Tanıtım Asistanı',
+            prompt: 'Yüksek İhtisas Üniversitesi Tanıtım Günleri aday öğrenci asistanı gibi konuş.',
+        })
         matchExactSkillTriggersMock.mockResolvedValueOnce([])
         const campusMatch = {
             skill_id: 'skill-campus',
@@ -592,6 +596,12 @@ describe('demo chat API route', () => {
             3,
             expect.anything()
         )
+        expect(rewriteDemoSkillQueryMock).toHaveBeenCalledWith(expect.objectContaining({
+            organizationContext: 'Yüksek İhtisas Üniversitesi / YIU Aday Asistanı',
+            assistantInstructionContext: expect.stringContaining(
+                'Yüksek İhtisas Üniversitesi Tanıtım Günleri'
+            ),
+        }))
         expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
             text: 'kampüsler nerede acaba',
             preferredSkillMatch: campusMatch,
@@ -856,6 +866,45 @@ describe('demo chat API route', () => {
             metadata: expect.objectContaining({
                 demo_chat_reply_kind: 'text',
                 demo_chat_reply_source: 'scope_help',
+            }),
+        }))
+    })
+
+    it('answers assistant identity questions from configured behavior before retrieval', async () => {
+        const { botInsertChain, fromMock } = createDemoTextPersistenceMock()
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+        getOrgAiSettingsMock.mockResolvedValueOnce({
+            prompt: 'Yüksek İhtisas Üniversitesi Tanıtım Günleri aday öğrenci asistanı gibi konuş.',
+            bot_name: 'YİÜ Tanıtım Asistanı',
+        })
+        processInboundAiPipelineMock.mockImplementationOnce(async () => undefined)
+
+        const res = await POST(createRequest({
+            sessionId: 'session-1',
+            message: 'Sen kimsin, ChatGPT misin?',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: expect.stringContaining('YİÜ Tanıtım Asistanı'),
+            skillImage: null,
+        })
+        expect(matchExactSkillTriggersMock).not.toHaveBeenCalled()
+        expect(matchSkillsMock).not.toHaveBeenCalled()
+        expect(rewriteDemoSkillQueryMock).not.toHaveBeenCalled()
+        expect(buildOpenAiFileSearchDemoReplyMock).not.toHaveBeenCalled()
+        expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalled()
+        expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            text: 'Sen kimsin, ChatGPT misin?',
+            skipAutomation: true,
+        }))
+        expect(botInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
+            content: expect.stringContaining('YİÜ Tanıtım Asistanı'),
+            metadata: expect.objectContaining({
+                demo_chat_reply_kind: 'text',
+                demo_chat_reply_source: 'assistant_identity',
             }),
         }))
     })

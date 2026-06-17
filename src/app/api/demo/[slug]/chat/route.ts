@@ -10,6 +10,10 @@ import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
 import { verifyDemoChatAccessToken } from '@/lib/demo-chat/access'
 import { buildDemoChatContactId, resolveDemoChatChannel } from '@/lib/demo-chat/channel'
 import { buildOpenAiFileSearchDemoReply } from '@/lib/demo-chat/openai-file-search'
+import {
+    buildDemoAssistantInstructionContext,
+    resolveDemoOrganizationContext,
+} from '@/lib/demo-chat/organization-context'
 import { rewriteDemoSkillQuery, type DemoSkillQueryRewriteResult } from '@/lib/demo-chat/skill-query-rewriter'
 import { verifyDemoSkillCandidates } from '@/lib/demo-chat/skill-candidate-verifier'
 import {
@@ -251,6 +255,30 @@ function isDemoScopeHelpQuestion(message: string) {
     return /\b(?:hangi|ne|neler|what|which)\b.*\b(?:konu|konular|konularda|soru|sorabilirim|sorabilirsin|ask|topics?)\b/u.test(normalized)
         || /\b(?:sana|size|asistana|assistant)?\s*(?:ne|neler)\s+sorabilirim\b/u.test(normalized)
         || /\bwhat\s+can\s+i\s+ask\b/u.test(normalized)
+}
+
+function isDemoAssistantIdentityQuestion(message: string) {
+    const normalized = normalizeDemoScopeHelpText(message)
+    if (!normalized) return false
+
+    return /\b(?:sen|siz|bot|asistan|assistant|ai|yapay zeka|chatgpt|qualy)\b.*\b(?:kimsin|kimdir|nesin|misin|mısın|musun|müsün|are you|who are you|what are you)\b/u.test(normalized)
+        || /\b(?:kimsin|nesin|who are you|what are you)\b/u.test(normalized)
+        || /\b(?:chatgpt|gercek insan|gerçek insan|ogrenci misin|öğrenci misin|yapay zeka misin|ai misin|asistan misin)\b/u.test(normalized)
+}
+
+function buildDemoAssistantIdentityReply(input: {
+    message: string
+    botName?: string | null
+    channelDisplayName?: string | null
+}) {
+    if (!isDemoAssistantIdentityQuestion(input.message)) return null
+
+    const botName = input.botName?.trim() || 'YİÜ Tanıtım Asistanı'
+    const channelName = input.channelDisplayName?.trim() || 'Yüksek İhtisas Üniversitesi Tanıtım Günleri'
+
+    return resolveMvpResponseLanguage(input.message) === 'tr'
+        ? `Ben ${botName}. ${channelName} kapsamında aday öğrenci ve tanıtım sorularına yardımcı olan yapay zeka asistanıyım; gerçek insan veya ChatGPT arayüzü değilim. Programlar, ücretler, kontenjanlar, kampüsler, kayıt süreci ve benzeri konularda yardımcı olabilirim.`
+        : `I am ${botName}, the AI assistant for ${channelName}. I am not a human or the ChatGPT interface. I can help with programs, fees, quotas, campuses, registration steps, and similar admissions questions.`
 }
 
 function buildDemoScopeHelpReply(message: string) {
@@ -1546,6 +1574,7 @@ async function persistDemoChatScopeHelpReply(input: {
     message: string
     messageId: string
     replyText: string
+    replySource?: string
 }) {
     try {
         await ingestDemoChatInboundOnly({
@@ -1563,7 +1592,7 @@ async function persistDemoChatScopeHelpReply(input: {
             messageId: input.messageId,
             replyText: input.replyText,
             metadata: {
-                demo_chat_reply_source: 'scope_help'
+                demo_chat_reply_source: input.replySource ?? 'scope_help'
             }
         })
     } catch (error) {
@@ -1792,14 +1821,32 @@ async function tryIntentAwareDemoSkillReply(input: {
     if (!process.env.OPENAI_API_KEY?.trim()) return null
 
     const conversationHistory = await readDemoSkillRewriteHistory(input)
+    const responseLanguage = resolveMvpResponseLanguage(input.message)
+    let assistantSettings: Awaited<ReturnType<typeof getOrgAiSettings>> | null = null
+    try {
+        assistantSettings = await getOrgAiSettings(input.channel.organizationId, {
+            supabase: input.supabase,
+            locale: responseLanguage,
+        })
+    } catch (error) {
+        console.warn('Demo Chat: skill rewrite settings unavailable; continuing with channel context.', {
+            organization_id: input.channel.organizationId,
+            error
+        })
+    }
+    const organizationContext = resolveDemoOrganizationContext({
+        channelDisplayName: input.channel.displayName,
+        settings: assistantSettings,
+    }) || input.channel.displayName || input.channel.slug
 
     let rewrite: DemoSkillQueryRewriteResult | null = null
     try {
         const rewritePromise = rewriteDemoSkillQuery({
             latestUserMessage: input.message,
             recentMessages: conversationHistory,
-            organizationContext: input.channel.displayName || input.channel.slug,
-            responseLanguage: resolveMvpResponseLanguage(input.message),
+            organizationContext,
+            assistantInstructionContext: buildDemoAssistantInstructionContext(assistantSettings),
+            responseLanguage,
         })
         const rewriteResult = await waitForPipelineResult(
             rewritePromise,
@@ -1931,6 +1978,34 @@ export async function POST(req: NextRequest, context: RouteContext) {
         return NextResponse.json({ error: 'Demo access denied' }, { status: 401 })
     }
     const inboundMessageId = uuidv4()
+    if (isDemoAssistantIdentityQuestion(message)) {
+        const aiSettings = await getOrgAiSettings(channel.organizationId, {
+            supabase,
+            locale: resolveMvpResponseLanguage(message)
+        })
+        const identityReply = buildDemoAssistantIdentityReply({
+            message,
+            botName: aiSettings.bot_name,
+            channelDisplayName: channel.displayName
+        })
+        if (identityReply) {
+            await persistDemoChatScopeHelpReply({
+                supabase,
+                channel,
+                sessionId,
+                message,
+                messageId: inboundMessageId,
+                replyText: identityReply,
+                replySource: 'assistant_identity'
+            })
+
+            return NextResponse.json({
+                pending: false,
+                response: identityReply,
+                skillImage: null
+            })
+        }
+    }
     const scopeHelpReply = buildDemoScopeHelpReply(message)
     if (scopeHelpReply) {
         await persistDemoChatScopeHelpReply({
