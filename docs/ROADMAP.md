@@ -1,5 +1,12 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Evaluation Update (2026-06-17):** A fresh non-overlapping YİÜ Public Demo random 100 run was executed through local `main` with maintenance bypass limited to the local eval session. The run completed `100/100` with `0` errors and route counts of `21` Skill answers, `49` grounded RAG answers, `13` clarifications, `12` no-info replies, `4` refusals, and `1` direct answer. Manual Codex review scored the run `6.73/10`: `39` strong, `36` usable, `18` weak, and `7` bad/unsafe. The next quality priorities are banning source-less direct answers for institutional facts, tightening direct-evidence checks for facility/service/equipment/location claims, expanding shorthand Skill phrases, and repairing weak Skill answer templates (`docs/evaluations/yiu-routing-random-100-codex-review-2026-06-17T16-42-59-385Z.md`).
+
+- [x] Run and manually review a fresh YİÜ random 100 route-quality sample after the identity/Skill copy updates.
+- [ ] Ban source-less direct answers for institution facts in the simple Public Demo RAG path.
+- [ ] Add direct-evidence checks for facility, service, equipment, location, office, and practice-location claims.
+- [ ] Expand YİÜ Skill shorthand phrases and repair weak matched-answer templates for wrong-facet replies.
+
 > **Implementation Update (2026-06-17):** Public Demo assistant-identity replies now resolve ASCII Turkish prompts such as `sen kimsin` and `nesin sen` as Turkish, so the identity boundary no longer falls back to English when the message lacks Turkish-specific characters. The identity copy also no longer mentions ChatGPT unless the user explicitly asks whether the assistant is ChatGPT; ordinary `sen kimsin` prompts answer from the configured bot name and demo context only.
 
 - [x] Fix assistant-identity language detection for ASCII Turkish identity prompts.
