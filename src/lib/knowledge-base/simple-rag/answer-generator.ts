@@ -151,16 +151,22 @@ function termPattern(term: string) {
 function requestedFacilityTerms(value: string) {
   const normalizedValue = normalized(value)
   const candidates = [
+    'simulasyon laboratuvar',
+    'cihaz egitimi',
     'rontgen',
     'mr',
     'tomografi',
+    'simulasyon',
     'kadavra',
     'mikroskop',
     'laboratuvar',
     'lab',
     'uygulama alani',
   ]
-  return candidates.filter((term) => termPattern(term).test(normalizedValue))
+  const matched = candidates.filter((term) => termPattern(term).test(normalizedValue))
+  return matched.filter((term) =>
+    !matched.some((other) => other !== term && other.includes(term))
+  )
 }
 
 function requestedOperationalTerms(value: string) {
@@ -193,7 +199,7 @@ function requestedOperationalTerms(value: string) {
 }
 
 function sentenceHasPositiveAvailability(sentence: string) {
-  return /\b(?:var|vardir|mevcut|bulunur|bulunuyor|bulunmaktadir|sahip|yer alir|yer almaktadir)\b/i.test(sentence)
+  return /\b(?:var|vardir|mevcut|bulunur|bulunuyor|bulunmaktadir|sahip|yer alir|yer almaktadir|verilir|veriliyor|verilmektedir|saglanir|saglanmaktadir)\b/i.test(sentence)
 }
 
 function sentenceDeniesAvailability(sentence: string) {
@@ -435,19 +441,17 @@ export async function generateSimpleRagAnswer(input: {
     return { status: 'no_info', reason: 'speculative_operational_inference', usage, model }
   }
 
-  if (asksFacilityAvailability(input.latestUserMessage)) {
-    const unsupportedTerms = unsupportedPositiveFacilityTerms({
-      question: input.latestUserMessage,
-      answer,
-      support: selectedChunks.map((chunk) => chunk.content).join('\n'),
-    })
-    if (unsupportedTerms.length > 0) {
-      return {
-        status: 'no_info',
-        reason: `unsupported_facility_availability:${unsupportedTerms.join(',')}`,
-        usage,
-        model,
-      }
+  const unsupportedFacilityTerms = unsupportedPositiveFacilityTerms({
+    question: input.latestUserMessage,
+    answer,
+    support: selectedChunks.map((chunk) => chunk.content).join('\n'),
+  })
+  if (unsupportedFacilityTerms.length > 0) {
+    return {
+      status: 'no_info',
+      reason: `unsupported_facility_availability:${unsupportedFacilityTerms.join(',')}`,
+      usage,
+      model,
     }
   }
 

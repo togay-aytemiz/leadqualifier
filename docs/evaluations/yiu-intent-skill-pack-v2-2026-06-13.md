@@ -75,6 +75,8 @@ Kullanıcı örnekleri:
 - Akademik birimleriniz neler?
 - YİÜ'de hangi okullar bulunuyor?
 - Fakülte ve yüksekokulları sayar mısın?
+- say bölümleri
+- sayısal bölümleriniz neler?
 
 Instructed cevap:
 Yüksek İhtisas Üniversitesinde öne çıkan akademik birimler şunlardır:
@@ -106,6 +108,9 @@ Kullanıcı örnekleri:
 - kampüs nerde
 - kampüs nerede acaba
 - yerleşke adresleri
+- bağlum kampüs nerede?
+- baglum kampus
+- 100. yıl yerleşkesine nasıl giderim?
 
 Instructed cevap:
 Yüksek İhtisas Üniversitesinin Ankara'da birden fazla yerleşkesi bulunur:
@@ -178,6 +183,8 @@ Kullanıcı örnekleri:
 - shmyo nerde
 - shmyo bölümleri hangi kampüste?
 - tlt hangi kampüste?
+- bağlum kampüste hangi programlar var?
+- baglum kampus hangi bölümler?
 
 Instructed cevap:
 Sağlık Hizmetleri Meslek Yüksekokulu programları iki yerleşkeye dağılır:
@@ -259,11 +266,13 @@ Kullanıcı örnekleri:
 - Öğrenciler nerede kalıyor?
 - Üniversitenin yurdu var mı?
 - Yurt ücretleri nerede yazıyor?
+- Şehir dışından gelenler nerede kalıyor?
+- KYK yurdu var mı?
 
 Instructed cevap:
-Üniversitenin aday öğrenci yönlendirmelerinde konaklama/yurt başlığı bulunur; ancak net yurt adı, garanti edilen kontenjan veya güncel ücret bilgisi için kesin bir sayı vermem doğru olmaz.
+Yurt/konaklama için garanti edilen bir yurt adı, kontenjan veya ücret bilgisi paylaşmak doğru olmaz.
 
-Konaklama planı yaparken yurt seçeneklerini, ücretleri, kontenjanı ve ulaşım mesafesini güncel dönem için ayrıca sormak en sağlıklı yol olur.
+Şehir dışından geleceksen yurt, apart ve ulaşım mesafesini güncel dönem için ayrıca kontrol etmek en sağlıklı yol olur. Üniversite program, yerleşke ve ulaşım bilgilerini netleştirmeye yardımcı olabilir; konaklama seçimini güncel yurt/apart bilgileriyle doğrulamak gerekir.
 
 Kaynak notu: Tanıtım broşürü QR bağlantıları, web sitesi yurtlar sayfası menüsü.
 
@@ -279,11 +288,13 @@ Kullanıcı örnekleri:
 - Ulaşım bilgisi verir misin?
 - Tıp kampüsüne ulaşım nasıl?
 - Bağlum'a nasıl ulaşırım?
+- 100. Yıl Yerleşkesine nasıl giderim?
+- Kampüsten hastaneye servis var mı?
 
 Instructed cevap:
 Yerleşke adreslerini net olarak paylaşabilirim; ancak servis/ring güzergahı, saatleri veya servis varlığı için kesin bilgi vermem doğru olmaz.
 
-Hangi yerleşkeye gideceğini yazarsan adresini tekrar netleştirebilirim. Servis ve ulaşım saatleri gibi değişken bilgiler için güncel dönem duyurusu esas alınmalıdır.
+100. Yıl / İşçi Blokları Yerleşkesi Çankaya'da, Balgat Yerleşkesi Balgat'ta, Bağlum Yerleşkesi Keçiören'de, Bağlıca Yerleşkesi Bağlıca'dadır. Hangi yerleşkeye gideceğini yazarsan adresini netleştirebilirim. Servis ve ulaşım saatleri gibi değişken bilgiler için güncel dönem duyurusu esas alınmalıdır.
 
 Kaynak notu: Tanıtım broşürü ulaşım QR bağlantısı, yerleşke adresleri.
 
@@ -360,11 +371,14 @@ Kullanıcı örnekleri:
 - Tıp Fakültesinde stajlar ne zaman başlıyor?
 - Tıp programının yapısı nasıl?
 - İlk 3 yıl ve son yıllar nasıl ayrılıyor?
+- tıp hastane kaçıncı sınıf
+- hasta başı eğitim kaçıncı sınıfta başlıyor?
+- Tıp öğrencileri hastaneye ne zaman geçiyor?
 
 Instructed cevap:
-Tıp eğitiminde ilk üç yıl preklinik dönemdir; Dönem I, II ve III'te ders kurulları ağırlıklı harmanlanmış/hibrit yapı bulunur.
+Tıp eğitiminde hastane/klinik dönem Dönem IV ve V'teki klinik stajlarla başlar; Dönem VI ise intörn hekimlik dönemidir.
 
-Dönem IV ve V klinik stajlardan oluşur. Dönem VI ise intörn hekimlik dönemidir. Eğitim modeli teorik bilgi, uygulama, klinik beceri, iletişim becerileri ve kanıta dayalı tıp yaklaşımını birlikte ele alır.
+İlk üç yıl preklinik dönemdir; Dönem I, II ve III'te ders kurulları ağırlıklı harmanlanmış/hibrit yapı bulunur. Eğitim modeli teorik bilgi, uygulama, klinik beceri, iletişim becerileri ve kanıta dayalı tıp yaklaşımını birlikte ele alır.
 
 Kaynak notu: Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi.
 
@@ -464,6 +478,8 @@ Kullanıcı örnekleri:
 - Tıp %50 indirimli kaç para?
 - Tıp burslu ücret öder mi?
 - Tıp İngilizce ücretli 2025 fiyatı nedir?
+- Tıp burslu öğrenciler ücret ödüyor mu?
+- Burslu tıp kaç para?
 
 Instructed cevap:
 2025 Tıp Fakültesi ücretleri şöyledir:
@@ -573,6 +589,9 @@ Kullanıcı örnekleri:
 - Hemşirelik var mı?
 - Dil ve Konuşma Terapisi var mı?
 - Sağlık alanında 4 yıllık hangi bölümler var?
+- SAY bölümleri hangileri?
+- sayısal sağlık bölümleri neler?
+- say puan türüyle hangi programlar var?
 
 Instructed cevap:
 Sağlık Bilimleri Fakültesinde şu lisans programları bulunur:
@@ -585,7 +604,7 @@ Sağlık Bilimleri Fakültesinde şu lisans programları bulunur:
 - Ebelik
 - Sağlık Yönetimi
 
-Hemşirelik, Beslenme ve Diyetetik, Dil ve Konuşma Terapisi, Fizyoterapi ve Rehabilitasyon, Ergoterapi ve Ebelik SAY puan türüyle; Sağlık Yönetimi EA puan türüyle listelenir. Yerleşke Bağlıca'dır.
+SAY puan türüyle Tıp Fakültesi programları ile Sağlık Bilimleri Fakültesindeki Hemşirelik, Beslenme ve Diyetetik, Dil ve Konuşma Terapisi, Fizyoterapi ve Rehabilitasyon, Ergoterapi ve Ebelik listelenir. Sağlık Yönetimi ise EA puan türündedir. Sağlık Bilimleri Fakültesi yerleşkesi Bağlıca'dır.
 
 Kaynak notu: Tanıtım broşürü program listeleri.
 
@@ -749,6 +768,8 @@ Kullanıcı örnekleri:
 - Eşit ağırlıkla hangi bölüm var?
 - Sağlık Yönetimi ücreti ne kadar?
 - Sağlık Yönetimi kontenjanı kaç?
+- ea var mı
+- eşit ağırlık bölümünüz var mı?
 
 Instructed cevap:
 Sağlık Bilimleri Fakültesinde EA puan türüyle listelenen program Sağlık Yönetimi'dir.
@@ -885,13 +906,20 @@ Kullanıcı örnekleri:
 - Laboratuvar teknikleri burslu var mı?
 - Tıbbi Laboratuvar %50 indirimli fiyat nedir?
 - Tıbbi Laboratuvar taban puanı kaç?
+- Laboratuvarda çalışmak istiyorum, hangi bölüm uygun?
+- Tıbbi Laboratuvar programı için laboratuvar var mı?
+- Laboratuvar ağırlıklı bölüm hangisi?
 
 Instructed cevap:
+Laboratuvar ağırlıklı bir ön lisans programı düşünüyorsan Tıbbi Laboratuvar Teknikleri bu alandaki doğrudan programlardan biridir.
+
 2025 Tıbbi Laboratuvar Teknikleri bilgileri şöyledir:
 
 - Tıbbi Laboratuvar Teknikleri (Ücretli): kontenjan 10, ücret 330.000 TL, 2024 taban puanı 263,122, başarı sırası 1.429.838
 - Tıbbi Laboratuvar Teknikleri (Burslu): kontenjan 9, ücret tutarı verilmez, 2024 taban puanı 334,689, başarı sırası 521.304
 - Tıbbi Laboratuvar Teknikleri (%50 İndirimli): kontenjan 55, ücret 165.000 TL, 2024 taban puanı 287,670, başarı sırası 1.050.102
+
+Fiziksel laboratuvar imkanı veya gezilebilir laboratuvar gibi tesis detaylarında doğrudan güncel bilgi gerekiyorsa ayrıca doğrulama yapılmalıdır.
 
 Kaynak notu: Tanıtım broşürü SHMYO tablosu.
 
@@ -1148,6 +1176,8 @@ Kullanıcı örnekleri:
 - kardeş bursu var mı?
 - burslar neler?
 - indirim var mı?
+- burslu öğrenciler ücret ödüyor mu?
+- burslu kontenjan ücretli mi?
 
 Instructed cevap:
 Yüksek İhtisas Üniversitesinde 2025-2026 için öne çıkan burs ve indirim başlıkları şunlardır:
@@ -1156,7 +1186,7 @@ Yüksek İhtisas Üniversitesinde 2025-2026 için öne çıkan burs ve indirim b
 - Tercih Bursu: 1. tercih %10, 2. tercih %7, 3. tercih %5 eğitim ücreti indirimi
 - Akademik Başarı Bursu: ücretli programlarda başarı koşullarını sağlayan öğrencilere sonraki yıl için %75 indirim
 
-Kardeş indirimi, şehit/gazi yakını indirimi veya sporcu bursu için net bir tutar ya da garanti bilgi veremem.
+Burslu kontenjanlarda ayrıca ücret tutarı verilmez; %50 indirimli satırlarda ücretin yarısı uygulanır. Kardeş indirimi, şehit/gazi yakını indirimi veya sporcu bursu için net bir tutar ya da garanti bilgi veremem.
 
 Kaynak notu: Tanıtım broşürü Burs İmkanları bölümü.
 
@@ -1430,11 +1460,13 @@ Kullanıcı örnekleri:
 - Ücreti ne zaman ödemem gerekiyor?
 - Kayıttan sonra bölüm değiştirebilir miyim?
 - ÖSYM kılavuzunda neye bakmalıyım?
+- kesin kayıt ne zaman?
+- kayıtlar hangi tarihte?
 
 Instructed cevap:
-Kayıt ve tercih sürecinde program adı, puan türü, kontenjan, burs/indirim türü, ücret, öğretim dili, hazırlık koşulu ve özel koşullar birlikte değerlendirilmelidir.
+Kayıt tarihleri ve kesin kayıt adımları dönemsel olarak güncellenir; bu yüzden kesin tarih için ilgili yılın ÖSYM kılavuzu ve üniversitenin güncel kayıt duyurusu esas alınmalıdır.
 
-Düşündüğün programı yazarsan kontenjan, ücret ve geçmiş yıl puan/sıra bilgisini birlikte özetleyebilirim. Son ve bağlayıcı bilgi tercih yılında yayımlanan ÖSYM kılavuzu ve üniversitenin güncel kayıt duyurularıdır.
+Düşündüğün programı yazarsan kontenjan, ücret, puan türü, öğretim dili, hazırlık koşulu ve özel koşulları birlikte özetleyebilirim.
 
 Kaynak notu: Ana web sitesi aday öğrenci ve ücret/kontenjan yönlendirmeleri, tanıtım broşürü, ÖSYM kılavuzu uyarıları.
 

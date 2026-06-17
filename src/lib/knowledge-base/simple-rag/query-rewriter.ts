@@ -76,7 +76,7 @@ function looksLikeKnowledgeQuestion(value: string) {
   if (!normalized) return false
   if (isConversationalDirectMessage(value) || isSensitiveActionBoundary(value)) return false
   if (/[?？]/u.test(value)) return true
-  return /\b(?:var mi|var mı|nerede|nereye|hangi|nedir|ne demek|nasil|nasıl|kac|kaç|ne kadar|mi|mı|mu|mü|misin|mısın|musun|müsün|miyim|mıyım|olur mu|veriyor musunuz|yapiliyor mu|yapılıyor mu|kullaniliyor mu|kullanılıyor mu|geciyor mu|geçiyor mu)\b/.test(normalized)
+  return /\b(?:varmi|var mi|var mı|nerde|nerede|nereye|hangi|nedir|ne demek|nasil|nasıl|kac|kaç|ne kadar|mi|mı|mu|mü|misin|mısın|musun|müsün|miyim|mıyım|olur mu|veriyor musunuz|yapiliyor mu|yapılıyor mu|kullaniliyor mu|kullanılıyor mu|geciyor mu|geçiyor mu)\b/.test(normalized)
 }
 
 function primaryOrganizationName(organizationContext?: string | null) {

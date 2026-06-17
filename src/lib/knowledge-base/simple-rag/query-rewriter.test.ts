@@ -194,6 +194,30 @@ describe('rewriteSimpleRagQuery', () => {
     })
   })
 
+  it('forces shorthand institutional fact responds back through retrieval', async () => {
+    const createCompletion = vi.fn(async () =>
+      completion({
+        status: 'respond',
+        response: 'Yüksek İhtisas Üniversitesi’nin kendi hastanesi bulunmaktadır.',
+        response_language: 'tr',
+      })
+    )
+
+    const result = await rewriteSimpleRagQuery({
+      latestUserMessage: 'hastaneniz varmı',
+      recentMessages: [],
+      organizationContext: 'Yüksek İhtisas Üniversitesi',
+      responseLanguage: 'tr',
+      createCompletion,
+    })
+
+    expect(result.plan).toEqual({
+      status: 'search',
+      standaloneQuery: 'Yüksek İhtisas Üniversitesi hastaneniz varmı',
+      responseLanguage: 'tr',
+    })
+  })
+
   it('bounds off-topic tutoring requests instead of treating them as chat', async () => {
     const createCompletion = vi.fn(async () =>
       completion({

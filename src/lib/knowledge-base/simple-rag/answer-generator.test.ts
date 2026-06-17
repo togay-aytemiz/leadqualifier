@@ -171,6 +171,37 @@ describe('generateSimpleRagAnswer', () => {
     })
   })
 
+  it('rejects device training location inferred from only program campus evidence', async () => {
+    const result = await generateSimpleRagAnswer({
+      latestUserMessage: 'Tıbbi Görüntüleme için cihaz eğitimi nerede veriliyor?',
+      standaloneQuery: 'Tıbbi Görüntüleme cihaz eğitimi nerede veriliyor?',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      chunks: [
+        {
+          id: 'C1',
+          fileId: 'file_1',
+          filename: 'campuses.md',
+          title: 'Program ve Yerleşke Eşleşmeleri',
+          score: 0.88,
+          content: 'Tıbbi Görüntüleme Teknikleri programı Balgat Yerleşkesinde yer almaktadır.',
+        },
+      ],
+      createCompletion: vi.fn(async () =>
+        completion({
+          status: 'answer',
+          answer: 'Tıbbi Görüntüleme cihaz eğitimi Balgat Yerleşkesinde verilmektedir.',
+          used_chunk_ids: ['C1'],
+        })
+      ),
+    })
+
+    expect(result).toMatchObject({
+      status: 'no_info',
+      reason: 'unsupported_facility_availability:cihaz egitimi',
+    })
+  })
+
   it('allows positive facility availability when support directly states quantity or availability', async () => {
     const localChunks = [
       {
