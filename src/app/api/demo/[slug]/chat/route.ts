@@ -63,7 +63,8 @@ const MIN_CONTEXTUAL_ANCHOR_TOKEN_COVERAGE = 2
 const DEMO_MAINTENANCE_RETRY_AFTER_SECONDS = 15 * 60
 const DEMO_CHAT_RAG_HISTORY_TURN_LIMIT = 10
 const DEMO_CHAT_RAG_HISTORY_QUERY_LIMIT = DEMO_CHAT_RAG_HISTORY_TURN_LIMIT + 2
-const DEMO_CHAT_IMMEDIATE_SKILL_MATCH_THRESHOLD = 0.6
+const DEMO_CHAT_SKILL_CANDIDATE_MATCH_THRESHOLD = 0.35
+const DEMO_CHAT_SKILL_CANDIDATE_LIMIT = 8
 
 type RouteContext = {
     params: Promise<{ slug: string }>
@@ -301,6 +302,84 @@ function buildDemoScopeHelpReply(message: string) {
 
 function demoKnowledgeQueryKey(value: string) {
     return normalizeDemoKnowledgeQuery(value).toLocaleLowerCase('tr-TR')
+}
+
+function demoKnowledgeTokenCount(value: string) {
+    return (normalizeDemoScopeHelpText(value).match(/[\p{L}\p{N}]{2,}/gu) ?? []).length
+}
+
+function isVagueDemoSkillCandidateQuery(value: string) {
+    const normalized = normalizeDemoScopeHelpText(value)
+    if (!normalized) return true
+
+    return /^(?:evet|olur|tamam|peki|ok|okay|devam|devam et|goster|göster|paylas|paylaş|anlat|bak|kontrol et|evet goster|evet göster|olur goster|olur göster|hadi goster|hadi göster|lutfen|lütfen)$/u.test(normalized)
+        || (
+            demoKnowledgeTokenCount(normalized) < 2
+            && !/\b(?:cap|çap|myo|tip|tıp)\b/u.test(normalized)
+        )
+}
+
+function isLikelyActionableDemoSkillQuestion(message: string, rewrittenQuery?: string | null) {
+    const combined = normalizeDemoScopeHelpText([
+        message,
+        rewrittenQuery ?? ''
+    ].filter(Boolean).join(' '))
+    if (!combined) return false
+
+    const tokenCount = demoKnowledgeTokenCount(combined)
+    if (tokenCount < 2) return false
+
+    const hasFactFacet = /\b(?:adres|akreditasyon|basari|başarı|basvuru|başvuru|bolum|bölüm|burs|cap|çap|cift|çift|denklik|diploma|ders|egitim|eğitim|fakulte|fakülte|fiyat|gecer|geçer|hangi|hazirlik|hazırlık|iletisim|iletişim|indirim|ingilizce|is|iş|kampus|kampüs|kayd|kayit|kayıt|kocluk|koçluk|kontenjan|laboratuvar|lisans|mavi|meslek|myo|nerede|neresi|odeme|ödeme|ogrenci|öğrenci|onlisans|önlisans|para|program|puan|sira|sıra|siralam|sıralam|staj|sure|süre|taban|telefon|tip|tıp|turkce|türkçe|ucret|ücret|ulasim|ulaşım|var|yandal|yerleske|yerleşke|yil|yıl)\b/u.test(combined)
+    const asksFactQuestion = /(?:\?| nedir\b| ne kadar\b| kac\b| kaç\b| nerede\b| neresi\b| var mi\b| var mı\b| olur mu\b| yapabilir miyim\b| alabilir miyim\b)/u.test(combined)
+
+    return tokenCount >= 3 && (hasFactFacet || asksFactQuestion)
+}
+
+function buildDemoSkillCandidateSearchQueries(input: {
+    message: string
+    rewrite: DemoSkillQueryRewriteResult
+}) {
+    const queries: string[] = []
+    const rewrittenQuery = input.rewrite.query.trim()
+    const rewrittenQueryIsUseful = rewrittenQuery && !isVagueDemoSkillCandidateQuery(rewrittenQuery)
+    const shouldUseRewrite = rewrittenQueryIsUseful && (
+        !input.rewrite.needsClarification
+        || input.rewrite.decision === 'accepted_previous_offer'
+        || isLikelyActionableDemoSkillQuestion(input.message, rewrittenQuery)
+    )
+
+    if (shouldUseRewrite) queries.push(rewrittenQuery)
+
+    const originalMessageIsUseful = !isVagueDemoSkillCandidateQuery(input.message)
+        && isLikelyActionableDemoSkillQuestion(input.message, rewrittenQuery)
+    if (input.rewrite.decision !== 'accepted_previous_offer' && originalMessageIsUseful) {
+        queries.push(input.message)
+    }
+
+    const seen = new Set<string>()
+    return queries.filter((query) => {
+        const key = demoKnowledgeQueryKey(query)
+        if (!key || seen.has(key)) return false
+        seen.add(key)
+        return true
+    })
+}
+
+function mergeDemoSkillCandidates(groups: SkillMatch[][]) {
+    const bySkillId = new Map<string, SkillMatch>()
+
+    for (const group of groups) {
+        for (const candidate of group) {
+            const existing = bySkillId.get(candidate.skill_id)
+            if (!existing || candidate.similarity > existing.similarity) {
+                bySkillId.set(candidate.skill_id, candidate)
+            }
+        }
+    }
+
+    return Array.from(bySkillId.values())
+        .sort((left, right) => right.similarity - left.similarity)
+        .slice(0, DEMO_CHAT_SKILL_CANDIDATE_LIMIT)
 }
 
 function hasDemoCompoundQuestionSignal(part: string) {
@@ -1882,40 +1961,41 @@ async function tryIntentAwareDemoSkillReply(input: {
 
     const rewrittenQuery = rewrite?.query.trim()
     if (!rewrite || !rewrittenQuery) return null
-    if (rewrite.needsClarification) return null
-    if (
-        rewrite.decision === 'unresolved'
-        && demoKnowledgeQueryKey(rewrittenQuery) === demoKnowledgeQueryKey(input.message)
-    ) {
-        return null
-    }
 
-    const candidateResult = await matchSkillsWithStatus({
-        matcher: () => matchSkills(
-            rewrittenQuery,
-            input.channel.organizationId,
-            DEMO_CHAT_IMMEDIATE_SKILL_MATCH_THRESHOLD,
-            3,
-            input.supabase
-        ),
-        context: {
-            organization_id: input.channel.organizationId,
-            source: 'demo_chat_post_intent_candidates'
-        },
-        intentGate: {
-            message: rewrittenQuery,
-            threshold: DEMO_CHAT_IMMEDIATE_SKILL_MATCH_THRESHOLD
-        }
+    const candidateQueries = buildDemoSkillCandidateSearchQueries({
+        message: input.message,
+        rewrite
     })
-    if (candidateResult.status !== 'matched') return null
+    if (candidateQueries.length === 0) return null
+
+    const candidateGroups = await Promise.all(candidateQueries.map(async (candidateQuery) => {
+        const candidateResult = await matchSkillsWithStatus({
+            matcher: () => matchSkills(
+                candidateQuery,
+                input.channel.organizationId,
+                DEMO_CHAT_SKILL_CANDIDATE_MATCH_THRESHOLD,
+                DEMO_CHAT_SKILL_CANDIDATE_LIMIT,
+                input.supabase
+            ),
+            context: {
+                organization_id: input.channel.organizationId,
+                source: 'demo_chat_post_intent_candidates',
+                candidate_query: candidateQuery
+            }
+        })
+        return candidateResult.matches
+    }))
+
+    const candidates = mergeDemoSkillCandidates(candidateGroups)
+    if (candidates.length === 0) return null
 
     try {
         const verificationPromise = verifyDemoSkillCandidates({
             latestUserMessage: input.message,
-            standaloneQuery: rewrittenQuery,
+            standaloneQuery: candidateQueries[0] ?? rewrittenQuery,
             subject: rewrite.subject,
             facet: rewrite.facet,
-            candidates: candidateResult.matches,
+            candidates,
         })
         const verificationResult = await waitForPipelineResult(
             verificationPromise,

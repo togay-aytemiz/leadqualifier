@@ -20,6 +20,7 @@ export type DemoSkillCandidateVerificationResult = {
     decision: 'skill' | 'no_skill'
     match: SkillMatch | null
     confidence: number
+    coverage: 'direct' | 'partial' | 'none'
     reason: string
     model: string
     usage: {
@@ -30,7 +31,7 @@ export type DemoSkillCandidateVerificationResult = {
 }
 
 const DEFAULT_MODEL = 'gpt-4.1-mini'
-const MAX_CANDIDATES = 5
+const MAX_CANDIDATES = 10
 const MAX_TEXT_CHARS = 600
 
 function normalizeText(value: unknown, maxLength: number) {
@@ -64,14 +65,21 @@ async function defaultCompletion(args: Record<string, unknown>) {
 
 function systemPrompt() {
     return [
-        'Select an approved Skill only when it directly answers the user requested subject and facet.',
-        'Compare meaning, not just shared words or broad topic similarity.',
+        'Select the best approved Skill for the latest user message.',
+        'A Skill is eligible only when the supplied Skill response itself directly answers the requested subject and facet.',
+        'Prefer a supplied Skill when its reusable intent answer directly covers the requested subject and facet, even if wording is not exact.',
+        'Compare meaning, requested fact family, and entity, not just shared words or broad topic similarity.',
         'A matching subject with the wrong facet is NO_SKILL. A matching facet for the wrong program, department, service, or entity is NO_SKILL.',
+        'Do not substitute a parent or nearby entity for a more specific requested entity. A university-level answer does not answer a faculty, hospital, campus, department, program, dorm, event, or service question unless that exact entity is covered.',
+        'If the Skill is only a nearby topic, broad background, or would require extra retrieval to answer the actual question, it is NO_SKILL.',
+        'If the user asks a specific detail and the Skill response does not contain that detail or a clear equivalent, it is NO_SKILL.',
+        'Do not reject a useful Skill merely because the user omitted the active organization name, year, or a narrower filter such as burs type. The Skill can answer generally when its response covers the family of facts.',
+        'If the user asks whether something exists, how many, where, how much, duration, quota, score/rank, registration, policy, contact, campus, curriculum, internship, or career information, select the Skill that answers that facet for that entity.',
         'Do not choose the nearest candidate merely because candidates were supplied.',
         'When none directly fits, return skill_id null. This is the normal safe result, not an error.',
         'Do not answer the user question.',
         'Return JSON only:',
-        '{"skill_id":"candidate-id or null","confidence":0.0,"reason":"short reason"}',
+        '{"skill_id":"candidate-id or null","coverage":"direct|partial|none","confidence":0.0,"reason":"short reason"}',
     ].join('\n')
 }
 
@@ -121,15 +129,20 @@ export async function verifyDemoSkillCandidates(input: {
     const record = payload as Record<string, unknown>
     const rawSkillId = record.skill_id ?? record.skillId
     const skillId = typeof rawSkillId === 'string' ? rawSkillId.trim() : null
+    const rawCoverage = typeof record.coverage === 'string' ? record.coverage.trim().toLowerCase() : ''
+    const coverage = rawCoverage === 'direct' || rawCoverage === 'partial' || rawCoverage === 'none'
+        ? rawCoverage
+        : (skillId ? 'direct' : 'none')
     const confidence = normalizeConfidence(record.confidence)
     const reason = normalizeText(record.reason, 300) || 'No reason provided.'
     const usage = normalizeUsage(completion.usage)
 
-    if (!skillId) {
+    if (!skillId || coverage !== 'direct') {
         return {
             decision: 'no_skill',
             match: null,
             confidence,
+            coverage: coverage === 'direct' ? 'none' : coverage,
             reason,
             model,
             usage,
@@ -143,6 +156,7 @@ export async function verifyDemoSkillCandidates(input: {
         decision: 'skill',
         match,
         confidence,
+        coverage,
         reason,
         model,
         usage,

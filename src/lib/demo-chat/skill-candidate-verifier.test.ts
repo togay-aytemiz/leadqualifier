@@ -74,6 +74,36 @@ describe('verifyDemoSkillCandidates', () => {
         })
     })
 
+    it('treats partial coverage as no skill even when a candidate id is returned', async () => {
+        const createCompletion = vi.fn().mockResolvedValue({
+            choices: [{
+                message: {
+                    content: JSON.stringify({
+                        skill_id: 'skill-anesthesia',
+                        coverage: 'partial',
+                        confidence: 0.88,
+                        reason: 'The candidate is related to the program but does not answer the specific requested detail.',
+                    }),
+                },
+            }],
+        })
+
+        const result = await verifyDemoSkillCandidates({
+            latestUserMessage: 'Anestezi staj yerini üniversite mi ayarlıyor?',
+            standaloneQuery: 'Anestezi programında staj yerini üniversite mi ayarlıyor?',
+            subject: 'Anestezi programı',
+            facet: 'staj yerini kimin ayarladığı',
+            candidates,
+            createCompletion,
+        })
+
+        expect(result).toMatchObject({
+            decision: 'no_skill',
+            match: null,
+            coverage: 'partial',
+        })
+    })
+
     it('rejects ids that were not supplied as candidates', async () => {
         const createCompletion = vi.fn().mockResolvedValue({
             choices: [{
