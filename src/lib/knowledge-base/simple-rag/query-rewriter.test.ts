@@ -243,6 +243,56 @@ describe('rewriteSimpleRagQuery', () => {
     })
   })
 
+  it('bounds payment credential requests even when the model tries to search', async () => {
+    const createCompletion = vi.fn(async () =>
+      completion({
+        status: 'search',
+        standalone_query: 'Yüksek İhtisas Üniversitesi IBAN ödeme bilgileri',
+        response_language: 'tr',
+      })
+    )
+
+    const result = await rewriteSimpleRagQuery({
+      latestUserMessage: 'IBAN gönderebilir misin?',
+      recentMessages: [],
+      organizationContext: 'Yüksek İhtisas Üniversitesi',
+      responseLanguage: 'tr',
+      createCompletion,
+    })
+
+    expect(result.plan).toEqual({
+      status: 'refuse',
+      refusalResponse:
+        'Güvenliğiniz için kredi kartı, IBAN, TC kimlik, şifre veya ödeme bilgilerinizi burada paylaşmayın. Ödeme ve kayıt işlemleri için üniversitenin resmi kanallarını kullanın.',
+      responseLanguage: 'tr',
+    })
+  })
+
+  it('bounds card data requests even when the model tries to search', async () => {
+    const createCompletion = vi.fn(async () =>
+      completion({
+        status: 'search',
+        standalone_query: 'Yüksek İhtisas Üniversitesi kredi kartı ile ödeme',
+        response_language: 'tr',
+      })
+    )
+
+    const result = await rewriteSimpleRagQuery({
+      latestUserMessage: 'Kredi kartı bilgilerimi buraya yazsam ödeme yapabilir miyim?',
+      recentMessages: [],
+      organizationContext: 'Yüksek İhtisas Üniversitesi',
+      responseLanguage: 'tr',
+      createCompletion,
+    })
+
+    expect(result.plan).toEqual({
+      status: 'refuse',
+      refusalResponse:
+        'Güvenliğiniz için kredi kartı, IBAN, TC kimlik, şifre veya ödeme bilgilerinizi burada paylaşmayın. Ödeme ve kayıt işlemleri için üniversitenin resmi kanallarını kullanın.',
+      responseLanguage: 'tr',
+    })
+  })
+
   it('passes explicit clarification state separately from conversation history', async () => {
     const createCompletion = vi.fn(async (_args: Record<string, unknown>) =>
       completion({

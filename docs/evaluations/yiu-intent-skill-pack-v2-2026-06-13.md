@@ -55,6 +55,9 @@ Kullanıcı örnekleri:
 - Bu üniversiteyi kısaca anlatır mısın?
 - Yüksek İhtisas özel mi?
 - Üniversitenizin geçmişi nedir?
+- Vakıf üniversitesi mi?
+- Hangi şehirde?
+- Sağlık üniversitesi mi?
 
 Instructed cevap:
 Yüksek İhtisas Üniversitesi, Ankara'da bulunan bir vakıf üniversitesidir. Sağlık alanındaki birikimini tıp, sağlık bilimleri, spor bilimleri ve meslek yüksekokulu programlarıyla eğitim ve araştırmaya taşır.
@@ -75,8 +78,12 @@ Kullanıcı örnekleri:
 - Akademik birimleriniz neler?
 - YİÜ'de hangi okullar bulunuyor?
 - Fakülte ve yüksekokulları sayar mısın?
-- say bölümleri
-- sayısal bölümleriniz neler?
+- Bölümleriniz neler?
+- Hangi programlar var?
+- Lisans bölümleri hangileri?
+- 4 yıllık bölümleriniz neler?
+- Üniversitenizde hangi meslek yüksekokulları var?
+- Hangi MYO'lar var?
 
 Instructed cevap:
 Yüksek İhtisas Üniversitesinde öne çıkan akademik birimler şunlardır:
@@ -111,6 +118,11 @@ Kullanıcı örnekleri:
 - bağlum kampüs nerede?
 - baglum kampus
 - 100. yıl yerleşkesine nasıl giderim?
+- okul nerede?
+- adresiniz nedir?
+- kampusler
+- Ankara'da mısınız?
+- hangi şehirde eğitim veriyorsunuz?
 
 Instructed cevap:
 Yüksek İhtisas Üniversitesinin Ankara'da birden fazla yerleşkesi bulunur:
@@ -136,6 +148,11 @@ Kullanıcı örnekleri:
 - Tıp Fakültesi adresi nedir?
 - Tıp nerede okunuyor?
 - İngilizce Tıp hangi yerleşkede?
+- tip nerde
+- tıp hangi kampüs
+- tıp adres
+- Türkçe Tıp nerede?
+- Tıp İngilizce nerede?
 
 Instructed cevap:
 Tıp Fakültesi 100. Yıl / İşçi Blokları Yerleşkesindedir.
@@ -158,6 +175,11 @@ Kullanıcı örnekleri:
 - Hemşirelik hangi kampüste?
 - Dil ve Konuşma Terapisi hangi yerleşkede?
 - Sağlık Bilimleri adresi nedir?
+- sağlık fakültesi nerde
+- FTR hangi kampüste?
+- Ergoterapi nerede?
+- Ebelik hangi kampüste?
+- Sağlık Yönetimi hangi yerleşkede?
 
 Instructed cevap:
 Sağlık Bilimleri Fakültesi programları için Bağlıca Yerleşkesi kullanılır.
@@ -185,6 +207,11 @@ Kullanıcı örnekleri:
 - tlt hangi kampüste?
 - bağlum kampüste hangi programlar var?
 - baglum kampus hangi bölümler?
+- Tıbbi Görüntüleme hangi kampüste?
+- Biyomedikal hangi yerleşkede?
+- Optisyenlik nerede?
+- Anestezi nerde?
+- İlk Acil hangi kampüs?
 
 Instructed cevap:
 Sağlık Hizmetleri Meslek Yüksekokulu programları iki yerleşkeye dağılır:
@@ -222,6 +249,11 @@ Kullanıcı örnekleri:
 - myo nerde
 - myo kampüsü neresi?
 - grafik tasarım nerede?
+- Balgat Yerleşkesinde hangi bölümler var?
+- balgat kampüs bölümleri
+- Balgat'ta hangi programlar var?
+- Antrenörlük nerede?
+- Spor kampüsü nerede?
 
 Instructed cevap:
 Meslek Yüksekokulu ve Spor Bilimleri Fakültesi Balgat Yerleşkesindedir.
@@ -244,6 +276,11 @@ Kullanıcı örnekleri:
 - YİÜ iletişim bilgisi verir misin?
 - Tıp Fakültesi öğrenci işleri numarası var mı?
 - Üniversiteye nasıl ulaşabilirim?
+- Öğrenci işleri telefon numarası nedir?
+- telefon numarası
+- iletişim numarası
+- kayıt ofisi telefonu
+- öğrenci işleri no
 
 Instructed cevap:
 Genel iletişim için ana telefon numarası 0 (312) 329 10 10'dur.
@@ -268,6 +305,12 @@ Kullanıcı örnekleri:
 - Yurt ücretleri nerede yazıyor?
 - Şehir dışından gelenler nerede kalıyor?
 - KYK yurdu var mı?
+- Apart var mı?
+- Kampüs çevresinde apart var mı?
+- Yurt garantisi var mı?
+- Yakınlarda KYK var mı?
+- Konaklama ücretleri belli mi?
+- Kampüs içinde yurt var mı?
 
 Instructed cevap:
 Yurt/konaklama için garanti edilen bir yurt adı, kontenjan veya ücret bilgisi paylaşmak doğru olmaz.
@@ -290,6 +333,13 @@ Kullanıcı örnekleri:
 - Bağlum'a nasıl ulaşırım?
 - 100. Yıl Yerleşkesine nasıl giderim?
 - Kampüsten hastaneye servis var mı?
+- servis güzergahları nereden geçiyor?
+- ring var mı?
+- metro ile gidilir mi?
+- toplu taşıma var mı?
+- hastaneye toplu taşıma var mı?
+- Servis ücretli mi?
+- Kampüsler arası servis var mı?
 
 Instructed cevap:
 Yerleşke adreslerini net olarak paylaşabilirim; ancak servis/ring güzergahı, saatleri veya servis varlığı için kesin bilgi vermem doğru olmaz.
@@ -310,6 +360,9 @@ Kullanıcı örnekleri:
 - Yüksek İhtisas Tıp nasıl bir fakülte?
 - Tıp Fakültenizi anlatır mısınız?
 - Neden Yüksek İhtisas Tıp?
+- Tıp iyi mi?
+- Neden YİÜ Tıp?
+- Tıp eğitimi güçlü mü?
 
 Instructed cevap:
 Yüksek İhtisas Üniversitesi Tıp Fakültesi; entegre teorik ve pratik eğitim, Probleme Dayalı Öğrenim, Klinik Beceri Eğitimi, İletişim Becerileri Eğitimi, Kanıta Dayalı Tıp Eğitimi, modern laboratuvarlar, kadavra diseksiyonu ve multidisipliner laboratuvar uygulamalarıyla tanıtılır.
@@ -331,6 +384,10 @@ Kullanıcı örnekleri:
 - İngilizce Tıp var mı?
 - Türkçe Tıp var mı?
 - Tıp programının dili nedir?
+- tıp var mı
+- tip varmi
+- tıp tr mi ing mi?
+- tıp Türkçe İngilizce seçenekleri var mı?
 
 Instructed cevap:
 Yüksek İhtisas Üniversitesinde Tıp Fakültesi için Türkçe ve İngilizce program seçenekleri bulunur.
@@ -351,6 +408,10 @@ Kullanıcı örnekleri:
 - YİÜ Tıp kaç senelik?
 - Tıp okumak kaç yıl sürüyor?
 - Tıp Fakültesi 6 yıl mı?
+- tıp kaç yıllık
+- tip kac yil
+- hazırlık dahil kaç yıl?
+- İngilizce Tıp kaç yıl?
 
 Instructed cevap:
 Tıp Fakültesi eğitimi hazırlık sınıfı hariç 6 yıldır.
@@ -374,6 +435,10 @@ Kullanıcı örnekleri:
 - tıp hastane kaçıncı sınıf
 - hasta başı eğitim kaçıncı sınıfta başlıyor?
 - Tıp öğrencileri hastaneye ne zaman geçiyor?
+- klinik staj kaçıncı sınıfta?
+- stajlar kaçıncı sınıfta başlıyor?
+- tıp öğrencileri hasta görüyor mu?
+- hasta başı eğitim var mı?
 
 Instructed cevap:
 Tıp eğitiminde hastane/klinik dönem Dönem IV ve V'teki klinik stajlarla başlar; Dönem VI ise intörn hekimlik dönemidir.
@@ -397,6 +462,10 @@ Kullanıcı örnekleri:
 - kadavra varmı
 - anatomi lab var mı?
 - maket varmı?
+- kadavra görüyor muyuz?
+- diseksiyon yapılıyor mu?
+- anatomi maketi var mı?
+- tıpta kadavra var mı?
 
 Instructed cevap:
 Evet, Tıp Fakültesinde anatomi laboratuvarı, kadavra diseksiyonu imkanı ve maketlerle uygulama başlıkları bulunur.
@@ -417,6 +486,9 @@ Kullanıcı örnekleri:
 - Birinci sınıftan uygulama oluyor mu?
 - Tıp öğrencileri klinik beceri öğreniyor mu?
 - Klinik Beceri Eğitimi ne demek?
+- klinik uygulama eğitimi var mı?
+- pratik ders var mı?
+- hasta başı beceri öğretiliyor mu?
 
 Instructed cevap:
 Evet, Tıp Fakültesinde Klinik Beceri Eğitimi ayrı bir başlıktır.
@@ -480,6 +552,11 @@ Kullanıcı örnekleri:
 - Tıp İngilizce ücretli 2025 fiyatı nedir?
 - Tıp burslu öğrenciler ücret ödüyor mu?
 - Burslu tıp kaç para?
+- tıp kaç para
+- tip ücret
+- tıp ing kaç para
+- tıp tr fiyat
+- tıp %50 kaç tl
 
 Instructed cevap:
 2025 Tıp Fakültesi ücretleri şöyledir:
@@ -508,6 +585,10 @@ Kullanıcı örnekleri:
 - Tıp burslu kontenjan kaç?
 - İngilizce Tıp %50 indirimli kontenjanı nedir?
 - Tıp ücretli kontenjan kaç?
+- tıp kaç kişi alıyor
+- tip kontenjan
+- tıp burslu kaç kişi
+- tıp ing kontenjan
 
 Instructed cevap:
 2025 Tıp Fakültesi kontenjanları şöyledir:
@@ -539,6 +620,11 @@ Kullanıcı örnekleri:
 - Tıp burslu kaç binle almış?
 - Tıp ücretli kaç puanla almış?
 - Tıp %50 indirimli taban puanı nedir?
+- tıp sıralamaları nedir?
+- tıp başarı sıralamaları
+- tıp kaç binle alıyor?
+- tıp tr sıralama
+- tıp ing sıralama
 
 Instructed cevap:
 2024 yerleşme verilerine göre Tıp Fakültesi taban puanı ve başarı sırası şöyledir:
@@ -569,6 +655,9 @@ Kullanıcı örnekleri:
 - hazırlık varmı
 - tıp ing hazırlık var mı?
 - hazırlık sınıfı var mı?
+- hazırlığı geçemezsem ne olur?
+- hazırlık geçme şartı nedir?
+- hazırlık zorunlu mu?
 
 Instructed cevap:
 Tıp Fakültesi için 2025 hazırlık ücreti 410.000 TL olarak verilir.
@@ -592,6 +681,11 @@ Kullanıcı örnekleri:
 - SAY bölümleri hangileri?
 - sayısal sağlık bölümleri neler?
 - say puan türüyle hangi programlar var?
+- SAY puan türüyle hangi bölümler var?
+- say var mı
+- sayısal var mı?
+- 4 yıllık sayısal bölümler
+- lisans sağlık bölümleri
 
 Instructed cevap:
 Sağlık Bilimleri Fakültesinde şu lisans programları bulunur:
@@ -649,6 +743,11 @@ Kullanıcı örnekleri:
 - Hemşirelik burslu var mı?
 - Hemşirelik %50 indirimli fiyatı nedir?
 - Hemşirelik taban puanı kaç?
+- hemşirelik var mı
+- hemşirelik kaç tl
+- hemşirelik sıralama
+- hemşirelik kaç kişi
+- Hemşirelik kontenjanı nedir?
 
 Instructed cevap:
 2025 Hemşirelik bilgileri şöyledir:
@@ -671,6 +770,10 @@ Kullanıcı örnekleri:
 - Dil konuşma burslu var mı?
 - DKT %50 indirimli fiyatı nedir?
 - Dil ve Konuşma Terapisi taban puanı kaç?
+- dkt var mı
+- DKT kaç para?
+- konuşma terapisi var mı?
+- dil konuşma terapisi sıralama
 
 Instructed cevap:
 2025 Dil ve Konuşma Terapisi bilgileri şöyledir:
@@ -693,6 +796,10 @@ Kullanıcı örnekleri:
 - Fizyoterapi lisans mı?
 - FTR burslu var mı?
 - Fizyoterapi taban puanı kaç?
+- ftr var mı
+- ftr kaç para
+- fizyoterapi ve rehabilitasyon var mı?
+- ftr sıralama
 
 Instructed cevap:
 2025 Fizyoterapi ve Rehabilitasyon lisans bilgileri şöyledir:
@@ -717,6 +824,10 @@ Kullanıcı örnekleri:
 - Beslenme burslu var mı?
 - Beslenme %50 indirimli fiyatı nedir?
 - Beslenme ve Diyetetik taban puanı kaç?
+- beslenme var mı
+- diyetetik var mı
+- diyetisyenlik var mı
+- beslenme kaç para
 
 Instructed cevap:
 2025 Beslenme ve Diyetetik bilgileri şöyledir:
@@ -740,6 +851,10 @@ Kullanıcı örnekleri:
 - Ebelik kontenjanı kaç?
 - Ebelik burslu var mı?
 - Ergoterapi taban puanı neden yok?
+- ergoterapi var mı
+- ebelik var mı
+- ergoterapi kaç para
+- ebelik sıralama
 
 Instructed cevap:
 2025 Ergoterapi ve Ebelik bilgileri şöyledir:
@@ -770,6 +885,10 @@ Kullanıcı örnekleri:
 - Sağlık Yönetimi kontenjanı kaç?
 - ea var mı
 - eşit ağırlık bölümünüz var mı?
+- ea bölümleri
+- eşit ağırlık var mı?
+- sağlık yönetimi ea mı?
+- Sağlık Yönetimi bölümü var mı?
 
 Instructed cevap:
 Sağlık Bilimleri Fakültesinde EA puan türüyle listelenen program Sağlık Yönetimi'dir.
@@ -793,6 +912,11 @@ Kullanıcı örnekleri:
 - TYT sağlık programları hangileri?
 - Anestezi var mı?
 - İlk ve Acil Yardım var mı?
+- TYT bölümleri neler?
+- 2 yıllık bölümleriniz neler?
+- ön lisans sağlık bölümleri
+- tyt var mı
+- sağlık ön lisans programları
 
 Instructed cevap:
 Sağlık Hizmetleri Meslek Yüksekokulunda şu ön lisans programları bulunur:
@@ -826,6 +950,10 @@ Kullanıcı örnekleri:
 - Anestezi ve ameliyathane kaç TL?
 - Sağlık meslek yüksekokulu fiyatları nedir?
 - TYT sağlık programlarında %50 indirimli fiyat ne?
+- shmyo kaç para
+- sağlık hizmetleri myo ücret
+- 2 yıllık sağlık ücretleri
+- tyt sağlık ücretleri
 
 Instructed cevap:
 2025 Sağlık Hizmetleri Meslek Yüksekokulu ücretleri programlara göre değişir.
@@ -859,6 +987,10 @@ Kullanıcı örnekleri:
 - Anestezi burslu var mı?
 - Anestezi %50 indirimli fiyat nedir?
 - Anestezi taban puanı kaç?
+- anestezi var mı
+- anestezi kaç tl
+- anestezi sıralama
+- anestezi kaç kişi
 
 Instructed cevap:
 2025 Anestezi bilgileri şöyledir:
@@ -882,6 +1014,13 @@ Kullanıcı örnekleri:
 - Paramedik programı var mı?
 - İlk ve Acil Yardım burslu kaç kişi?
 - İlk ve Acil Yardım %50 indirimli fiyatı nedir?
+- paramedik kaç para
+- paramedik kontenjan
+- ilk acil kaç tl
+- ilk yardım var mı
+- ilkyardım ücret
+- ilk yardım ücret
+- ilk acil ücret
 
 Instructed cevap:
 2025 İlk ve Acil Yardım bilgileri şöyledir:
@@ -909,6 +1048,10 @@ Kullanıcı örnekleri:
 - Laboratuvarda çalışmak istiyorum, hangi bölüm uygun?
 - Tıbbi Laboratuvar programı için laboratuvar var mı?
 - Laboratuvar ağırlıklı bölüm hangisi?
+- tlt kaç para
+- tıbbi lab kontenjan
+- laboratuvar teknikleri kaç tl
+- tıbbi laboratuvar var mı
 
 Instructed cevap:
 Laboratuvar ağırlıklı bir ön lisans programı düşünüyorsan Tıbbi Laboratuvar Teknikleri bu alandaki doğrudan programlardan biridir.
@@ -935,6 +1078,10 @@ Kullanıcı örnekleri:
 - Ameliyathane burslu var mı?
 - Ameliyathane %50 indirimli fiyat nedir?
 - Ameliyathane taban puanı kaç?
+- ameliyathane var mı
+- ameliyathane kaç tl
+- ameliyathane sıralama
+- ameliyathane kaç kişi
 
 Instructed cevap:
 2025 Ameliyathane Hizmetleri bilgileri şöyledir:
@@ -981,6 +1128,10 @@ Kullanıcı örnekleri:
 - Tıbbi Veri İşleme kontenjanı kaç?
 - Tıbbi Veri İşleme %50 fiyatı nedir?
 - Tele-Sağlık burslu kaç kişi?
+- tele sağlık var mı
+- tıbbi veri işleme kaç para
+- tele sağlık kaç tl
+- tıbbi veri kontenjan
 
 Instructed cevap:
 2025 Tele-Sağlık Teknikerliği ve Tıbbi Veri İşleme Teknikerliği için kontenjan ve ücret yapısı aynıdır:
@@ -1005,6 +1156,11 @@ Kullanıcı örnekleri:
 - Bilgisayar Programcılığı var mı?
 - Eczane Hizmetleri var mı?
 - Grafik Tasarım var mı?
+- myo bölümleri
+- 2 yıllık myo bölümleri
+- iç mekan tasarımı var mı?
+- ağız diş sağlığı var mı?
+- çocuk gelişimi var mı?
 
 Instructed cevap:
 Meslek Yüksekokulunda şu ön lisans programları bulunur:
@@ -1038,6 +1194,11 @@ Kullanıcı örnekleri:
 - grafik tasarım kaç tl
 - bilgisayar programcılığı var mı
 - myo ücretleri
+- bilgisayar kaç para
+- çocuk gelişimi kaç para
+- eczane hizmetleri kaç para
+- ağız diş sağlığı kaç para
+- iç mekan tasarımı kaç tl
 
 Instructed cevap:
 2025 Meslek Yüksekokulu ücretleri şöyledir:
@@ -1071,6 +1232,10 @@ Kullanıcı örnekleri:
 - Antrenörlük kaç para?
 - Spor Bilimleri kontenjanı kaç?
 - Antrenörlük TYT mi?
+- antrenörlük var mı
+- antrenörlük kaç tl
+- spor bilimleri kaç para
+- spor bölümü var mı?
 
 Instructed cevap:
 Spor Bilimleri Fakültesinde Antrenörlük Eğitimi programı bulunur ve TYT puan türüyle listelenir.
@@ -1099,6 +1264,10 @@ Kullanıcı örnekleri:
 - yks bursu kaç
 - sıralama bursu kaç
 - ilk bine burs var mı?
+- ilk 10000 bursu
+- derece bursu var mı?
+- yks derece bursu
+- başarı sırası bursu
 
 Instructed cevap:
 YKS Üstün Başarı Bursu başarı sırasına göre 8 ay karşılıksız burs imkanı sağlar.
@@ -1125,6 +1294,10 @@ Kullanıcı örnekleri:
 - İlk sıraya yazarsam indirim oluyor mu?
 - 2. tercih bursu kaç?
 - 3. tercihte indirim var mı?
+- ilk tercih bursu
+- tercih indirimi var mı?
+- 1. sıraya yazarsam indirim alır mıyım?
+- tercih sırası indirimi
 
 Instructed cevap:
 Evet, tercih bursu bulunur.
@@ -1150,6 +1323,10 @@ Kullanıcı örnekleri:
 - Tıp için akademik başarı bursu kaç GANO?
 - Başarı bursunda yüzde kaç indirim var?
 - Akademik başarı bursu şartları neler?
+- gano bursu var mı?
+- ortalama bursu
+- not ortalaması indirimi
+- başarılı öğrenci indirimi
 
 Instructed cevap:
 Akademik başarı bursu, ücretli programlara yerleşen öğrenciler için başarı durumuna bağlı indirim sağlar.
@@ -1178,6 +1355,12 @@ Kullanıcı örnekleri:
 - indirim var mı?
 - burslu öğrenciler ücret ödüyor mu?
 - burslu kontenjan ücretli mi?
+- burslu okuyunca ücret ödenir mi?
+- burslu fiyat var mı?
+- %50 indirim ne demek?
+- indirimli kontenjan nedir?
+- Burs imkanlarınız nelerdir?
+- %50 indirimli kontenjan ne demek?
 
 Instructed cevap:
 Yüksek İhtisas Üniversitesinde 2025-2026 için öne çıkan burs ve indirim başlıkları şunlardır:
@@ -1205,6 +1388,11 @@ Kullanıcı örnekleri:
 - çap var mı?
 - cap yapabiliyor muyum?
 - 2 yıllık çap var mı?
+- çift anadal ikinci diploma mı?
+- Çift anadal yapınca ikinci diploma alıyor muyum?
+- çap yapınca ikinci diploma alıyor muyum?
+- hangi programlarda çap var?
+- çap şartları neler?
 
 Instructed cevap:
 Ön lisans programlarında çift anadal imkanı bulunur.
@@ -1226,6 +1414,10 @@ Kullanıcı örnekleri:
 - Final sınavına girmeden sınıf geçmek mümkün mü?
 - Bütünleme final yerine geçer mi?
 - Tıp Fakültesinde bütünleme hakkı var mı?
+- tıp geçme notu
+- tıp bütünleme var mı?
+- finale girmeden geçilir mi?
+- kurul notu nedir?
 
 Instructed cevap:
 Tıp Fakültesinde ders kurulu, genel sınav ve bütünleme sınavı süreçleri ayrı değerlendirilir.
@@ -1266,6 +1458,10 @@ Kullanıcı örnekleri:
 - Dönem VI ne demek?
 - İntörn hekimler hangi stajları yapıyor?
 - İntörnlükte devam zorunlu mu?
+- stajda nöbet tutuluyor mu?
+- intörn nöbet tutar mı?
+- dönem 6 nöbet var mı?
+- tıp son sınıfta nöbet var mı?
 
 Instructed cevap:
 Tıp Fakültesinde 6. sınıf intörnlük dönemidir.
@@ -1412,6 +1608,10 @@ Kullanıcı örnekleri:
 - 2 yıllık fizyoterapi var mı?
 - FTR ile SHMYO Fizyoterapi farkı nedir?
 - Fizyoterapi hangi fakültede?
+- ftr ön lisans mı?
+- fizyoterapi 2 yıllık mı?
+- fizyoterapi ve rehabilitasyon 4 yıllık mı?
+- ftr ile fizyoterapi farkı
 
 Instructed cevap:
 Yüksek İhtisas Üniversitesinde iki farklı fizyoterapi programı vardır:
@@ -1439,6 +1639,10 @@ Kullanıcı örnekleri:
 - diploma eki veriyor musunuz?
 - diploma eki veriyor musunuz
 - diplomam avrupada geçerli mi?
+- diploma Avrupa'da geçerli mi?
+- mavi diploma var mı?
+- diplomanız geçerli mi?
+- denklik veriyor musunuz?
 
 Instructed cevap:
 Üniversitede diploma, diploma eki ve diğer mezuniyet belgeleriyle ilgili bir süreç bulunur.
@@ -1462,6 +1666,10 @@ Kullanıcı örnekleri:
 - ÖSYM kılavuzunda neye bakmalıyım?
 - kesin kayıt ne zaman?
 - kayıtlar hangi tarihte?
+- kayıt tarihleri belli mi?
+- kayıt ofisi nerede?
+- kayıt için ne lazım?
+- online kayıt var mı?
 
 Instructed cevap:
 Kayıt tarihleri ve kesin kayıt adımları dönemsel olarak güncellenir; bu yüzden kesin tarih için ilgili yılın ÖSYM kılavuzu ve üniversitenin güncel kayıt duyurusu esas alınmalıdır.
@@ -1483,6 +1691,10 @@ Kullanıcı örnekleri:
 - Final haftası ne zaman?
 - Yaz okulu tarihleri nerede yayınlanıyor?
 - Duyurulara nereden bakabilirim?
+- dersler ne zaman başlıyor?
+- kayıt takvimi nerede?
+- akademik takvim belli mi?
+- sınav takvimi nerede?
 
 Instructed cevap:
 Akademik takvim, sınav tarihleri, yaz öğretimi başvuruları ve benzeri güncel tarihler dönemsel olarak değişir.
@@ -1507,6 +1719,11 @@ Kullanıcı örnekleri:
 - kampüs yaşamı hakkında bilgi
 - kantin var mı?
 - kulüpler var mı?
+- yemek var mı?
+- yemekhane ücretli mi?
+- spor salonu var mı?
+- kampüste revir var mı?
+- öğrenci kulüpleri neler?
 
 Instructed cevap:
 Üniversitede kütüphane/dokümantasyon ve öğrenci topluluklarıyla ilgili düzenlenmiş süreçler bulunur.

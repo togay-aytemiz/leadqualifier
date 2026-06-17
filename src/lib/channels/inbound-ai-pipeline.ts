@@ -1016,8 +1016,13 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         }
     }
 
-    const sendOutboundAndCollectMetadata = async (content: OutboundMessageInput) => {
-        const activated = await activateOutboundTextContent(content)
+    const sendOutboundAndCollectMetadata = async (
+        content: OutboundMessageInput,
+        settings?: { skipInternalAgentActivation?: boolean }
+    ) => {
+        const activated = settings?.skipInternalAgentActivation
+            ? { content, metadata: {} }
+            : await activateOutboundTextContent(content)
         const outboundResult = await options.sendOutbound(activated.content)
         return {
             ...buildOutboundProviderMetadata(options.platform, outboundResult),
@@ -1219,7 +1224,9 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                 content: formattedSkillReply,
                 replyButtons
             })
-            : await sendOutboundAndCollectMetadata(formattedSkillReply)
+            : await sendOutboundAndCollectMetadata(formattedSkillReply, {
+                skipInternalAgentActivation: true
+            })
 
         await persistBotMessage(formattedSkillReply, {
             ...outboundMetadata,

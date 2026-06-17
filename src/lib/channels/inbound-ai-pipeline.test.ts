@@ -21,6 +21,8 @@ const {
     resolveOrganizationUsageEntitlementMock,
     resolveBotModeActionMock,
     resolveLeadExtractionAllowanceMock,
+    isInternalAgentActivationEnabledMock,
+    runInternalAgentActivatedTurnMock,
     runInternalAgentTurnShadowMock,
     runLeadExtractionMock,
     searchKnowledgeBaseMock
@@ -47,6 +49,8 @@ const {
     resolveOrganizationUsageEntitlementMock: vi.fn(),
     resolveBotModeActionMock: vi.fn(),
     resolveLeadExtractionAllowanceMock: vi.fn(),
+    isInternalAgentActivationEnabledMock: vi.fn(),
+    runInternalAgentActivatedTurnMock: vi.fn(),
     runInternalAgentTurnShadowMock: vi.fn(),
     runLeadExtractionMock: vi.fn(),
     searchKnowledgeBaseMock: vi.fn()
@@ -153,6 +157,12 @@ vi.mock('@/lib/ai/booking', () => ({
 
 vi.mock('@/lib/ai/agent/runtime-shadow', () => ({
     runInternalAgentTurnShadow: runInternalAgentTurnShadowMock
+}))
+
+vi.mock('@/lib/ai/agent/activation', () => ({
+    buildInternalAgentActivationRequest: vi.fn((input) => input),
+    isInternalAgentActivationEnabled: isInternalAgentActivationEnabledMock,
+    runInternalAgentActivatedTurn: runInternalAgentActivatedTurnMock
 }))
 
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
@@ -375,6 +385,17 @@ describe('processInboundAiPipeline guardrails', () => {
         delete process.env.OPENAI_RAG_MODEL
         delete process.env.INTERNAL_AGENT_SHADOW
         delete process.env.INTERNAL_AGENT_SHADOW_ORG_IDS
+        isInternalAgentActivationEnabledMock.mockReturnValue(false)
+        runInternalAgentActivatedTurnMock.mockImplementation(async (input) => ({
+            result: input.currentResult,
+            diagnostics: {
+                status: 'skipped',
+                activated: false,
+                fallbackToCurrent: true,
+                plannedTools: [],
+                claimCount: 0
+            }
+        }))
         afterCallbacks.length = 0
         afterMock.mockImplementation((callback: () => void | Promise<void>) => {
             afterCallbacks.push(callback)
@@ -753,6 +774,79 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(botInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({
             metadata: expect.objectContaining({
                 skill_id: 'skill-anesthesia',
+                skill_match_source: 'verified_preferred_match',
+            }),
+        }))
+    })
+
+    it('does not let internal agent activation override a matched skill response', async () => {
+        isInternalAgentActivationEnabledMock.mockReturnValue(true)
+        runInternalAgentActivatedTurnMock.mockResolvedValueOnce({
+            result: {
+                answer: 'Could you please clarify which facility or service you would like information about?',
+                refusal: false,
+                citations: [],
+                diagnostics: {}
+            },
+            diagnostics: {
+                status: 'completed',
+                decision: 'clarify',
+                reason: 'Specific facility or service is required for lookup.',
+                activated: true,
+                fallbackToCurrent: false,
+                plannedTools: [],
+                claimCount: 1
+            }
+        })
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation({
+            platform: 'demo_chat',
+            contact_phone: 'demo:demo-channel-1:session-1',
+        }))
+        const inboundInsert = createInsertBuilder()
+        const languageHistory = createMessageHistoryBuilder([])
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: false })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, languageHistory.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            skills: [skillDetails.builder],
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound, {
+            platform: 'demo_chat',
+            source: 'demo_chat',
+            contactId: 'demo:demo-channel-1:session-1',
+            inboundMessageId: 'demo-message-verified',
+            inboundMessageIdMetadataKey: 'demo_chat_message_id',
+            inboundMessageMetadata: {
+                demo_chat_message_id: 'demo-message-verified',
+                demo_chat_channel_id: 'demo-channel-1',
+                demo_chat_session_id: 'session-1',
+            },
+            preferredSkillMatch: {
+                skill_id: 'skill-myo',
+                title: 'MYO ve Spor Kampüsü',
+                response_text: 'Meslek Yüksekokulu ve Spor Bilimleri Fakültesi Balgat Yerleşkesindedir.',
+                trigger_text: 'myo nerde',
+                similarity: 0.9,
+            },
+            text: 'myo nerde',
+            logPrefix: 'Demo Chat',
+        } as never))
+
+        expect(runInternalAgentActivatedTurnMock).not.toHaveBeenCalled()
+        expect(sendOutbound).toHaveBeenCalledWith('Meslek Yüksekokulu ve Spor Bilimleri Fakültesi Balgat Yerleşkesindedir.')
+        expect(botInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({
+            sender_type: 'bot',
+            content: 'Meslek Yüksekokulu ve Spor Bilimleri Fakültesi Balgat Yerleşkesindedir.',
+            metadata: expect.objectContaining({
+                skill_id: 'skill-myo',
                 skill_match_source: 'verified_preferred_match',
             }),
         }))

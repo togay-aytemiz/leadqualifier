@@ -62,7 +62,13 @@ function isConversationalDirectMessage(value: string) {
 
 function isSensitiveActionBoundary(value: string) {
   const normalized = normalizeForIntent(value)
-  return /\b(?:kredi kart|kartimi|kartımı|tc kimlik|sifre|şifre|password|credit card|odeme al|ödeme al)\b/.test(normalized)
+  return /\b(?:iban(?:i)?|kredi kart\w*|kart\w*\s+bilg|kartimi|tc kimlik|sifre|password|credit card|payment detail|odeme bilg|odeme al)\b/.test(normalized)
+}
+
+function sensitiveActionRefusal(responseLanguage: MvpResponseLanguage) {
+  return responseLanguage === 'tr'
+    ? 'Güvenliğiniz için kredi kartı, IBAN, TC kimlik, şifre veya ödeme bilgilerinizi burada paylaşmayın. Ödeme ve kayıt işlemleri için üniversitenin resmi kanallarını kullanın.'
+    : 'For your safety, do not share credit card, IBAN, national ID, password, or payment details here. Please use the university’s official channels for payment and registration.'
 }
 
 function isOffTopicTutoringRequest(value: string) {
@@ -97,14 +103,22 @@ function fallbackStandaloneQuery(input: {
     : `${organization} ${message}`.trim()
 }
 
-function enforceRespondBoundary(input: {
+function enforcePlanBoundary(input: {
   plan: SimpleRagRewritePlan
   latestUserMessage: string
   organizationContext?: string | null
   responseLanguage: MvpResponseLanguage
 }): SimpleRagRewritePlan {
+  if (isSensitiveActionBoundary(input.latestUserMessage)) {
+    return {
+      status: 'refuse',
+      refusalResponse: sensitiveActionRefusal(input.responseLanguage),
+      responseLanguage: input.responseLanguage,
+    }
+  }
+
   if (input.plan.status !== 'respond') return input.plan
-  if (isConversationalDirectMessage(input.latestUserMessage) || isSensitiveActionBoundary(input.latestUserMessage)) {
+  if (isConversationalDirectMessage(input.latestUserMessage)) {
     return input.plan
   }
   if (isOffTopicTutoringRequest(input.latestUserMessage)) {
@@ -174,7 +188,7 @@ function systemPrompt(responseLanguage: MvpResponseLanguage) {
     'Return respond only for conversational messages that do not need knowledge-base facts, such as greetings, thanks, assistant identity, or general preference guidance. Never put organization facts in a respond result. For identity questions, use the provided assistant identity. If asked whether you are ChatGPT or a human, clearly say no and identify yourself as the configured AI assistant.',
     'If the latest question is already standalone, preserve its meaning and requested facet.',
     'Clarify only when an unresolved missing value materially changes what must be searched. Ask exactly one specific question.',
-    'Refuse only unsafe or prohibited requests, never an ordinary knowledge-base miss.',
+    'Refuse unsafe or prohibited requests, including payment credential collection or requests for card, IBAN, national ID, or password handling. Never refuse an ordinary knowledge-base miss.',
     `Default response language: ${responseLanguage}.`,
     'Return JSON only using one exact shape:',
     '{"status":"search","standalone_query":"...","response_language":"tr|en"}',
@@ -227,7 +241,7 @@ export async function rewriteSimpleRagQuery(input: {
   const payload = parseJsonObject(completion.choices?.[0]?.message?.content ?? '')
   const parsedPlan = parseSimpleRagRewritePlan(payload)
   const plan = parsedPlan
-    ? enforceRespondBoundary({
+    ? enforcePlanBoundary({
         plan: parsedPlan,
         latestUserMessage: input.latestUserMessage,
         organizationContext: input.organizationContext,

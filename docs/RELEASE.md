@@ -6,7 +6,15 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Changed matched Skill delivery so Internal Agent activation cannot overwrite a verified Skill response with a clarification/refusal/no-info boundary. This preserves approved Skill answers such as `myo nerde` after a Skill match while leaving non-Skill fallback/RAG activation available (`src/lib/channels/inbound-ai-pipeline.ts`, `src/lib/channels/inbound-ai-pipeline.test.ts`).
+- Changed the simple RAG query rewriter to refuse IBAN, credit card, TC identity, password, and payment-detail handling requests before retrieval, even when the planner attempts a search (`src/lib/knowledge-base/simple-rag/query-rewriter.ts`, `src/lib/knowledge-base/simple-rag/query-rewriter.test.ts`).
+
 ### Added
+
+- Added a YİÜ same-seed random 100 routing eval after the Skill phrase cleanup and matched-Skill runtime fix. The run completed `100/100` with `0` errors and route counts of `34` Skill answers, `40` grounded RAG answers, `10` clarifications, `10` no-info replies, `5` refusals, and `1` assistant identity reply; the report includes a manual Codex review of remaining no-info, matcher-miss, and RAG over-inference risks (`docs/evaluations/yiu-routing-random-100-2026-06-17T20-45-35-256Z.md`).
+- Added focused YİÜ Skill phrase/overlap cleanup for campus, yurt, ulaşım, SAY/EA, Hemşirelik, İlk ve Acil Yardım, burs, ÇAP, and MYO questions. The production demo skill push updated `9` skills and refreshed `656` embedding rows (`docs/evaluations/yiu-intent-skill-pack-v2-2026-06-13.md`).
 
 - Added a focused YİÜ quality hardening pass for the simple Public Demo RAG and Skill pack. Shorthand institutional fact prompts such as `hastaneniz varmı` are now forced through retrieval instead of source-less direct response, and facility/equipment training-location claims now require direct support even for `nerede veriliyor` questions. The YİÜ Skill Pack V2 was expanded for weak shorthand/facet cases including SAY/EA programs, Bağlum campus, Tıp clinical timing, burslu fees, lab-oriented program advice, yurt/konaklama, and registration dates; the production demo push updated `12` skills and refreshed `439` embedding rows (`src/lib/knowledge-base/simple-rag/query-rewriter.ts`, `src/lib/knowledge-base/simple-rag/answer-generator.ts`, `docs/evaluations/yiu-intent-skill-pack-v2-2026-06-13.md`).
 - Added a fresh YİÜ Public Demo random 100 routing run plus manual Codex quality review. The run completed `100/100` with `0` errors and route counts of `21` Skill answers, `49` grounded RAG answers, `13` clarifications, `12` no-info replies, `4` refusals, and `1` direct answer; manual review scored `6.73/10` and identified source-less direct institutional answers, wrong-facet Skill replies, and adjacent-evidence facility/service inference as the next quality blockers (`docs/evaluations/yiu-routing-random-100-2026-06-17T16-42-59-385Z.md`, `docs/evaluations/yiu-routing-random-100-codex-review-2026-06-17T16-42-59-385Z.md`).
