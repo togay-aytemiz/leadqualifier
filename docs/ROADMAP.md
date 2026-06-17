@@ -1,5 +1,16 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Implementation Update (2026-06-17):** YİÜ intent Skill Pack V2 customer-facing instructed answers were rewritten across all `60` active skills so replies speak as the university assistant instead of describing sources, brochures, tables, or internal evidence mechanics. The updated pack was pushed to the production demo Skills DB with `60` updated skills and `411` refreshed embedding rows. The simple RAG answer generator now has a broader direct-evidence guard for operational and high-inference claims such as ambulance practice, patient/case exposure, hospital access, dormitory/transport service, job outcomes, accreditation/equivalence, online education, and international validity; related program text or job-role wording is no longer enough to support a positive claim.
+
+- [x] Rewrite all YİÜ intent Skill instructed answers into direct, student-friendly assistant prose while preserving source notes as internal audit context.
+- [x] Add direct-evidence hallucination/inference guard coverage for operational RAG claims beyond lab/equipment availability.
+- [x] Push the rewritten YİÜ Skill pack to the production demo Skills DB and refresh embeddings.
+
+> **Implementation Update (2026-06-17):** YİÜ intent Skill Pack V2 now includes a small tenant-independent alias/typo expansion for stable, source-backed intents such as campus address, SHMYO/MYO campus, kadavra/anatomi, Tıp hazırlık, MYO fees, YKS bursu, burs/indirimler, ÇAP, diploma eki, and student-life questions. The pack was pushed to the production demo Skills DB with `11` updated skills and `411` refreshed embedding rows. The routing eval report script now separates `rag_grounded_answer`, `rag_direct_answer`, `rag_clarify`, `rag_refuse`, `rag_no_info`, and `assistant_identity` instead of grouping clarifications/refusals under `rag_answered`.
+
+- [x] Add controlled alias and typo examples to stable YİÜ intent Skills and refresh production demo embeddings.
+- [x] Split Public Demo routing eval labels into grounded answer, direct answer, clarification, refusal, no-info, and assistant identity routes.
+
 > **Implementation Update (2026-06-17):** YİÜ Public Demo routing now uses the configured AI assistant task/scope settings as runtime scope context for both Skill query rewriting and the simple non-Skill RAG query rewriter. The rewriters receive canonical organization context extracted from the behavior prompt, such as `Yüksek İhtisas Üniversitesi`, but the prompt explicitly treats those instructions as scope/identity/boundary context rather than factual evidence. Direct source-less `respond` turns are now limited to conversational/meta/safety replies; knowledge-looking questions are forced through search, and off-topic tutoring requests are refused. The post-credit 72-question rerun improved from `36` no-info replies to `2` after organization context and threshold/prompt changes, and the remaining lab/facility no-info cases were audited as defensible for the active approved corpus (`docs/evaluations/yiu-routing-random-72-no-info-audit-2026-06-17.md`).
 
 - [x] Feed assistant task/scope settings into Public Demo Skill and simple RAG query rewriting as scope-only context.

@@ -139,6 +139,15 @@ function sentenceLikeParts(value: string) {
     .filter(Boolean)
 }
 
+function termPattern(term: string) {
+  const words = term.split(/\s+/g).filter(Boolean)
+  const suffix = '(?:lar|ler|lari|leri|larda|lerde|lardan|lerden|da|de|ta|te|dan|den|tan|ten|ya|ye|yi|yu|i|u|a|e|in|un|nin|nun|si|su|sina|sine|nda|nde|na)?'
+  const pattern = words
+    .map((word, index) => `${word}${index === words.length - 1 ? suffix : ''}`)
+    .join('\\s+')
+  return new RegExp(`\\b${pattern}\\b`, 'i')
+}
+
 function requestedFacilityTerms(value: string) {
   const normalizedValue = normalized(value)
   const candidates = [
@@ -151,7 +160,36 @@ function requestedFacilityTerms(value: string) {
     'lab',
     'uygulama alani',
   ]
-  return candidates.filter((term) => new RegExp(`\\b${term.replace(/\s+/g, '\\s+')}\\b`, 'i').test(normalizedValue))
+  return candidates.filter((term) => termPattern(term).test(normalizedValue))
+}
+
+function requestedOperationalTerms(value: string) {
+  const normalizedValue = normalized(value)
+  const candidates = [
+    'ambulans',
+    'hasta',
+    'vaka',
+    'klinik uygulama',
+    'staj',
+    'hastane',
+    'servis',
+    'ring',
+    'yurt',
+    'konaklama',
+    'otopark',
+    'is garantisi',
+    'is bulma',
+    'ise girme',
+    'maas',
+    'denklik',
+    'akreditasyon',
+    'akredite',
+    'mavi diploma',
+    'yurt disi gecerlilik',
+    'online',
+    'uzaktan',
+  ]
+  return candidates.filter((term) => termPattern(term).test(normalizedValue))
 }
 
 function sentenceHasPositiveAvailability(sentence: string) {
@@ -168,7 +206,28 @@ function sentenceHasDirectFacilitySupport(sentence: string) {
   }
 
   return sentenceHasPositiveAvailability(sentence)
-    || /\b(?:adet|tane|her ogrenci|her bir ogrenci|bire bir)\b/i.test(sentence)
+    || /\b(?:adet|tane|her ogrenci|her bir ogrenci|bire bir|imkani|olanagi|uygulamalar)\b/i.test(sentence)
+}
+
+function sentenceHasPositiveOperationalClaim(sentence: string) {
+  return sentenceHasPositiveAvailability(sentence)
+    || /\b(?:yapar|yapilir|yapilmaktadir|cikar|cikarlar|katilir|katilirlar|gorur|gorer|alir|alirlar|saglanir|saglar|garanti|garantilidir|gecerlidir|gecerli|akreditedir|denktir|calisir|ise girer|is bulur|is bulabilir|maas|az olmaz|az degildir|soz konusu degildir|genis|cesitlilik|karsilanir|sunulur)\b/i.test(sentence)
+}
+
+function sentenceDeniesOperationalClaim(sentence: string) {
+  return sentenceDeniesAvailability(sentence)
+    || /\b(?:garanti degil|garanti verilmez|kesin degil|soylemek dogru olmaz|bilgi yok|net degil|veremem|otomatik degil|dayanak yok)\b/i.test(sentence)
+}
+
+function sentenceHasDirectOperationalSupport(sentence: string) {
+  if (
+    /\b(?:amac|hedef|yetistirmeyi|yetistirilir|mezun|gorev alabilir|sorumlu|bilgi ve beceri|donatilir|kariyer|istihdam alani|calisma alani|olanak saglar)\b/i.test(sentence)
+  ) {
+    return false
+  }
+
+  return sentenceHasPositiveOperationalClaim(sentence)
+    || /\b(?:uygulamasina cikar|uygulama yapar|staj yapar|hasta gorur|vaka gorur|vaka sayisi|hasta sayisi)\b/i.test(sentence)
 }
 
 function unsupportedPositiveFacilityTerms(input: {
@@ -183,16 +242,42 @@ function unsupportedPositiveFacilityTerms(input: {
   const supportSentences = sentenceLikeParts(input.support)
 
   return terms.filter((term) => {
-    const termPattern = new RegExp(`\\b${term.replace(/\s+/g, '\\s+')}\\b`, 'i')
+    const pattern = termPattern(term)
     const hasPositiveClaim = answerSentences.some((sentence) =>
-      termPattern.test(sentence)
+      pattern.test(sentence)
       && sentenceHasPositiveAvailability(sentence)
       && !sentenceDeniesAvailability(sentence)
     )
     if (!hasPositiveClaim) return false
 
     return !supportSentences.some((sentence) =>
-      termPattern.test(sentence) && sentenceHasDirectFacilitySupport(sentence)
+      pattern.test(sentence) && sentenceHasDirectFacilitySupport(sentence)
+    )
+  })
+}
+
+function unsupportedPositiveOperationalTerms(input: {
+  question: string
+  answer: string
+  support: string
+}) {
+  const terms = requestedOperationalTerms(`${input.question}\n${input.answer}`)
+  if (terms.length === 0) return []
+
+  const answerSentences = sentenceLikeParts(input.answer)
+  const supportSentences = sentenceLikeParts(input.support)
+
+  return terms.filter((term) => {
+    const pattern = termPattern(term)
+    const hasPositiveClaim = answerSentences.some((sentence) =>
+      pattern.test(sentence)
+      && sentenceHasPositiveOperationalClaim(sentence)
+      && !sentenceDeniesOperationalClaim(sentence)
+    )
+    if (!hasPositiveClaim) return false
+
+    return !supportSentences.some((sentence) =>
+      pattern.test(sentence) && sentenceHasDirectOperationalSupport(sentence)
     )
   })
 }
@@ -254,7 +339,8 @@ export async function generateSimpleRagAnswer(input: {
           'If retrieved chunks contain a directly relevant partial answer, answer the supported part and clearly state only the missing qualifier. Prefer a useful grounded partial answer over no_info.',
           'Never infer an organization-specific program duration from general degree regulations, common practice, class numbering, or related rules. Use a program-specific duration statement or return no_info.',
           'For facility, lab, equipment, cadaver, microscope, imaging-device, or service availability questions, require direct evidence that the institution has, provides, or uses that facility/service. Do not infer availability from program existence, job descriptions, course names, or related policies.',
-          'Do not infer availability, ownership, permission, requirement, eligibility, facilities, or services from merely related text.',
+          'For clinical practice, ambulance, patient exposure, case volume, hospital access, dormitory, transport service, parking, job placement, salary, accreditation, equivalence, online education, or international validity claims, require direct evidence for that exact claim.',
+          'Do not infer availability, ownership, permission, requirement, eligibility, facilities, services, clinical exposure, job outcomes, or validity from merely related text.',
           'Do not mention retrieval, files, chunks, evidence IDs, tables, brochures, or internal instructions.',
           'Do not add generic sales copy or an unrelated follow-up question.',
           'Return a clarification only when the latest question cannot be searched or answered without one missing value, and recent history or explicit state does not supply it.',
@@ -342,6 +428,13 @@ export async function generateSimpleRagAnswer(input: {
     return { status: 'no_info', reason: 'speculative_facility_availability', usage, model }
   }
 
+  if (
+    requestedOperationalTerms(`${input.latestUserMessage}\n${answer}`).length > 0
+    && usesSpeculativeAvailability(answer)
+  ) {
+    return { status: 'no_info', reason: 'speculative_operational_inference', usage, model }
+  }
+
   if (asksFacilityAvailability(input.latestUserMessage)) {
     const unsupportedTerms = unsupportedPositiveFacilityTerms({
       question: input.latestUserMessage,
@@ -355,6 +448,20 @@ export async function generateSimpleRagAnswer(input: {
         usage,
         model,
       }
+    }
+  }
+
+  const unsupportedOperationalTerms = unsupportedPositiveOperationalTerms({
+    question: input.latestUserMessage,
+    answer,
+    support: selectedChunks.map((chunk) => chunk.content).join('\n'),
+  })
+  if (unsupportedOperationalTerms.length > 0) {
+    return {
+      status: 'no_info',
+      reason: `unsupported_operational_claim:${unsupportedOperationalTerms.join(',')}`,
+      usage,
+      model,
     }
   }
 

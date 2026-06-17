@@ -59,8 +59,12 @@ type DemoTrace = {
 
 type RouteKind =
     | 'skill_answered'
-    | 'rag_answered'
+    | 'rag_grounded_answer'
+    | 'rag_direct_answer'
+    | 'rag_clarify'
+    | 'rag_refuse'
     | 'rag_no_info'
+    | 'assistant_identity'
     | 'fallback_answered'
     | 'scope_help'
     | 'no_info_unknown_route'
@@ -400,6 +404,18 @@ function readMetadataRecord(metadata: Record<string, unknown> | null, key: strin
         : null
 }
 
+function readNestedRecord(value: Record<string, unknown> | null | undefined, key: string) {
+    const nested = value?.[key]
+    return nested && typeof nested === 'object' && !Array.isArray(nested)
+        ? nested as Record<string, unknown>
+        : null
+}
+
+function readRecordString(record: Record<string, unknown> | null | undefined, key: string) {
+    const value = record?.[key]
+    return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
 function extractSourceUrl(content: string | null | undefined) {
     return content?.match(/^Source URL:\s*(.+)$/im)?.[1]?.trim() ?? ''
 }
@@ -438,6 +454,7 @@ function classifyRoute(answer: string, metadata: Record<string, unknown> | null)
     if (!metadata) return isNoInfoAnswer(answer) ? 'no_info_unknown_route' : 'unknown_answered'
 
     if (metadata.skill_id || metadata.matched_skill_title) return 'skill_answered'
+    if (metadata.demo_chat_reply_source === 'assistant_identity') return 'assistant_identity'
     if (metadata.demo_chat_reply_source === 'scope_help') return 'scope_help'
     if (metadata.is_fallback === true) return isNoInfoAnswer(answer) ? 'rag_no_info' : 'fallback_answered'
 
@@ -445,7 +462,22 @@ function classifyRoute(answer: string, metadata: Record<string, unknown> | null)
     if (metadata.is_rag === true || ragFileSearch || metadata.demo_chat_reply_source === 'simple_standalone_query_rag') {
         const failureReason = readMetadataString(ragFileSearch, 'failure_reason')
         if (failureReason || isNoInfoAnswer(answer)) return 'rag_no_info'
-        return 'rag_answered'
+        const diagnostics = readNestedRecord(ragFileSearch, 'diagnostics')
+        const simpleRag = readNestedRecord(diagnostics, 'simpleRag')
+        const answerStatus = readRecordString(simpleRag, 'answerStatus')
+        if (answerStatus === 'clarify') return 'rag_clarify'
+        if (answerStatus === 'refuse') return 'rag_refuse'
+        if (answerStatus === 'no_info') return 'rag_no_info'
+        if (readRecordString(diagnostics, 'queryIntent') === 'simple_rag_clarify' || metadata.rag_pending_clarification) {
+            return 'rag_clarify'
+        }
+        if (readRecordString(diagnostics, 'queryIntent') === 'simple_rag_refuse' || ragFileSearch?.refusal === true) {
+            return 'rag_refuse'
+        }
+        const hasVisibleSources = readMetadataArray(metadata, 'sources').length > 0
+            || readMetadataArray(metadata, 'source_titles').length > 0
+            || readMetadataArray(metadata, 'source_urls').length > 0
+        return hasVisibleSources ? 'rag_grounded_answer' : 'rag_direct_answer'
     }
 
     return isNoInfoAnswer(answer) ? 'no_info_unknown_route' : 'unknown_answered'
@@ -773,7 +805,7 @@ function followupStatus(first: DemoTrace, second: DemoTrace | null, secondError:
     if (first.route !== 'skill_answered') return 'first_not_skill'
     if (!second) return 'error'
     if (second.route === 'skill_answered') return 'followup_skill_answered'
-    if (second.route === 'rag_answered' || second.route === 'rag_no_info') return 'followup_rag_answered'
+    if (second.route.startsWith('rag_')) return 'followup_rag_answered'
     if (second.route === 'fallback_answered' || second.route === 'scope_help' || second.route === 'no_info_unknown_route') {
         return 'followup_fallback'
     }

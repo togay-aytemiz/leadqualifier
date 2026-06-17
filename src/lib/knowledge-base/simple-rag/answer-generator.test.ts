@@ -203,4 +203,99 @@ describe('generateSimpleRagAnswer', () => {
       selectedChunks: localChunks,
     })
   })
+
+  it('rejects ambulance practice claims inferred from job-role outcomes', async () => {
+    const result = await generateSimpleRagAnswer({
+      latestUserMessage: 'İlk ve Acil Yardım öğrencileri ambulansta uygulama yapıyor mu?',
+      standaloneQuery: 'İlk ve Acil Yardım öğrencileri ambulansta uygulama yapıyor mu?',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      chunks: [
+        {
+          id: 'C1',
+          fileId: 'file_1',
+          filename: 'first-aid.md',
+          title: 'İlk ve Acil Yardım',
+          score: 0.86,
+          content: 'İlk ve Acil Yardım mezunları ambulans ekiplerinde görev alabilecek bilgi ve beceriyle yetiştirilir.',
+        },
+      ],
+      createCompletion: vi.fn(async () =>
+        completion({
+          status: 'answer',
+          answer: 'Evet, öğrenciler ambulansta uygulama yapar.',
+          used_chunk_ids: ['C1'],
+        })
+      ),
+    })
+
+    expect(result).toMatchObject({
+      status: 'no_info',
+      reason: 'unsupported_operational_claim:ambulans',
+    })
+  })
+
+  it('rejects patient volume claims inferred from generic hospital or center wording', async () => {
+    const result = await generateSimpleRagAnswer({
+      latestUserMessage: 'Özel hastane olduğu için vaka az olmaz mı?',
+      standaloneQuery: 'Yüksek İhtisas Üniversitesi Tıp Fakültesi vaka çeşitliliği hasta sayısı',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      chunks: [
+        {
+          id: 'C1',
+          fileId: 'file_1',
+          filename: 'medicine-center.md',
+          title: 'Araştırma ve Uygulama Merkezi',
+          score: 0.78,
+          content: 'Merkez, sağlık alanında bilimsel araştırmalar yürütmeyi ve nitelikli insan gücü yetiştirmeyi amaçlar.',
+        },
+      ],
+      createCompletion: vi.fn(async () =>
+        completion({
+          status: 'answer',
+          answer: 'Vaka sayısının az olması söz konusu değildir; öğrenciler geniş hasta ve vaka çeşitliliği görür.',
+          used_chunk_ids: ['C1'],
+        })
+      ),
+    })
+
+    expect(result).toMatchObject({
+      status: 'no_info',
+      reason: 'unsupported_operational_claim:hasta,vaka',
+    })
+  })
+
+  it('allows operational claims when support directly states the practice', async () => {
+    const localChunks = [
+      {
+        id: 'C1',
+        fileId: 'file_1',
+        filename: 'first-aid.md',
+        title: 'İlk ve Acil Yardım Uygulama',
+        score: 0.91,
+        content: 'İlk ve Acil Yardım öğrencileri ambulans uygulamasına çıkar ve acil sağlık hizmetleri uygulamalarına katılır.',
+      },
+    ]
+    const result = await generateSimpleRagAnswer({
+      latestUserMessage: 'İlk ve Acil Yardım öğrencileri ambulansta uygulama yapıyor mu?',
+      standaloneQuery: 'İlk ve Acil Yardım öğrencileri ambulansta uygulama yapıyor mu?',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      chunks: localChunks,
+      createCompletion: vi.fn(async () =>
+        completion({
+          status: 'answer',
+          answer: 'Evet, İlk ve Acil Yardım öğrencileri ambulans uygulamasına çıkar.',
+          used_chunk_ids: ['C1'],
+        })
+      ),
+    })
+
+    expect(result).toMatchObject({
+      status: 'answer',
+      answer: 'Evet, İlk ve Acil Yardım öğrencileri ambulans uygulamasına çıkar.',
+      selectedChunks: localChunks,
+    })
+  })
 })

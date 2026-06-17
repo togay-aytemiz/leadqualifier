@@ -57,9 +57,9 @@ Kullanıcı örnekleri:
 - Üniversitenizin geçmişi nedir?
 
 Instructed cevap:
-Yüksek İhtisas Üniversitesi, Ankara'da bulunan bir vakıf üniversitesidir. Tanıtım kaynaklarında üniversitenin Türkiye Yüksek İhtisas Hastanesi Vakfı tarafından kurulduğu, sağlık alanındaki geçmişini eğitim, araştırma ve topluma hizmet odağıyla sürdürdüğü belirtilir.
+Yüksek İhtisas Üniversitesi, Ankara'da bulunan bir vakıf üniversitesidir. Sağlık alanındaki birikimini tıp, sağlık bilimleri, spor bilimleri ve meslek yüksekokulu programlarıyla eğitim ve araştırmaya taşır.
 
-Broşürde Tıp Fakültesi, Sağlık Bilimleri Fakültesi, Spor Bilimleri Fakültesi, Sağlık Hizmetleri Meslek Yüksekokulu ve Meslek Yüksekokulu ile özellikle sağlık bilimleri alanında insan gücü yetiştirildiği vurgulanır.
+Aday öğrenciler için öne çıkan tarafı sağlık ağırlıklı program yapısı, Tıp Fakültesi, uygulamalı sağlık eğitimi ve Ankara'daki yerleşkeleridir.
 
 Kaynak notu: Ana web sitesi, aday öğrenci sayfası, tanıtım broşürü.
 
@@ -77,7 +77,7 @@ Kullanıcı örnekleri:
 - Fakülte ve yüksekokulları sayar mısın?
 
 Instructed cevap:
-Yüksek İhtisas Üniversitesi tanıtım kaynaklarında şu akademik birimler öne çıkar:
+Yüksek İhtisas Üniversitesinde öne çıkan akademik birimler şunlardır:
 
 - Tıp Fakültesi
 - Sağlık Bilimleri Fakültesi
@@ -87,7 +87,7 @@ Yüksek İhtisas Üniversitesi tanıtım kaynaklarında şu akademik birimler ö
 - Lisansüstü Eğitim Enstitüsü
 - Yabancı Diller Yüksekokulu
 
-Hangi programı düşündüğünü söylersen ücret, kontenjan, yerleşke veya eğitim süresi gibi bilgileri daha net paylaşabilirim.
+Hangi programı düşündüğünü söylersen ücret, kontenjan, yerleşke veya eğitim süresi bilgisini ayrıca paylaşabilirim.
 
 Kaynak notu: Ana web sitesi menüsü, tanıtım broşürü.
 
@@ -103,16 +103,19 @@ Kullanıcı örnekleri:
 - Üniversite hangi kampüslerde eğitim veriyor?
 - YİÜ kampüs adresleri neler?
 - Kampüs adreslerini yazar mısın?
+- kampüs nerde
+- kampüs nerede acaba
+- yerleşke adresleri
 
 Instructed cevap:
-Yüksek İhtisas Üniversitesi için kaynaklarda şu yerleşkeler yer alıyor:
+Yüksek İhtisas Üniversitesinin Ankara'da birden fazla yerleşkesi bulunur:
 
 - 100. Yıl / İşçi Blokları Yerleşkesi: İşçi Blokları Mahallesi 1505. Sokak / Cadde No:18/A, Çankaya, Ankara
 - Balgat Yerleşkesi: Oğuzlar Mahallesi 1375. Sokak No:8, Balgat, Ankara
 - Bağlum Yerleşkesi: Karakaya Mahallesi Bağlum Bulvarı No:1, Keçiören, Ankara
 - Bağlıca Yerleşkesi: Bağlıca Mahallesi, Höyük Caddesi No:1, Bağlıca, Ankara
 
-Hangi fakülte veya programı düşündüğünü yazarsan ilgili yerleşkeyi ayrıca söyleyebilirim.
+Program adını yazarsan hangi yerleşkede olduğunu da net söyleyebilirim.
 
 Kaynak notu: Web sitesi iletişim/footer bilgileri, tanıtım broşürü yerleşke eşleşmeleri.
 
@@ -130,9 +133,11 @@ Kullanıcı örnekleri:
 - İngilizce Tıp hangi yerleşkede?
 
 Instructed cevap:
-Tıp Fakültesi, kaynaklarda 100. Yıl / İşçi Blokları Yerleşkesi ile eşleşiyor. Adres: İşçi Blokları Mahallesi 1505. Sokak No:18/A, Çankaya / Ankara.
+Tıp Fakültesi 100. Yıl / İşçi Blokları Yerleşkesindedir.
 
-Broşürde Tıp Fakültesi Türkçe ve İngilizce programlarının aynı yerleşke başlığı altında gösterildiğini görüyoruz.
+Adres: İşçi Blokları Mahallesi 1505. Sokak No:18/A, Çankaya / Ankara.
+
+Türkçe Tıp ve İngilizce Tıp için yerleşke bilgisi aynı adreste verilir.
 
 Kaynak notu: Tanıtım broşürü program-yerleşke eşleşmesi, web sitesi iletişim sayfası.
 
@@ -150,9 +155,11 @@ Kullanıcı örnekleri:
 - Sağlık Bilimleri adresi nedir?
 
 Instructed cevap:
-Tanıtım broşüründe Sağlık Bilimleri Fakültesi programları Bağlıca Yerleşkesi ile eşleşiyor. Adres: Bağlıca Mahallesi, Höyük Caddesi No:1, Bağlıca / Ankara.
+Sağlık Bilimleri Fakültesi programları için Bağlıca Yerleşkesi kullanılır.
 
-Bu yerleşke altında Ergoterapi, Ebelik, Hemşirelik, Beslenme ve Diyetetik, Fizyoterapi ve Rehabilitasyon, Dil ve Konuşma Terapisi ve Sağlık Yönetimi programları listeleniyor.
+Adres: Bağlıca Mahallesi, Höyük Caddesi No:1, Bağlıca / Ankara.
+
+Bu fakültede Hemşirelik, Beslenme ve Diyetetik, Dil ve Konuşma Terapisi, Fizyoterapi ve Rehabilitasyon, Ergoterapi, Ebelik ve Sağlık Yönetimi gibi lisans programları bulunur.
 
 Kaynak notu: Tanıtım broşürü program-yerleşke eşleşmesi.
 
@@ -168,14 +175,28 @@ Kullanıcı örnekleri:
 - Anestezi hangi yerleşkede?
 - Tıbbi Laboratuvar hangi kampüste?
 - İlk ve Acil Yardım kampüsü neresi?
+- shmyo nerde
+- shmyo bölümleri hangi kampüste?
+- tlt hangi kampüste?
 
 Instructed cevap:
-Tanıtım broşüründe Sağlık Hizmetleri Meslek Yüksekokulu programları iki yerleşkeye ayrılmış görünüyor:
+Sağlık Hizmetleri Meslek Yüksekokulu programları iki yerleşkeye dağılır:
 
-- Bağlum Yerleşkesi: Anestezi, Ameliyathane Hizmetleri, İlk ve Acil Yardım, Tıbbi Tanıtım ve Pazarlama, Optisyenlik, Tıbbi Dokümantasyon ve Sekreterlik, Tele-Sağlık Teknikerliği.
-- Balgat Yerleşkesi: Elektronörofizyoloji, Biyomedikal Cihaz Teknolojisi, Fizyoterapi, Tıbbi Veri İşleme Teknikerliği, Tıbbi Laboratuvar Teknikleri.
+Bağlıca Yerleşkesi:
+- Anestezi
+- Ameliyathane Hizmetleri
+- Fizyoterapi
+- Tıbbi Laboratuvar Teknikleri
 
-Bağlum adresi Karakaya Mahallesi Bağlum Bulvarı No:1 Keçiören / Ankara; Balgat adresi Oğuzlar Mahallesi 1375. Sokak No:8 Balgat / Ankara.
+Bağlum Yerleşkesi:
+- İlk ve Acil Yardım
+- Tıbbi Görüntüleme Teknikleri
+- Biyomedikal Cihaz Teknolojisi
+- Optisyenlik
+- Tıbbi Dokümantasyon ve Sekreterlik
+- Tıbbi Tanıtım ve Pazarlama
+- Tele-Sağlık Teknikerliği
+- Tıbbi Veri İşleme Teknikerliği
 
 Kaynak notu: Tanıtım broşürü program-yerleşke eşleşmesi.
 
@@ -191,13 +212,16 @@ Kullanıcı örnekleri:
 - Grafik Tasarım kampüsü neresi?
 - Spor Bilimleri Fakültesi nerede?
 - Antrenörlük Eğitimi hangi yerleşkede?
+- myo nerde
+- myo kampüsü neresi?
+- grafik tasarım nerede?
 
 Instructed cevap:
-Tanıtım broşüründe Meslek Yüksekokulu ve Spor Bilimleri Fakültesi Balgat Yerleşkesi ile eşleşiyor.
+Meslek Yüksekokulu ve Spor Bilimleri Fakültesi Balgat Yerleşkesindedir.
 
-Balgat Yerleşkesi adresi: Oğuzlar Mahallesi 1375. Sokak No:8, Balgat / Ankara.
+Adres: Oğuzlar Mahallesi 1375. Sokak No:8, Balgat / Ankara.
 
-Broşürde Meslek Yüksekokulu altında Bilgisayar Programcılığı, Eczane Hizmetleri, Elektrik ve Grafik Tasarım; Spor Bilimleri Fakültesi altında Antrenörlük Eğitimi listeleniyor.
+Bu yerleşke; Meslek Yüksekokulu programları ile Spor Bilimleri Fakültesi Antrenörlük Eğitimi programı için kullanılır.
 
 Kaynak notu: Tanıtım broşürü program-yerleşke eşleşmesi.
 
@@ -215,9 +239,11 @@ Kullanıcı örnekleri:
 - Üniversiteye nasıl ulaşabilirim?
 
 Instructed cevap:
-Web sitesi ve broşürde genel iletişim için ana telefon `0 (312) 329 10 10` olarak yer alıyor. Bağlum yerleşkesi için broşürde `0 (312) 329 74 25` telefonu da verilmiş.
+Genel iletişim için ana telefon numarası 0 (312) 329 10 10'dur.
 
-Web sitesi iletişim sayfasında Tıp Fakültesi öğrenci işleri için ana hat üzerinden dahili bilgiler de listeleniyor. Kesin ve güncel birim yönlendirmesi için üniversitenin iletişim sayfasını veya ana santrali kullanmanı öneririm.
+Bağlum Yerleşkesi için ayrıca 0 (312) 329 74 25 numarası kullanılır.
+
+Belirli bir program, kayıt, ücret ya da öğrenci işleri konusu için hangi birime yönlenmek istediğini yazarsan daha uygun iletişim bilgisini paylaşabilirim.
 
 Kaynak notu: Web sitesi iletişim sayfası, tanıtım broşürü.
 
@@ -235,9 +261,9 @@ Kullanıcı örnekleri:
 - Yurt ücretleri nerede yazıyor?
 
 Instructed cevap:
-Tanıtım broşüründe konaklama bilgileri için üniversitenin resmi konaklama/yurt sayfasına yönlendirme bulunuyor. Ancak broşürde bu başlık altında net yurt adı, kontenjan veya ücret listesi verilmediği için kesin bilgi vermek doğru olmaz.
+Üniversitenin aday öğrenci yönlendirmelerinde konaklama/yurt başlığı bulunur; ancak net yurt adı, garanti edilen kontenjan veya güncel ücret bilgisi için kesin bir sayı vermem doğru olmaz.
 
-Yurt, başvuru, ücret ve kontenjan gibi konularda güncel bilgiyi üniversitenin resmi konaklama sayfasından veya öğrenci işleri/aday öğrenci biriminden teyit etmeni öneririm.
+Konaklama planı yaparken yurt seçeneklerini, ücretleri, kontenjanı ve ulaşım mesafesini güncel dönem için ayrıca sormak en sağlıklı yol olur.
 
 Kaynak notu: Tanıtım broşürü QR bağlantıları, web sitesi yurtlar sayfası menüsü.
 
@@ -255,9 +281,9 @@ Kullanıcı örnekleri:
 - Bağlum'a nasıl ulaşırım?
 
 Instructed cevap:
-Kaynaklarda yerleşke adresleri ve ulaşım bilgileri için resmi bağlantı yer alıyor; fakat servis güzergahı, saatleri veya servis varlığı için net bir tablo görmüyorum.
+Yerleşke adreslerini net olarak paylaşabilirim; ancak servis/ring güzergahı, saatleri veya servis varlığı için kesin bilgi vermem doğru olmaz.
 
-Bu nedenle adresi paylaşabilirim: hangi fakülte veya programı soruyorsan ilgili yerleşkeyi söyle. Servis/güzergah gibi değişebilen bilgiler için üniversitenin güncel ulaşım duyurusunu veya ilgili yerleşke öğrenci işlerini teyit etmek en güvenlisi.
+Hangi yerleşkeye gideceğini yazarsan adresini tekrar netleştirebilirim. Servis ve ulaşım saatleri gibi değişken bilgiler için güncel dönem duyurusu esas alınmalıdır.
 
 Kaynak notu: Tanıtım broşürü ulaşım QR bağlantısı, yerleşke adresleri.
 
@@ -275,9 +301,9 @@ Kullanıcı örnekleri:
 - Neden Yüksek İhtisas Tıp?
 
 Instructed cevap:
-Yüksek İhtisas Üniversitesi Tıp Fakültesi; entegre teorik ve pratik eğitim, Probleme Dayalı Öğrenim, birinci sınıftan itibaren Klinik Beceri Eğitimi, İletişim Becerileri Eğitimi, Kanıta Dayalı Tıp Eğitimi, modern laboratuvarlar, kadavra diseksiyonu ve multidisipliner laboratuvar uygulamaları gibi başlıklarla tanıtılmaktadır.
+Yüksek İhtisas Üniversitesi Tıp Fakültesi; entegre teorik ve pratik eğitim, Probleme Dayalı Öğrenim, Klinik Beceri Eğitimi, İletişim Becerileri Eğitimi, Kanıta Dayalı Tıp Eğitimi, modern laboratuvarlar, kadavra diseksiyonu ve multidisipliner laboratuvar uygulamalarıyla tanıtılır.
 
-Tıp eğitimi yoğun ve uzun soluklu bir süreçtir. Bu nedenle tercih yaparken sadece puan ve ücret değil; eğitim modeli, uygulama olanakları, klinik eğitim süreci, akademik kadro ve mesleğe kişisel uygunluk birlikte değerlendirilmelidir.
+Tıp uzun ve yoğun bir eğitimdir. Tercih yaparken puan ve ücretin yanında eğitim modeli, klinik eğitim süreci, uygulama imkanları ve mesleğe kişisel uygunluk birlikte değerlendirilmelidir.
 
 Kaynak notu: Tıp Fakültesi web içeriği, tanıtım broşürü, Tıp yönergeleri.
 
@@ -296,9 +322,9 @@ Kullanıcı örnekleri:
 - Tıp programının dili nedir?
 
 Instructed cevap:
-Evet, Yüksek İhtisas Üniversitesinde Tıp Fakültesi bulunmaktadır. Tanıtım broşüründe Tıp Fakültesi için Türkçe ve İngilizce program satırları ayrı ayrı listelenmiştir.
+Yüksek İhtisas Üniversitesinde Tıp Fakültesi için Türkçe ve İngilizce program seçenekleri bulunur.
 
-Programların güncel kontenjanı, burs türü, ücreti, öğretim dili ve özel koşulları her tercih döneminde ÖSYM kılavuzu ve üniversitenin güncel aday öğrenci duyuruları ile kesinleşir. Tercih yapmadan önce ilgili yılın ÖSYM kılavuzunda program adını ve özel koşulları kontrol etmek gerekir.
+Tercih döneminde program adını, öğretim dilini, kontenjanı, burs/indirim türünü ve özel koşulları ilgili yılın ÖSYM kılavuzundan birlikte kontrol etmek gerekir.
 
 Kaynak notu: Tanıtım broşürü Tıp Fakültesi tablosu, ana web sitesi akademik birimler.
 
@@ -316,9 +342,9 @@ Kullanıcı örnekleri:
 - Tıp Fakültesi 6 yıl mı?
 
 Instructed cevap:
-Tıp Fakültesinde eğitim süresi 6 yıldır. Tıp eğitiminde ilk yıllar preklinik dönem, sonraki yıllar klinik stajlar ve son yıl Dönem VI intörnlük eğitimi şeklinde yapılandırılır.
+Tıp Fakültesi eğitimi hazırlık sınıfı hariç 6 yıldır.
 
-İngilizce program veya hazırlık koşulu gibi özel durumlar için ilgili yılın ÖSYM kılavuzu ve üniversite duyuruları ayrıca kontrol edilmelidir.
+Dönem I, II ve III preklinik eğitim; Dönem IV ve V klinik stajlar; Dönem VI ise intörnlük dönemidir. İngilizce programda hazırlık koşulu ayrıca değerlendirilir.
 
 Kaynak notu: Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi, Tıp web içerikleri.
 
@@ -336,9 +362,9 @@ Kullanıcı örnekleri:
 - İlk 3 yıl ve son yıllar nasıl ayrılıyor?
 
 Instructed cevap:
-Tıp Fakültesi eğitim yapısı kaynaklarda genel olarak şöyle anlatılıyor: Dönem I, II ve III'te ders kurulları ağırlıklı Harmanlanmış/Hibrit Preklinik Tıp Bilimleri eğitimi; Dönem IV ve V'te klinik stajlardan oluşan Klinik Tıp Bilimleri eğitimi; Dönem VI'da ise intörnlük eğitimi yer alır.
+Tıp eğitiminde ilk üç yıl preklinik dönemdir; Dönem I, II ve III'te ders kurulları ağırlıklı harmanlanmış/hibrit yapı bulunur.
 
-Bu yapı, temel tıp bilgisi ile klinik uygulamayı aşamalı şekilde birleştirmeyi hedefler.
+Dönem IV ve V klinik stajlardan oluşur. Dönem VI ise intörn hekimlik dönemidir. Eğitim modeli teorik bilgi, uygulama, klinik beceri, iletişim becerileri ve kanıta dayalı tıp yaklaşımını birlikte ele alır.
 
 Kaynak notu: Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi.
 
@@ -354,11 +380,14 @@ Kullanıcı örnekleri:
 - Tıp öğrencileri kadavra görüyor mu?
 - Anatomi maketleri var mı?
 - Kadavra diseksiyonu yapılıyor mu?
+- kadavra varmı
+- anatomi lab var mı?
+- maket varmı?
 
 Instructed cevap:
-Evet, Tıp Fakültesi tanıtım içeriğinde anatomi laboratuvarında kadavra diseksiyonu imkanı ve maketlerle uygulamalar yer alıyor. Kaynaklarda ayrıca modern laboratuvarlar ve multidisipliner laboratuvar uygulamaları vurgulanıyor.
+Evet, Tıp Fakültesinde anatomi laboratuvarı, kadavra diseksiyonu imkanı ve maketlerle uygulama başlıkları bulunur.
 
-Ancak "her öğrenci kaç kez girer, grup sayısı nedir, uygulama takvimi nasıldır" gibi operasyonel detaylar için ilgili dönem ders programı veya fakülte duyuruları kontrol edilmelidir.
+Bu imkanlar anatomi eğitimini sadece teorik anlatımla sınırlı bırakmadan uygulamalı öğrenmeyi desteklemek için kullanılır.
 
 Kaynak notu: Tıp Fakültesi web içeriği, aday öğrenci içerikleri.
 
@@ -376,9 +405,9 @@ Kullanıcı örnekleri:
 - Klinik Beceri Eğitimi ne demek?
 
 Instructed cevap:
-Tıp Fakültesi tanıtım ve yönerge kaynaklarında Klinik Beceri Eğitimi öne çıkan başlıklardan biridir. Bu eğitim, öğrencilerin hekimlik mesleğine yönelik temel klinik/pratik becerileri yapılandırılmış şekilde öğrenmesini hedefler.
+Evet, Tıp Fakültesinde Klinik Beceri Eğitimi ayrı bir başlıktır.
 
-Kaynaklarda Klinik Beceri Eğitimi Kurulu'nun yapısı, görevleri ve işleyişine ilişkin ayrı yönerge de bulunmaktadır. Güncel ders/dönem uygulamaları için ilgili akademik yıl programı ayrıca kontrol edilmelidir.
+Bu eğitim, öğrencilerin hekimlik uygulamalarına hazırlanmasına yardımcı olur; klinik süreçlere geçmeden önce temel becerileri daha kontrollü ve yapılandırılmış biçimde öğrenmelerini destekler.
 
 Kaynak notu: Tıp Fakültesi Klinik Beceri Eğitimi Yönergesi, Tıp web içeriği.
 
@@ -396,9 +425,9 @@ Kullanıcı örnekleri:
 - Kanıta dayalı tıp kurulunuz var mı?
 
 Instructed cevap:
-Evet, Tıp Fakültesi kaynaklarında Kanıta Dayalı Tıp Eğitimi yer alıyor. Bu başlık, öğrencilerin bilimsel kanıtı değerlendirme, araştırma mantığıyla düşünme ve tıbbi kararları kanıta dayandırma becerilerini geliştirmeyi hedefleyen eğitim alanı olarak sunuluyor.
+Evet, Tıp Fakültesinde Kanıta Dayalı Tıp Eğitimi bulunur.
 
-Tıp Fakültesi Kanıta Dayalı Tıp Kurulu Yönergesi de bu alandaki programların planlanması ve yürütülmesiyle ilgili düzenlemeleri içerir.
+Bu başlık öğrencilerin bilimsel kanıtı değerlendirme, araştırma mantığıyla düşünme ve tıbbi kararları kanıta dayandırma becerisini geliştirmeyi hedefler.
 
 Kaynak notu: Tıp Fakültesi Kanıta Dayalı Tıp Kurulu Yönergesi, Tıp web içeriği.
 
@@ -416,9 +445,9 @@ Kullanıcı örnekleri:
 - Doktorlukta iletişim dersi alıyor muyuz?
 
 Instructed cevap:
-Tıp Fakültesi kaynaklarında İletişim Becerileri Eğitimi ayrı bir eğitim başlığı olarak yer alıyor. Bu eğitim, hekimlik mesleğinde hasta, hasta yakını ve sağlık ekibiyle etkili iletişim kurma becerisini destekleyen alanlardan biridir.
+Evet, Tıp Fakültesinde İletişim Becerileri Eğitimi bulunur.
 
-Güncel ders saati, dönem dağılımı ve uygulama planı için ilgili akademik yıl ders programı veya fakülte duyuruları kontrol edilmelidir.
+Bu eğitim, öğrencilerin hasta, hasta yakını ve sağlık ekibiyle doğru, açık ve mesleki iletişim kurma becerisini destekler.
 
 Kaynak notu: Tıp Fakültesi İletişim Becerileri Eğitimi Kurulu Yönergesi, Tıp web içeriği.
 
@@ -437,16 +466,16 @@ Kullanıcı örnekleri:
 - Tıp İngilizce ücretli 2025 fiyatı nedir?
 
 Instructed cevap:
-2025 tanıtım broşüründeki Tıp Fakültesi satırlarına göre:
+2025 Tıp Fakültesi ücretleri şöyledir:
 
 - Tıp Fakültesi (Ücretli): 720.000 TL
 - Tıp Fakültesi (%50 İndirimli): 360.000 TL
-- Tıp Fakültesi (Burslu): ücret alanı `-` olarak gösterilmiş
-- Tıp Fakültesi (İngilizce) (Ücretli): 720.000 TL
-- Tıp Fakültesi (İngilizce) (%50 İndirimli): 360.000 TL
-- Tıp Fakültesi (İngilizce) (Burslu): ücret alanı `-` olarak gösterilmiş
+- Tıp Fakültesi (Burslu): ayrıca ücret tutarı verilmez
+- Tıp Fakültesi İngilizce (Ücretli): 720.000 TL
+- Tıp Fakültesi İngilizce (%50 İndirimli): 360.000 TL
+- Tıp Fakültesi İngilizce (Burslu): ayrıca ücret tutarı verilmez
 
-Ayrıca broşürde Tıp Fakültesi hazırlık satırı için 410.000 TL bilgisi yer alır. Ücretler tercih/kayıt döneminde güncellenebileceği için kesin kontrolü üniversitenin güncel ücret duyurusu ve ÖSYM kılavuzu ile yapmak gerekir.
+Tıp hazırlık ücreti 410.000 TL olarak verilir. Güncel kayıt yılında ücretler değişebileceği için son karar öncesi güncel ücret duyurusu ve ÖSYM bilgileri esas alınmalıdır.
 
 Kaynak notu: Tanıtım broşürü Tıp Fakültesi 2025 kontenjan ve fiyat tablosu.
 
@@ -465,7 +494,7 @@ Kullanıcı örnekleri:
 - Tıp ücretli kontenjan kaç?
 
 Instructed cevap:
-2025 tanıtım broşüründeki Tıp Fakültesi kontenjanları şöyle:
+2025 Tıp Fakültesi kontenjanları şöyledir:
 
 Türkçe Tıp:
 - Ücretli: 75
@@ -477,7 +506,7 @@ Türkçe Tıp:
 - Burslu: 7
 - %50 İndirimli: 6
 
-Kontenjanlar tercih döneminde ÖSYM kılavuzu ile kesinleştiği için son ve bağlayıcı kontrol ilgili yılın ÖSYM kılavuzundan yapılmalıdır.
+Kontenjanlar tercih döneminde ÖSYM kılavuzu ile kesinleşir.
 
 Kaynak notu: Tanıtım broşürü Tıp Fakültesi 2025 kontenjan ve fiyat tablosu.
 
@@ -496,16 +525,16 @@ Kullanıcı örnekleri:
 - Tıp %50 indirimli taban puanı nedir?
 
 Instructed cevap:
-Broşürde 2024 taban puanı ve başarı sırası referansları verilmiş. Tıp Fakültesi satırları şöyle:
+2024 yerleşme verilerine göre Tıp Fakültesi taban puanı ve başarı sırası şöyledir:
 
 - Tıp Fakültesi (Ücretli): taban puanı 453,467; başarı sırası 36.073
 - Tıp Fakültesi (Burslu): taban puanı 497,406; başarı sırası 11.519
 - Tıp Fakültesi (%50 İndirimli): taban puanı 483,077; başarı sırası 18.145
-- Tıp Fakültesi (İngilizce) (Ücretli): taban puanı 448,213; başarı sırası 39.907
-- Tıp Fakültesi (İngilizce) (Burslu): taban puanı 496,513; başarı sırası 11.890
-- Tıp Fakültesi (İngilizce) (%50 İndirimli): taban puanı 479,259; başarı sırası 20.117
+- Tıp Fakültesi İngilizce (Ücretli): taban puanı 448,213; başarı sırası 39.907
+- Tıp Fakültesi İngilizce (Burslu): taban puanı 496,513; başarı sırası 11.890
+- Tıp Fakültesi İngilizce (%50 İndirimli): taban puanı 479,259; başarı sırası 20.117
 
-Bunlar geçmiş yıl referansıdır; yerleşme garantisi vermez. Güncel tercih için ilgili yılın ÖSYM kılavuzu esas alınmalıdır.
+Bunlar geçmiş yıl verileridir; güncel yılda yerleşme garantisi anlamına gelmez.
 
 Kaynak notu: Tanıtım broşürü Tıp Fakültesi 2024 taban puanı ve başarı sırası sütunları.
 
@@ -521,11 +550,14 @@ Kullanıcı örnekleri:
 - Hazırlık kaç para?
 - Tıp Fakültesi hazırlık zorunlu mu?
 - İngilizce hazırlık fiyatı nedir?
+- hazırlık varmı
+- tıp ing hazırlık var mı?
+- hazırlık sınıfı var mı?
 
 Instructed cevap:
-2025 tanıtım broşüründe Tıp Fakültesi için hazırlık satırında 410.000 TL fiyat bilgisi yer alıyor.
+Tıp Fakültesi için 2025 hazırlık ücreti 410.000 TL olarak verilir.
 
-Ancak hazırlığın hangi öğrenci için zorunlu olduğu, muafiyet koşulları ve güncel uygulama ilgili yılın ÖSYM kılavuzu, Yabancı Diller Yüksekokulu duyuruları ve üniversitenin güncel kayıt duyurularıyla doğrulanmalıdır. Hazırlıkla ilgili kesin karar için bu resmi kaynakları kontrol etmek gerekir.
+Hazırlık koşulu programın öğretim dili ve muafiyet durumuna göre değişebilir. İngilizce Tıp düşünüyorsan hazırlık/muafiyet şartlarını kayıt öncesi ayrıca kontrol etmek gerekir.
 
 Kaynak notu: Tanıtım broşürü Tıp Fakültesi hazırlık satırı, hazırlık muafiyet duyuruları.
 
@@ -543,17 +575,17 @@ Kullanıcı örnekleri:
 - Sağlık alanında 4 yıllık hangi bölümler var?
 
 Instructed cevap:
-Tanıtım broşüründe Sağlık Bilimleri Fakültesi altında şu programlar listeleniyor:
+Sağlık Bilimleri Fakültesinde şu lisans programları bulunur:
 
+- Hemşirelik
 - Beslenme ve Diyetetik
 - Dil ve Konuşma Terapisi
 - Fizyoterapi ve Rehabilitasyon
-- Hemşirelik
-- Sağlık Yönetimi
 - Ergoterapi
 - Ebelik
+- Sağlık Yönetimi
 
-Hangi programı düşündüğünü söylersen ücret, kontenjan, puan türü veya yerleşke bilgisini ayrıca paylaşabilirim.
+Hemşirelik, Beslenme ve Diyetetik, Dil ve Konuşma Terapisi, Fizyoterapi ve Rehabilitasyon, Ergoterapi ve Ebelik SAY puan türüyle; Sağlık Yönetimi EA puan türüyle listelenir. Yerleşke Bağlıca'dır.
 
 Kaynak notu: Tanıtım broşürü program listeleri.
 
@@ -571,11 +603,18 @@ Kullanıcı örnekleri:
 - Sağlık Bilimleri %50 indirimli ücretler nedir?
 
 Instructed cevap:
-2025 tanıtım broşürüne göre Sağlık Bilimleri Fakültesinde birçok program için ücretli fiyat 490.000 TL, %50 indirimli fiyat 245.000 TL olarak listelenmiş. Bu grup Beslenme ve Diyetetik, Dil ve Konuşma Terapisi, Fizyoterapi ve Rehabilitasyon ve Hemşirelik satırlarında görülür.
+2025 Sağlık Bilimleri Fakültesi ücretleri program ve burs/indirim türüne göre değişir.
 
-Sağlık Yönetimi için ücretli 460.000 TL, %50 indirimli 230.000 TL; Ergoterapi ve Ebelik için de ücretli 460.000 TL, %50 indirimli 230.000 TL bilgisi yer alır.
+Öne çıkan ücretli program tutarları:
+- Hemşirelik: 520.000 TL
+- Dil ve Konuşma Terapisi: 490.000 TL
+- Fizyoterapi ve Rehabilitasyon: 490.000 TL
+- Beslenme ve Diyetetik: 490.000 TL
+- Ergoterapi: 460.000 TL
+- Ebelik: 460.000 TL
+- Sağlık Yönetimi: 460.000 TL
 
-Hangi programı sorduğunu yazarsan kontenjan ve taban puanla birlikte net satırı paylaşabilirim.
+%50 indirimli satırlarda bu tutarların yarısı uygulanır. Burslu satırlarda ayrıca ücret tutarı verilmez.
 
 Kaynak notu: Tanıtım broşürü Sağlık Bilimleri Fakültesi 2025 tablosu.
 
@@ -593,13 +632,11 @@ Kullanıcı örnekleri:
 - Hemşirelik taban puanı kaç?
 
 Instructed cevap:
-2025 tanıtım broşüründe Hemşirelik için satırlar şöyle:
+2025 Hemşirelik bilgileri şöyledir:
 
-- Hemşirelik (Ücretli): kontenjan 2, 2025 fiyat 490.000 TL, 2024 taban puanı 286,806, başarı sırası 313.101
-- Hemşirelik (Burslu): kontenjan 7, fiyat alanı `-`, 2024 taban puanı 360,410, başarı sırası 131.581
-- Hemşirelik (%50 İndirimli): kontenjan 45, 2025 fiyat 245.000 TL, 2024 taban puanı 301,991, başarı sırası 258.575
-
-Bu bilgiler broşür referansıdır; kesin kontenjan ve koşullar için ÖSYM kılavuzu kontrol edilmelidir.
+- Hemşirelik (Ücretli): kontenjan 2, ücret 520.000 TL, 2024 taban puanı 294,272, başarı sırası 284.992
+- Hemşirelik (Burslu): kontenjan 12, ücret tutarı verilmez, 2024 taban puanı 391,497, başarı sırası 94.181
+- Hemşirelik (%50 İndirimli): kontenjan 66, ücret 260.000 TL, 2024 taban puanı 308,724, başarı sırası 235.073
 
 Kaynak notu: Tanıtım broşürü Sağlık Bilimleri Fakültesi tablosu.
 
@@ -617,11 +654,11 @@ Kullanıcı örnekleri:
 - Dil ve Konuşma Terapisi taban puanı kaç?
 
 Instructed cevap:
-2025 tanıtım broşüründe Dil ve Konuşma Terapisi için satırlar şöyle:
+2025 Dil ve Konuşma Terapisi bilgileri şöyledir:
 
-- Dil ve Konuşma Terapisi (Ücretli): kontenjan 2, 2025 fiyat 490.000 TL, 2024 taban puanı 288,301, başarı sırası 307.129
-- Dil ve Konuşma Terapisi (Burslu): kontenjan 7, fiyat alanı `-`, 2024 taban puanı 406,296, başarı sırası 76.136
-- Dil ve Konuşma Terapisi (%50 İndirimli): kontenjan 40, 2025 fiyat 245.000 TL, 2024 taban puanı 296,474, başarı sırası 277.071
+- Dil ve Konuşma Terapisi (Ücretli): kontenjan 2, ücret 490.000 TL, 2024 taban puanı 288,301, başarı sırası 307.129
+- Dil ve Konuşma Terapisi (Burslu): kontenjan 7, ücret tutarı verilmez, 2024 taban puanı 406,296, başarı sırası 76.136
+- Dil ve Konuşma Terapisi (%50 İndirimli): kontenjan 40, ücret 245.000 TL, 2024 taban puanı 296,474, başarı sırası 277.071
 
 Kaynak notu: Tanıtım broşürü Sağlık Bilimleri Fakültesi tablosu.
 
@@ -639,13 +676,13 @@ Kullanıcı örnekleri:
 - Fizyoterapi taban puanı kaç?
 
 Instructed cevap:
-2025 tanıtım broşüründe Fizyoterapi ve Rehabilitasyon için satırlar şöyle:
+2025 Fizyoterapi ve Rehabilitasyon lisans bilgileri şöyledir:
 
-- Fizyoterapi ve Rehabilitasyon (Ücretli): kontenjan 2, 2025 fiyat 490.000 TL, 2024 taban puanı 252,411, başarı sırası 510.665
-- Fizyoterapi ve Rehabilitasyon (Burslu): kontenjan 7, fiyat alanı `-`, 2024 taban puanı 310,627, başarı sırası 233.156
-- Fizyoterapi ve Rehabilitasyon (%50 İndirimli): kontenjan 40, 2025 fiyat 245.000 TL, 2024 taban puanı 253,403, başarı sırası 504.403
+- Fizyoterapi ve Rehabilitasyon (Ücretli): kontenjan 2, ücret 490.000 TL, 2024 taban puanı 241,862, başarı sırası 589.959
+- Fizyoterapi ve Rehabilitasyon (Burslu): kontenjan 7, ücret tutarı verilmez, 2024 taban puanı 367,860, başarı sırası 124.515
+- Fizyoterapi ve Rehabilitasyon (%50 İndirimli): kontenjan 40, ücret 245.000 TL, 2024 taban puanı 245,987, başarı sırası 558.678
 
-"Fizyoterapi ve Rehabilitasyon" Sağlık Bilimleri Fakültesi lisans programıdır; SHMYO'daki "Fizyoterapi" ön lisans programıyla karıştırılmamalıdır.
+Bu program Sağlık Bilimleri Fakültesindeki 4 yıllık lisans programıdır. 2 yıllık Fizyoterapi programı SHMYO altındadır.
 
 Kaynak notu: Tanıtım broşürü Sağlık Bilimleri Fakültesi tablosu.
 
@@ -663,11 +700,11 @@ Kullanıcı örnekleri:
 - Beslenme ve Diyetetik taban puanı kaç?
 
 Instructed cevap:
-2025 tanıtım broşüründe Beslenme ve Diyetetik için satırlar şöyle:
+2025 Beslenme ve Diyetetik bilgileri şöyledir:
 
-- Beslenme ve Diyetetik (Ücretli): kontenjan 2, 2025 fiyat 490.000 TL, 2024 taban puanı 259,245, başarı sırası 458.987
-- Beslenme ve Diyetetik (Burslu): kontenjan 7, fiyat alanı `-`, 2024 taban puanı 335,804, başarı sırası 173.823
-- Beslenme ve Diyetetik (%50 İndirimli): kontenjan 40, 2025 fiyat 245.000 TL, 2024 taban puanı 261,341, başarı sırası 444.798
+- Beslenme ve Diyetetik (Ücretli): kontenjan 2, ücret 490.000 TL, 2024 taban puanı 259,245, başarı sırası 458.987
+- Beslenme ve Diyetetik (Burslu): kontenjan 7, ücret tutarı verilmez, 2024 taban puanı 335,804, başarı sırası 173.823
+- Beslenme ve Diyetetik (%50 İndirimli): kontenjan 40, ücret 245.000 TL, 2024 taban puanı 261,341, başarı sırası 444.798
 
 Kaynak notu: Tanıtım broşürü Sağlık Bilimleri Fakültesi tablosu.
 
@@ -686,12 +723,17 @@ Kullanıcı örnekleri:
 - Ergoterapi taban puanı neden yok?
 
 Instructed cevap:
-2025 tanıtım broşüründe Ergoterapi ve Ebelik için şu bilgiler yer alıyor:
+2025 Ergoterapi ve Ebelik bilgileri şöyledir:
 
-- Ergoterapi: ücretli kontenjan 6 ve fiyat 460.000 TL; burslu kontenjan 4; %50 indirimli kontenjan 19 ve fiyat 230.000 TL.
-- Ebelik: ücretli kontenjan 6 ve fiyat 460.000 TL; burslu kontenjan 4; %50 indirimli kontenjan 19 ve fiyat 230.000 TL.
+Ergoterapi:
+- Ücretli: kontenjan 2, ücret 460.000 TL, 2024 taban puanı 231,930, başarı sırası 668.437
+- Burslu: kontenjan 5, ücret tutarı verilmez, 2024 taban puanı 315,043, başarı sırası 215.235
+- %50 İndirimli: kontenjan 31, ücret 230.000 TL, 2024 taban puanı 230,811, başarı sırası 677.165
 
-Broşürde bu iki program için 2024 taban puanı ve başarı sırası alanları `-` olarak gösterilmiş. Bu nedenle geçmiş yıl puanı yerine güncel ÖSYM kılavuzunu kontrol etmek gerekir.
+Ebelik:
+- Ücretli: kontenjan 2, ücret 460.000 TL, 2024 taban puanı 251,608, başarı sırası 513.803
+- Burslu: kontenjan 5, ücret tutarı verilmez, 2024 taban puanı 373,234, başarı sırası 116.906
+- %50 İndirimli: kontenjan 31, ücret 230.000 TL, 2024 taban puanı 266,516, başarı sırası 411.293
 
 Kaynak notu: Tanıtım broşürü Sağlık Bilimleri Fakültesi tablosu.
 
@@ -709,13 +751,12 @@ Kullanıcı örnekleri:
 - Sağlık Yönetimi kontenjanı kaç?
 
 Instructed cevap:
-Tanıtım broşüründe EA puan türüyle listelenen program Sağlık Yönetimi'dir.
+Sağlık Bilimleri Fakültesinde EA puan türüyle listelenen program Sağlık Yönetimi'dir.
 
-2025 broşür satırları:
-
-- Sağlık Yönetimi (Ücretli): kontenjan 2, fiyat 460.000 TL, 2024 taban puanı 211,394, başarı sırası 1.366.894
-- Sağlık Yönetimi (Burslu): kontenjan 7, fiyat alanı `-`, 2024 taban puanı 297,876, başarı sırası 364.146
-- Sağlık Yönetimi (%50 İndirimli): kontenjan 40, fiyat 230.000 TL, 2024 taban puanı 226,124, başarı sırası 1.159.672
+2025 Sağlık Yönetimi bilgileri:
+- Sağlık Yönetimi (Ücretli): kontenjan 2, ücret 460.000 TL, 2024 taban puanı 211,394, başarı sırası 1.366.894
+- Sağlık Yönetimi (Burslu): kontenjan 7, ücret tutarı verilmez, 2024 taban puanı 297,876, başarı sırası 364.146
+- Sağlık Yönetimi (%50 İndirimli): kontenjan 40, ücret 230.000 TL, 2024 taban puanı 226,124, başarı sırası 1.159.672
 
 Kaynak notu: Tanıtım broşürü Sağlık Bilimleri Fakültesi tablosu.
 
@@ -733,22 +774,22 @@ Kullanıcı örnekleri:
 - İlk ve Acil Yardım var mı?
 
 Instructed cevap:
-Tanıtım broşüründe Sağlık Hizmetleri Meslek Yüksekokulu altında şu programlar listeleniyor:
+Sağlık Hizmetleri Meslek Yüksekokulunda şu ön lisans programları bulunur:
 
-- Ameliyathane Hizmetleri
 - Anestezi
+- İlk ve Acil Yardım
+- Ameliyathane Hizmetleri
+- Tıbbi Laboratuvar Teknikleri
+- Tıbbi Görüntüleme Teknikleri
+- Fizyoterapi
 - Biyomedikal Cihaz Teknolojisi
-- Elektronörofizyoloji
 - Optisyenlik
 - Tıbbi Dokümantasyon ve Sekreterlik
-- Tıbbi Laboratuvar Teknikleri
 - Tıbbi Tanıtım ve Pazarlama
-- Fizyoterapi
-- İlk ve Acil Yardım
 - Tele-Sağlık Teknikerliği
 - Tıbbi Veri İşleme Teknikerliği
 
-Bu programlar TYT puan türüyle listelenmiştir.
+Bu programlar 2 yıllık ön lisans programlarıdır.
 
 Kaynak notu: Tanıtım broşürü SHMYO program listesi ve tablosu.
 
@@ -766,11 +807,22 @@ Kullanıcı örnekleri:
 - TYT sağlık programlarında %50 indirimli fiyat ne?
 
 Instructed cevap:
-2025 tanıtım broşüründe SHMYO programlarının çoğunda ücretli fiyat 330.000 TL, %50 indirimli fiyat 165.000 TL olarak listeleniyor. Buna Ameliyathane Hizmetleri, Anestezi, Biyomedikal Cihaz Teknolojisi, Elektronörofizyoloji, Optisyenlik, Tıbbi Dokümantasyon ve Sekreterlik, Tıbbi Laboratuvar Teknikleri ve İlk ve Acil Yardım gibi programlar dahildir.
+2025 Sağlık Hizmetleri Meslek Yüksekokulu ücretleri programlara göre değişir.
 
-Fizyoterapi ön lisans için ücretli 320.000 TL, %50 indirimli 160.000 TL; Tele-Sağlık Teknikerliği ve Tıbbi Veri İşleme Teknikerliği için ücretli 285.000 TL, %50 indirimli 142.500 TL bilgisi yer alır.
+Sık sorulan ücretli program tutarları:
+- Anestezi: 330.000 TL
+- İlk ve Acil Yardım: 330.000 TL
+- Tıbbi Laboratuvar Teknikleri: 330.000 TL
+- Ameliyathane Hizmetleri: 330.000 TL
+- Tıbbi Görüntüleme Teknikleri: 320.000 TL
+- Fizyoterapi: 320.000 TL
+- Biyomedikal Cihaz Teknolojisi: 285.000 TL
+- Optisyenlik: 285.000 TL
+- Tıbbi Dokümantasyon ve Sekreterlik: 285.000 TL
+- Tele-Sağlık Teknikerliği: 285.000 TL
+- Tıbbi Veri İşleme Teknikerliği: 285.000 TL
 
-Hangi programı soruyorsan net satırı paylaşabilirim.
+%50 indirimli satırlarda ilgili ücretin yarısı uygulanır.
 
 Kaynak notu: Tanıtım broşürü SHMYO 2025 tablosu.
 
@@ -788,11 +840,11 @@ Kullanıcı örnekleri:
 - Anestezi taban puanı kaç?
 
 Instructed cevap:
-2025 tanıtım broşüründe Anestezi için satırlar şöyle:
+2025 Anestezi bilgileri şöyledir:
 
-- Anestezi (Ücretli): kontenjan 10, fiyat 330.000 TL, 2024 taban puanı 296,241, başarı sırası 932.028
-- Anestezi (Burslu): kontenjan 10, fiyat alanı `-`, 2024 taban puanı 360,865, başarı sırası 349.366
-- Anestezi (%50 İndirimli): kontenjan 50, fiyat 165.000 TL, 2024 taban puanı 315,728, başarı sırası 698.670
+- Anestezi (Ücretli): kontenjan 5, ücret 330.000 TL, 2024 taban puanı 267,851, başarı sırası 1.353.668
+- Anestezi (Burslu): kontenjan 9, ücret tutarı verilmez, 2024 taban puanı 347,781, başarı sırası 407.337
+- Anestezi (%50 İndirimli): kontenjan 55, ücret 165.000 TL, 2024 taban puanı 283,333, başarı sırası 1.116.166
 
 Kaynak notu: Tanıtım broşürü SHMYO tablosu.
 
@@ -811,13 +863,13 @@ Kullanıcı örnekleri:
 - İlk ve Acil Yardım %50 indirimli fiyatı nedir?
 
 Instructed cevap:
-2025 tanıtım broşüründe İlk ve Acil Yardım için satırlar şöyle:
+2025 İlk ve Acil Yardım bilgileri şöyledir:
 
-- İlk ve Acil Yardım (Ücretli): kontenjan 5, fiyat 330.000 TL
-- İlk ve Acil Yardım (Burslu): kontenjan 5, fiyat alanı `-`
-- İlk ve Acil Yardım (%50 İndirimli): kontenjan 29, fiyat 165.000 TL
+- İlk ve Acil Yardım (Ücretli): kontenjan 5, ücret 330.000 TL
+- İlk ve Acil Yardım (Burslu): kontenjan 5, ücret tutarı verilmez
+- İlk ve Acil Yardım (%50 İndirimli): kontenjan 29, ücret 165.000 TL
 
-Broşürde bu program için 2024 taban puanı ve başarı sırası alanları `-` olarak gösterilmiş.
+Bu program için 2024 taban puanı ve başarı sırası bilgisi verilmemiştir.
 
 Kaynak notu: Tanıtım broşürü SHMYO tablosu.
 
@@ -835,11 +887,11 @@ Kullanıcı örnekleri:
 - Tıbbi Laboratuvar taban puanı kaç?
 
 Instructed cevap:
-2025 tanıtım broşüründe Tıbbi Laboratuvar Teknikleri için satırlar şöyle:
+2025 Tıbbi Laboratuvar Teknikleri bilgileri şöyledir:
 
-- Tıbbi Laboratuvar Teknikleri (Ücretli): kontenjan 10, fiyat 330.000 TL, 2024 taban puanı 263,122, başarı sırası 1.429.838
-- Tıbbi Laboratuvar Teknikleri (Burslu): kontenjan 9, fiyat alanı `-`, 2024 taban puanı 334,689, başarı sırası 521.304
-- Tıbbi Laboratuvar Teknikleri (%50 İndirimli): kontenjan 55, fiyat 165.000 TL, 2024 taban puanı 287,670, başarı sırası 1.050.102
+- Tıbbi Laboratuvar Teknikleri (Ücretli): kontenjan 10, ücret 330.000 TL, 2024 taban puanı 263,122, başarı sırası 1.429.838
+- Tıbbi Laboratuvar Teknikleri (Burslu): kontenjan 9, ücret tutarı verilmez, 2024 taban puanı 334,689, başarı sırası 521.304
+- Tıbbi Laboratuvar Teknikleri (%50 İndirimli): kontenjan 55, ücret 165.000 TL, 2024 taban puanı 287,670, başarı sırası 1.050.102
 
 Kaynak notu: Tanıtım broşürü SHMYO tablosu.
 
@@ -857,11 +909,11 @@ Kullanıcı örnekleri:
 - Ameliyathane taban puanı kaç?
 
 Instructed cevap:
-2025 tanıtım broşüründe Ameliyathane Hizmetleri için satırlar şöyle:
+2025 Ameliyathane Hizmetleri bilgileri şöyledir:
 
-- Ameliyathane Hizmetleri (Ücretli): kontenjan 5, fiyat 330.000 TL, 2024 taban puanı 268,669, başarı sırası 1.340.077
-- Ameliyathane Hizmetleri (Burslu): kontenjan 10, fiyat alanı `-`, 2024 taban puanı 328,856, başarı sırası 570.522
-- Ameliyathane Hizmetleri (%50 İndirimli): kontenjan 55, fiyat 165.000 TL, 2024 taban puanı 280,807, başarı sırası 1.150.818
+- Ameliyathane Hizmetleri (Ücretli): kontenjan 5, ücret 330.000 TL, 2024 taban puanı 253,483, başarı sırası 1.593.853
+- Ameliyathane Hizmetleri (Burslu): kontenjan 7, ücret tutarı verilmez, 2024 taban puanı 325,122, başarı sırası 618.751
+- Ameliyathane Hizmetleri (%50 İndirimli): kontenjan 40, ücret 165.000 TL, 2024 taban puanı 257,173, başarı sırası 1.533.977
 
 Kaynak notu: Tanıtım broşürü SHMYO tablosu.
 
@@ -879,12 +931,12 @@ Kullanıcı örnekleri:
 - Tıbbi Tanıtım tablosunda burslu fiyat neden var?
 
 Instructed cevap:
-2025 tanıtım broşüründe Tıbbi Tanıtım ve Pazarlama için iki satır görünüyor:
+2025 Tıbbi Tanıtım ve Pazarlama bilgilerinde dikkat edilmesi gereken bir tutarsızlık var.
 
-- Tıbbi Tanıtım ve Pazarlama (Burslu): kontenjan 4, 2024 taban puanı 309,532, başarı sırası 767.115; fiyat alanında 330.000 TL görünüyor.
-- Tıbbi Tanıtım ve Pazarlama (%50 İndirimli): kontenjan 30, fiyat 165.000 TL, 2024 taban puanı 215,543, başarı sırası 2.278.037.
+- Tıbbi Tanıtım ve Pazarlama (Ücretli): kontenjan 5, ücret 330.000 TL, 2024 taban puanı 208,489, başarı sırası 2.109.484
+- Tıbbi Tanıtım ve Pazarlama (Burslu): kontenjan 4, 2024 taban puanı 309,532, başarı sırası 767.115
 
-Burada dikkatli olmak gerekir: broşürde burslu satırda fiyat görünmesi, diğer burslu satırların genellikle `-` olmasıyla tutarsız. Bu nedenle bu satır için kayıt/aday ilişkileri biriminden teyit almak en doğru yaklaşım olur.
+Burslu satırdaki ücret bilgisi diğer burslu satırlardan farklı göründüğü için bu programda burslu ücret konusunda kesin tutar söylemek doğru olmaz. Ücretli satır için 330.000 TL bilgisi kullanılabilir.
 
 Kaynak notu: Doğrulanmış broşür markdown "Kontrol Gerektiren Kaynak Tutarsızlığı".
 
@@ -903,13 +955,13 @@ Kullanıcı örnekleri:
 - Tele-Sağlık burslu kaç kişi?
 
 Instructed cevap:
-2025 tanıtım broşüründe Tele-Sağlık Teknikerliği ve Tıbbi Veri İşleme Teknikerliği için aynı kontenjan/fiyat yapısı görünüyor:
+2025 Tele-Sağlık Teknikerliği ve Tıbbi Veri İşleme Teknikerliği için kontenjan ve ücret yapısı aynıdır:
 
-- Ücretli: kontenjan 8, fiyat 285.000 TL
-- Burslu: kontenjan 5, fiyat alanı `-`
-- %50 İndirimli: kontenjan 26, fiyat 142.500 TL
+- Ücretli: kontenjan 8, ücret 285.000 TL
+- Burslu: kontenjan 5, ücret tutarı verilmez
+- %50 İndirimli: kontenjan 26, ücret 142.500 TL
 
-Broşürde bu programlar için 2024 taban puanı ve başarı sırası alanları `-` olarak gösterilmiş.
+Bu programlar için 2024 taban puanı ve başarı sırası bilgisi verilmemiştir.
 
 Kaynak notu: Tanıtım broşürü SHMYO tablosu.
 
@@ -927,14 +979,16 @@ Kullanıcı örnekleri:
 - Grafik Tasarım var mı?
 
 Instructed cevap:
-Tanıtım broşüründe Meslek Yüksekokulu altında şu programlar listeleniyor:
+Meslek Yüksekokulunda şu ön lisans programları bulunur:
 
 - Bilgisayar Programcılığı
-- Eczane Hizmetleri
-- Elektrik
 - Grafik Tasarım
+- İç Mekan Tasarımı
+- Ağız ve Diş Sağlığı
+- Çocuk Gelişimi
+- Eczane Hizmetleri
 
-Bu programlar TYT puan türüyle listelenmiştir. Yerleşke olarak Balgat Yerleşkesi gösterilir.
+Meslek Yüksekokulu Balgat Yerleşkesindedir.
 
 Kaynak notu: Tanıtım broşürü MYO program listesi ve tablosu.
 
@@ -952,14 +1006,28 @@ Kullanıcı örnekleri:
 - Grafik Tasarım kaç TL?
 - Grafik Tasarım kontenjanı kaç?
 - MYO %50 indirimli ücretler ne kadar?
+- grafik tasarım kaç para
+- grafik tasarım kaç tl
+- bilgisayar programcılığı var mı
+- myo ücretleri
 
 Instructed cevap:
-2025 tanıtım broşürüne göre Meslek Yüksekokulu programlarında:
+2025 Meslek Yüksekokulu ücretleri şöyledir:
 
-- Bilgisayar Programcılığı: ücretli 330.000 TL, %50 indirimli 165.000 TL; kontenjanlar ücretli 5, burslu 7, %50 indirimli 37.
-- Eczane Hizmetleri: ücretli 330.000 TL, %50 indirimli 165.000 TL; kontenjanlar ücretli 2, burslu 7, %50 indirimli 40.
-- Elektrik: ücretli 300.000 TL, %50 indirimli 150.000 TL; kontenjanlar ücretli 7, burslu 5, %50 indirimli 27.
-- Grafik Tasarım: ücretli 300.000 TL, %50 indirimli 150.000 TL; kontenjanlar ücretli 7, burslu 5, %50 indirimli 27.
+- Bilgisayar Programcılığı (Ücretli): 250.000 TL
+- Bilgisayar Programcılığı (%50 İndirimli): 125.000 TL
+- Grafik Tasarım (Ücretli): 250.000 TL
+- Grafik Tasarım (%50 İndirimli): 125.000 TL
+- İç Mekan Tasarımı (Ücretli): 250.000 TL
+- İç Mekan Tasarımı (%50 İndirimli): 125.000 TL
+- Ağız ve Diş Sağlığı (Ücretli): 320.000 TL
+- Ağız ve Diş Sağlığı (%50 İndirimli): 160.000 TL
+- Çocuk Gelişimi (Ücretli): 285.000 TL
+- Çocuk Gelişimi (%50 İndirimli): 142.500 TL
+- Eczane Hizmetleri (Ücretli): 285.000 TL
+- Eczane Hizmetleri (%50 İndirimli): 142.500 TL
+
+Burslu satırlarda ayrıca ücret tutarı verilmez.
 
 Kaynak notu: Tanıtım broşürü Meslek Yüksekokulu tablosu.
 
@@ -977,15 +1045,14 @@ Kullanıcı örnekleri:
 - Antrenörlük TYT mi?
 
 Instructed cevap:
-Tanıtım broşüründe Spor Bilimleri Fakültesi altında Antrenörlük Eğitimi programı yer alıyor ve TYT puan türüyle listeleniyor.
+Spor Bilimleri Fakültesinde Antrenörlük Eğitimi programı bulunur ve TYT puan türüyle listelenir.
 
-2025 broşür bilgisine göre:
+2025 Antrenörlük Eğitimi bilgileri:
+- Ücretli: kontenjan 2, ücret 380.000 TL
+- Burslu: kontenjan 6, ücret tutarı verilmez
+- %50 İndirimli: kontenjan 32, ücret 190.000 TL
 
-- Antrenörlük Eğitimi (Ücretli): kontenjan 2, fiyat 380.000 TL
-- Antrenörlük Eğitimi (Burslu): kontenjan 6, fiyat alanı `-`
-- Antrenörlük Eğitimi (%50 İndirimli): kontenjan 32, fiyat 190.000 TL
-
-Yerleşke olarak Balgat Yerleşkesi gösteriliyor.
+Program Balgat Yerleşkesindedir.
 
 Kaynak notu: Tanıtım broşürü Spor Bilimleri Fakültesi tablosu.
 
@@ -1001,16 +1068,20 @@ Kullanıcı örnekleri:
 - Üstün başarı bursu ne kadar?
 - Sıralamaya göre burs alabilir miyim?
 - İlk 1000 bursu kaç TL?
+- yks bursu kaç
+- sıralama bursu kaç
+- ilk bine burs var mı?
 
 Instructed cevap:
-2025-2026 broşüründeki YKS Üstün Başarı Bursu bilgisine göre akademik yıllar süresince her sene 8 ay karşılıksız burs imkanı sağlanır. Tutarlar şöyle:
+YKS Üstün Başarı Bursu başarı sırasına göre 8 ay karşılıksız burs imkanı sağlar.
 
+2025-2026 tutarları:
 - İlk 100: 30.000 TL
-- İlk 101-500: 10.000 TL
-- İlk 501-1000: 7.000 TL
-- İlk 1001-10000: 5.000 TL
+- 101-500: 25.000 TL
+- 501-1000: 20.000 TL
+- 1001-10000: 15.000 TL
 
-Burs koşulları ilgili akademik yıl için geçerlidir; güncel koşullar üniversite duyurularından teyit edilmelidir.
+Bu burs eğitim ücretinden bağımsız nakdi destek niteliğindedir. Güncel yıl koşulları ayrıca değişebilir.
 
 Kaynak notu: Tanıtım broşürü Burs İmkanları.
 
@@ -1028,15 +1099,14 @@ Kullanıcı örnekleri:
 - 3. tercihte indirim var mı?
 
 Instructed cevap:
-Evet, broşürde tercih bursu bilgisi yer alıyor. Yüksek İhtisas Üniversitesi'ne YKS sonuçlarına göre:
+Evet, tercih bursu bulunur.
 
-- 1. sırada tercih ederek yerleşen öğrencilere yıllık eğitim öğretim ücretinden %10 indirim
-- 2. sırada tercih ederek yerleşen öğrencilere %7 indirim
-- 3. sırada tercih ederek yerleşen öğrencilere %5 indirim
+YKS sonuçlarına göre Yüksek İhtisas Üniversitesine:
+- 1. tercihten yerleşenlere %10
+- 2. tercihten yerleşenlere %7
+- 3. tercihten yerleşenlere %5
 
-uygulanacağı belirtiliyor.
-
-Bu bilgiler 2025-2026 broşür koşullarıdır; güncel yıl için üniversite duyuruları kontrol edilmelidir.
+eğitim ücreti indirimi uygulanır. Güncel yıl koşulları tercih döneminde ayrıca kontrol edilmelidir.
 
 Kaynak notu: Tanıtım broşürü Burs İmkanları.
 
@@ -1054,14 +1124,11 @@ Kullanıcı örnekleri:
 - Akademik başarı bursu şartları neler?
 
 Instructed cevap:
-Broşürde akademik başarı bursu, ÖSYM kılavuzunda ücretli öğrenci alınacağı belirtilen programlara yerleşen öğrenciler için açıklanıyor.
+Akademik başarı bursu, ücretli programlara yerleşen öğrenciler için başarı durumuna bağlı indirim sağlar.
 
-Koşullar özetle şöyledir:
+Genel ağırlıklı not ortalaması en az 3,50 olan, başarısız dersi bulunmayan ve bölüm/program başarı sıralamasında ilk %10'a giren öğrencilere bir sonraki eğitim-öğretim yılı ücretinden %75 indirim uygulanır.
 
-- Akademik yıl içinde bütün zorunlu ve seçmeli derslerden başarılı olmak gerekir.
-- Yıl sonu GANO eşiği Tıp Fakültesi için 3,50 ve üzeri; diğer fakülte ve yüksekokullar için 3,85 ve üzeridir.
-- En yüksek yıl sonu GANO'ya sahip her sınıftan 2 öğrenciye, izleyen akademik yıl ile sınırlı olarak eğitim öğretim ücretinde %75 indirim uygulanır.
-- GANO eşit olursa öğrencinin üniversiteye giriş sıralaması dikkate alınır.
+Hazırlık sınıfı ve kayıt dondurulan süreler bu değerlendirmeye dahil edilmez.
 
 Kaynak notu: Tanıtım broşürü Burs İmkanları.
 
@@ -1078,18 +1145,18 @@ Kullanıcı örnekleri:
 - Kardeş indirimi var mı?
 - Şehit gazi çocuğu bursu var mı?
 - Sporcu bursu veriyor musunuz?
+- kardeş bursu var mı?
+- burslar neler?
+- indirim var mı?
 
 Instructed cevap:
-2025-2026 tanıtım broşüründe şu burs ve indirim başlıkları yer alıyor:
+Yüksek İhtisas Üniversitesinde 2025-2026 için öne çıkan burs ve indirim başlıkları şunlardır:
 
-- YKS Üstün Başarı Bursu: ilk 100, 101-500, 501-1000 ve 1001-10000 başarı aralıkları için 8 ay karşılıksız burs tutarları belirtilmiş.
-- Tercih Bursu: 1. tercih için %10, 2. tercih için %7, 3. tercih için %5 eğitim ücreti indirimi belirtilmiş.
-- Akademik Başarı Bursu: ücretli programlara yerleşen öğrenciler için GANO ve başarı koşullarına bağlı %75 indirim başlığı yer alıyor.
-- Şehit ve Gazi Çocukları Bursu: eğitim öğretim ücretine %25 indirim.
-- Kardeş Bursu: üniversitede öğrenim gören kardeş öğrencilerin her biri için %5 indirim.
-- Spor Başarı Bursu ve Sosyal Destek Bursu: koşulları ve tutarları Mütevelli Heyet tarafından belirlenen burs başlıkları olarak açıklanıyor.
+- YKS Üstün Başarı Bursu: ilk 100, 101-500, 501-1000 ve 1001-10000 başarı aralıkları için 8 ay nakdi burs
+- Tercih Bursu: 1. tercih %10, 2. tercih %7, 3. tercih %5 eğitim ücreti indirimi
+- Akademik Başarı Bursu: ücretli programlarda başarı koşullarını sağlayan öğrencilere sonraki yıl için %75 indirim
 
-Broşürde burs koşullarının 2025-2026 Akademik Yılı için geçerli olduğu ve sonraki yıllarda değişebileceği notu vardır. Kesin bilgi için güncel burs/ücret duyurusunu kontrol etmek gerekir.
+Kardeş indirimi, şehit/gazi yakını indirimi veya sporcu bursu için net bir tutar ya da garanti bilgi veremem.
 
 Kaynak notu: Tanıtım broşürü Burs İmkanları bölümü.
 
@@ -1105,20 +1172,14 @@ Kullanıcı örnekleri:
 - Anestezi ile Ameliyathane çift anadal olur mu?
 - Tıbbi Laboratuvar öğrencisi başka programla ÇAP yapabilir mi?
 - Hangi 2 yıllık bölümlerde çift anadal var?
+- çap var mı?
+- cap yapabiliyor muyum?
+- 2 yıllık çap var mı?
 
 Instructed cevap:
-Tanıtım broşüründe ön lisans programlarında çift anadal programı olduğu ve öğrencilerin YKS ile yerleştikleri program dışında ikinci bir dalda ön lisans diploması alma fırsatı bulabileceği belirtiliyor.
+Ön lisans programlarında çift anadal imkanı bulunur.
 
-Broşürde çift anadal için listelenen programlar:
-
-- Ameliyathane Hizmetleri
-- Anestezi
-- Tıbbi Dokümantasyon ve Sekreterlik
-- Tıbbi Tanıtım ve Pazarlama
-- Tıbbi Laboratuvar Teknikleri
-- Eczane Hizmetleri
-
-Başvuru şartları, GANO eşiği, kontenjan ve dönem koşulları için ilgili çift anadal/yandal yönergesi ve güncel duyurular kontrol edilmelidir.
+Öğrenciler, yerleştikleri program dışında ikinci bir ön lisans dalında diploma alma fırsatı yakalayabilir. Çift anadal için başarı koşulu, kontenjan, başvuru zamanı ve program eşleşmeleri ayrıca değerlendirilir.
 
 Kaynak notu: Tanıtım broşürü Çift Anadal Programı, Yatay Geçiş/Çift Anadal/Yandal yönergesi.
 
@@ -1137,11 +1198,9 @@ Kullanıcı örnekleri:
 - Tıp Fakültesinde bütünleme hakkı var mı?
 
 Instructed cevap:
-Tıp Fakültesi yönerge kaynaklarına göre Dönem I, II ve III'te dönem sonu başarı notu genel olarak dönem içi kurul notunun %60'ı ile final veya bütünleme notunun %40'ının toplanmasıyla hesaplanır.
+Tıp Fakültesinde ders kurulu, genel sınav ve bütünleme sınavı süreçleri ayrı değerlendirilir.
 
-Yönerge çıktılarında dönem içi kurul notu yüksek olan öğrencilerin bazı koşullarla final sınavına girmeksizin başarılı sayılabileceği bilgisi de yer alır. Final sınavına girmesi gerektiği halde girmeyen veya final sınav puanı yeterli olmayan öğrenciler için bütünleme sınavı hakkı bulunur; bütünleme notu final notu yerine geçer.
-
-Bu kurallar dönem, kurul, devam ve baraj koşullarına göre değişebileceği için kesin durumunu öğrenci işleri veya ilgili Tıp Fakültesi yönergesi üzerinden kontrol etmek gerekir.
+Kısa özetle: dönem içi kurul sınavları ve yıl sonu sınavları birlikte başarı notunu oluşturur. Bütünleme hakkı, ilgili dönem ve sınav türüne göre uygulanır. Net geçme koşulu için dönem, ders/staj ve sınav türü birlikte değerlendirilmelidir.
 
 Kaynak notu: Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi.
 
@@ -1159,9 +1218,9 @@ Kullanıcı örnekleri:
 - Sağlık raporu sınav için geçerli mi?
 
 Instructed cevap:
-Tıp Fakültesi ve genel sınav yönerge kaynaklarında sağlık mazeretinin sağlık raporu ile belgelendirilmesi gerektiği; rapor veya mazeret ilgili yönetim kurulu tarafından kabul edilirse mazeret sınavı açılabileceği belirtilir.
+Sağlık mazereti için sağlık raporuyla belgelendirme gerekir.
 
-Raporlu olduğu halde sınava girme veya rapor teslim süresi gibi ayrıntılar öğrencinin birimine ve güncel yönergeye bağlıdır. Bu nedenle rapor, dilekçe ve başvuru süresini geciktirmeden öğrenci işleri/fakülte sekreterliği ile teyit etmek gerekir.
+Rapor veya mazeret ilgili yönetim kurulu tarafından kabul edilirse mazeret sınavı açılabilir. Her rapor otomatik sınav hakkı anlamına gelmez; karar ilgili kurul değerlendirmesine bağlıdır.
 
 Kaynak notu: Ön Lisans ve Lisans Eğitim-Öğretim ve Sınav Yönetmeliği, Tıp Fakültesi sınav yönergeleri.
 
@@ -1179,9 +1238,9 @@ Kullanıcı örnekleri:
 - İntörnlükte devam zorunlu mu?
 
 Instructed cevap:
-Tıp Fakültesinde Dönem VI, intörnlük eğitimi dönemidir. Kaynaklarda intörn hekimlik eğitiminin sağlık hizmeti sunum alanlarında uygulama yapabilme, hastayı değerlendirme, gerektiğinde uzmana yönlendirme ve izlem yapabilme gibi mesleki yeterlikleri geliştirmeyi hedeflediği görülür.
+Tıp Fakültesinde 6. sınıf intörnlük dönemidir.
 
-İntörnlükte zorunlu stajlara devam esastır; kabul edilen mazeretler ve telafi süreçleri Fakülte Yönetim Kurulu ve ilgili yönergeler kapsamında değerlendirilir.
+İntörnlük, öğrencinin hekimlik uygulamalarına daha aktif katıldığı ve mezuniyet öncesi klinik deneyimini güçlendirdiği dönemdir. Staj/rotasyon ayrıntıları ilgili akademik yıl programına göre yürütülür.
 
 Kaynak notu: Tıp Fakültesi Dönem VI İntörn Hekimlik Eğitimi Yönergesi.
 
@@ -1199,9 +1258,9 @@ Kullanıcı örnekleri:
 - Mezun olmak için seçmeli ders almak gerekiyor mu?
 
 Instructed cevap:
-Tıp Fakültesi seçmeli ders yönergesi, Dönem I, II ve III öğretim programlarındaki seçmeli derslerin planlanması ve yürütülmesine ilişkin esasları düzenler.
+Tıp Fakültesinde seçmeli dersler bulunur.
 
-Kaynaklarda Tıp Fakültesi müfredatında yer alan seçmeli derslerden Dönem VI sonuna kadar başarılı olunması gerektiği yönünde bilgi bulunur. Hangi seçmeli derslerin açılacağı, dönem planı ve başarı koşulları için güncel ders programı ve ilgili fakülte duyuruları kontrol edilmelidir.
+Öğrencilerin Dönem VI sonuna kadar müfredattaki seçmeli derslerden başarılı olması gerekir. Hangi seçmeli derslerin açılacağı ve dönem planı akademik yıla göre değişebilir.
 
 Kaynak notu: Tıp Fakültesi Seçmeli Ders Kurulu Yönergesi, Tıp Eğitim-Öğretim ve Sınav Yönergesi.
 
@@ -1219,9 +1278,9 @@ Kullanıcı örnekleri:
 - Hazırlık öğrencileri değişim programından yararlanabilir mi?
 
 Instructed cevap:
-Erasmus+ yönerge değerlendirme çıktılarında İngilizce Hazırlık Programı öğrencilerinin Erasmus+ Programı'ndan yararlanamayacağı bilgisi yer alıyor. Ayrıca Erasmus başvurusu için öğrencinin kayıtlı olduğu programa en az bir yıl devam etmiş olması koşulu da kaynaklarda geçiyor.
+İngilizce Hazırlık Programı öğrencileri Erasmus+ programından yararlanamaz.
 
-Bu nedenle hazırlık sınıfındayken Erasmus başvurusu uygun görünmüyor. Güncel başvuru şartları için Erasmus Koordinatörlüğü duyuruları kontrol edilmelidir.
+Erasmus başvurusu için öğrencinin kayıtlı olduğu programa en az bir yıl devam etmiş olması gerekir. Başvuru koşulları ve kontenjanlar her çağrı döneminde ayrıca duyurulur.
 
 Kaynak notu: Erasmus+ Programı Yönergesi, Erasmus öğrenci hareketliliği sayfası.
 
@@ -1239,9 +1298,9 @@ Kullanıcı örnekleri:
 - İntibak işlemleri ne demek?
 
 Instructed cevap:
-Muafiyet ve İntibak İşlemleri Yönergesi'nin amacı, Yüksek İhtisas Üniversitesi'ne yeni kayıt yaptıran öğrencilerin daha önce Yüksek İhtisas Üniversitesi dahil herhangi bir yükseköğretim kurumunda alıp başarılı oldukları derslerden muafiyet ve yarıyıl/yıl intibak esaslarını belirlemektir.
+Daha önce alınan ve başarılan dersler için muafiyet ve intibak süreci olabilir.
 
-Yatay geçiş, DGS, af kanunu, yeniden kayıt gibi durumlarda daha önce alınan ve başarılan dersler için muafiyet/intibak süreci olabilir. Başvuru süresi, belge ve karar koşulları için güncel duyuru ve öğrenci işleri yönlendirmesi takip edilmelidir.
+Bu süreç yatay geçiş, DGS, af kanunu, yeniden kayıt veya başka bir yükseköğretim kurumundan alınmış dersler gibi durumlarda gündeme gelir. Başvuru süresi, belge koşulları ve karar ilgili birim değerlendirmesine bağlıdır.
 
 Kaynak notu: Muafiyet ve İntibak İşlemleri Yönergesi, kayıt duyuruları.
 
@@ -1259,9 +1318,9 @@ Kullanıcı örnekleri:
 - Başarısız olduğum dersi yaz okulunda alabilir miyim?
 
 Instructed cevap:
-Yaz Öğretimi Yönergesi değerlendirme çıktılarında öğrencilerin her yaz öğretimi döneminde en fazla 3 ders alabileceği bilgisi yer alıyor. Ayrıca öğrenciler daha önce başarısız oldukları veya kredisi yetmediği için alamadıkları dersleri yaz öğretiminde alabilir.
+Yaz öğretiminde bir öğrenci en fazla 3 ders alabilir.
 
-Genel ağırlıklı not ortalaması en az 3.00 olan ve alt yarıyıllardan başarısız dersi bulunmayan öğrencilerin üst yarıyıllardan açılan dersleri alabilmesine ilişkin bilgi de kaynaklarda geçer. Güncel ders açılma durumu ve başvuru takvimi için ilgili yılın yaz öğretimi duyurusu kontrol edilmelidir.
+Öğrenciler daha önce başarısız oldukları veya kredisi yetmediği için alamadıkları dersleri yaz öğretiminde alabilir. Genel not ortalaması en az 3.00 olan ve alt yarıyıllardan başarısız dersi bulunmayan öğrenciler üst yarıyıllardan açılan dersleri de alabilir.
 
 Kaynak notu: Yaz Öğretimi Yönergesi değerlendirme çıktıları.
 
@@ -1279,9 +1338,9 @@ Kullanıcı örnekleri:
 - Çift anadal yönergesi nerede?
 
 Instructed cevap:
-Üniversitenin kurumsal mevzuat sayfasında yönetmelikler ve yönergeler listeleniyor. Tıp Fakültesi için ayrıca Tıp Fakültesi yönergeleri sayfasında Eğitim-Öğretim ve Sınav Yönergesi, Dönem VI İntörn Hekimlik Eğitimi Yönergesi, Klinik Beceri Eğitimi Yönergesi, Kanıta Dayalı Tıp Kurulu Yönergesi, Ölçme ve Değerlendirme yönergeleri gibi belgeler yer alıyor.
+Üniversitenin mevzuat ve yönergeleri kurumsal mevzuat sayfasında yayımlanır.
 
-Aradığın konu ders/sınav, intörnlük, Erasmus, muafiyet, çift anadal veya yaz öğretimi ise ilgili yönerge başlığına göre bakmak gerekir.
+Tıp Fakültesi için ayrıca Eğitim-Öğretim ve Sınav Yönergesi, Dönem VI İntörn Hekimlik Eğitimi Yönergesi, Klinik Beceri Eğitimi Yönergesi, Kanıta Dayalı Tıp Kurulu Yönergesi ve ölçme-değerlendirme yönergeleri gibi fakülteye özel belgeler bulunur.
 
 Kaynak notu: Kurumsal mevzuat sayfası, Tıp Fakültesi yönergeleri sayfası.
 
@@ -1300,15 +1359,13 @@ Kullanıcı örnekleri:
 - Biyomedikal burslu var mı?
 
 Instructed cevap:
-2025 tanıtım broşüründeki SHMYO tablosunda bu programlar için öne çıkan bilgiler şöyle:
+2025 SHMYO diğer program bilgileri şöyledir:
 
-- Biyomedikal Cihaz Teknolojisi: ücretli kontenjan 5 ve fiyat 330.000 TL; burslu kontenjan 5; %50 indirimli kontenjan 30 ve fiyat 165.000 TL. 2024 ücretli taban puanı 234,426; başarı sırası 1.930.251.
-- Elektronörofizyoloji: ücretli kontenjan 5 ve fiyat 330.000 TL; burslu kontenjan 7; %50 indirimli kontenjan 40 ve fiyat 165.000 TL. 2024 ücretli taban puanı 247,562; başarı sırası 1.695.282.
-- Optisyenlik: ücretli kontenjan 5 ve fiyat 330.000 TL; burslu kontenjan 7; %50 indirimli kontenjan 40 ve fiyat 165.000 TL. 2024 ücretli taban puanı 256,948; başarı sırası 1.533.439.
-- Tıbbi Dokümantasyon ve Sekreterlik: ücretli kontenjan 5 ve fiyat 330.000 TL; burslu kontenjan 8; %50 indirimli kontenjan 45 ve fiyat 165.000 TL. 2024 ücretli taban puanı 260,977; başarı sırası 1.465.575.
-- SHMYO Fizyoterapi: ücretli kontenjan 4 ve fiyat 320.000 TL; burslu kontenjan 4; %50 indirimli kontenjan 21 ve fiyat 160.000 TL. Broşürde bu program için 2024 taban puanı ve başarı sırası alanları `-` olarak görünüyor.
-
-Güncel tercih döneminde kontenjan, fiyat ve özel koşullar için ÖSYM kılavuzu ve üniversitenin güncel duyuruları esas alınmalıdır.
+- Tıbbi Görüntüleme Teknikleri: ücretli kontenjan 4 ve ücret 320.000 TL; burslu kontenjan 4; %50 indirimli kontenjan 21 ve ücret 160.000 TL
+- Fizyoterapi: ücretli kontenjan 4 ve ücret 320.000 TL; burslu kontenjan 4; %50 indirimli kontenjan 21 ve ücret 160.000 TL
+- Biyomedikal Cihaz Teknolojisi: ücretli kontenjan 8 ve ücret 285.000 TL; burslu kontenjan 5; %50 indirimli kontenjan 26 ve ücret 142.500 TL
+- Optisyenlik: ücretli kontenjan 8 ve ücret 285.000 TL; burslu kontenjan 5; %50 indirimli kontenjan 26 ve ücret 142.500 TL
+- Tıbbi Dokümantasyon ve Sekreterlik: ücretli kontenjan 8 ve ücret 285.000 TL; burslu kontenjan 5; %50 indirimli kontenjan 26 ve ücret 142.500 TL
 
 Kaynak notu: Tanıtım broşürü Sağlık Hizmetleri Meslek Yüksekokulu 2025 kontenjan ve fiyat tablosu.
 
@@ -1327,12 +1384,12 @@ Kullanıcı örnekleri:
 - Fizyoterapi hangi fakültede?
 
 Instructed cevap:
-Broşürde iki farklı fizyoterapi satırı vardır; karıştırmamak gerekir:
+Yüksek İhtisas Üniversitesinde iki farklı fizyoterapi programı vardır:
 
-- Fizyoterapi ve Rehabilitasyon: Sağlık Bilimleri Fakültesi altında lisans programıdır. 2025 broşüründe ücretli fiyat 490.000 TL, %50 indirimli fiyat 245.000 TL olarak listelenir.
-- Fizyoterapi: Sağlık Hizmetleri Meslek Yüksekokulu altında TYT puan türüyle listelenen ön lisans programıdır. 2025 broşüründe ücretli fiyat 320.000 TL, %50 indirimli fiyat 160.000 TL olarak listelenir.
+- Fizyoterapi ve Rehabilitasyon: Sağlık Bilimleri Fakültesi altında 4 yıllık lisans programıdır.
+- Fizyoterapi: Sağlık Hizmetleri Meslek Yüksekokulu altında 2 yıllık ön lisans programıdır.
 
-Kullanıcının hangi programı kastettiği belirsizse lisans FTR mi yoksa 2 yıllık SHMYO Fizyoterapi mi diye netleştirmek gerekir.
+Ücret, kontenjan, puan türü ve mezuniyet düzeyi bu iki programda farklıdır.
 
 Kaynak notu: Tanıtım broşürü Sağlık Bilimleri Fakültesi ve SHMYO 2025 tabloları.
 
@@ -1349,11 +1406,14 @@ Kullanıcı örnekleri:
 - YİÜ diploması yurtdışında geçerli mi?
 - Diploma ve mezuniyet belgeleri yönergesi var mı?
 - Diplomamı nasıl alırım?
+- diploma eki veriyor musunuz?
+- diploma eki veriyor musunuz
+- diplomam avrupada geçerli mi?
 
 Instructed cevap:
-Kurumsal mevzuat havuzunda `Diploma, Diploma Eki ve Diğer Mezuniyet Belgeleri Yönergesi` yer alıyor. Bu, diploma ve diploma eki gibi mezuniyet belgeleriyle ilgili bir üniversite yönergesi bulunduğunu gösterir.
+Üniversitede diploma, diploma eki ve diğer mezuniyet belgeleriyle ilgili bir süreç bulunur.
 
-Ancak kaynaklarda tek başına `mavi diploma` ifadesine veya her ülkede otomatik geçerlilik iddiasına dayanak olacak net bir ifade görmüyorsam bunu kesin şekilde söylememeliyim. Diploma eki, mezuniyet belgesi, yurtdışı kullanım veya belge alma süreci için güncel yönergeyi ve öğrenci işleri duyurularını kontrol etmek gerekir.
+Ancak “mavi diploma her ülkede otomatik geçerlidir” gibi kesin bir garanti vermem doğru olmaz. Diploma eki, mezuniyet belgesi ve yurtdışı kullanım konularında süreç öğrenci işleri ve ilgili mevzuata göre yürütülür.
 
 Kaynak notu: Kurumsal mevzuat sayfası, Diploma/Diploma Eki yönergesi başlığı.
 
@@ -1372,9 +1432,9 @@ Kullanıcı örnekleri:
 - ÖSYM kılavuzunda neye bakmalıyım?
 
 Instructed cevap:
-Kayıt, kesin kayıt belgesi, ödeme tarihi, özel koşullar ve bölüm/program değişikliği gibi konular tercih ve kayıt dönemine göre değişebilir. Bu yüzden kesin bilgi için ilgili yılın ÖSYM kılavuzu, üniversitenin güncel aday öğrenci/kayıt duyuruları ve öğrenci işleri açıklamaları esas alınmalıdır.
+Kayıt ve tercih sürecinde program adı, puan türü, kontenjan, burs/indirim türü, ücret, öğretim dili, hazırlık koşulu ve özel koşullar birlikte değerlendirilmelidir.
 
-Genel olarak program adı, puan türü, kontenjan, burs/indirim türü, ücret, öğretim dili, hazırlık koşulu ve özel koşullar birlikte kontrol edilmelidir. İstersen düşündüğün programı yaz; broşürdeki kontenjan, ücret ve geçmiş yıl puan/sıra bilgisini ayrıca özetleyebilirim.
+Düşündüğün programı yazarsan kontenjan, ücret ve geçmiş yıl puan/sıra bilgisini birlikte özetleyebilirim. Son ve bağlayıcı bilgi tercih yılında yayımlanan ÖSYM kılavuzu ve üniversitenin güncel kayıt duyurularıdır.
 
 Kaynak notu: Ana web sitesi aday öğrenci ve ücret/kontenjan yönlendirmeleri, tanıtım broşürü, ÖSYM kılavuzu uyarıları.
 
@@ -1393,9 +1453,9 @@ Kullanıcı örnekleri:
 - Duyurulara nereden bakabilirim?
 
 Instructed cevap:
-Akademik takvim, ders başlangıcı, final/bütünleme haftası, yaz öğretimi tarihleri ve duyurular dönem içinde güncellenebilir. Bu nedenle kesin tarih vermek için üniversitenin güncel akademik takvim ve duyurular sayfası esas alınmalıdır.
+Akademik takvim, sınav tarihleri, yaz öğretimi başvuruları ve benzeri güncel tarihler dönemsel olarak değişir.
 
-Kaynaklarda yaz öğretimi ve sınav süreçlerine ilişkin yönergeler bulunuyor; fakat güncel tarih, başvuru aralığı ve sınav takvimi için ilgili yılın resmi akademik takvimi ve birim duyuruları kontrol edilmelidir.
+Bu nedenle kesin tarih vermek için ilgili yılın akademik takvimi ve birim duyuruları esas alınmalıdır. İstersen hangi tarih/süreçle ilgilendiğini yaz; hangi başlığa bakman gerektiğini söyleyebilirim.
 
 Kaynak notu: Ana web sitesi duyuru/akademik takvim bağlantıları, Yaz Öğretimi Yönergesi, Tıp Fakültesi sınav yönergesi.
 
@@ -1412,10 +1472,13 @@ Kullanıcı örnekleri:
 - Kampüs yaşamı nasıl?
 - Sosyal imkanlar neler?
 - Kütüphane saatleri nedir?
+- kampüs yaşamı hakkında bilgi
+- kantin var mı?
+- kulüpler var mı?
 
 Instructed cevap:
-Kurumsal mevzuat havuzunda Kütüphane ve Dokümantasyon Daire Başkanlığı Yönergesi ile SKSDB Öğrenci Toplulukları Yönergesi yer alıyor. Bu, üniversitede kütüphane/dokümantasyon ve öğrenci topluluklarıyla ilgili resmi düzenlemeler bulunduğunu gösterir.
+Üniversitede kütüphane/dokümantasyon ve öğrenci topluluklarıyla ilgili düzenlenmiş süreçler bulunur.
 
-Ancak kütüphane çalışma saatleri, yemekhane menüsü/ücreti, belirli topluluk listesi veya kampüs etkinliği gibi güncel ve değişken detayları kaynakta doğrudan görmeden kesin söylememek gerekir. Bu başlıklar için güncel web duyurusu veya ilgili idari birim kontrol edilmelidir.
+Kütüphane saatleri, yemekhane menüsü/ücreti, aktif topluluk listesi ve kampüs etkinlikleri gibi bilgiler dönemsel değişebilir. Bu yüzden bu tür güncel detaylarda kesin saat, fiyat veya liste vermek yerine ilgili dönem duyurusu esas alınmalıdır.
 
 Kaynak notu: Kurumsal mevzuat sayfası, Kütüphane ve Dokümantasyon Daire Başkanlığı Yönergesi, SKSDB Öğrenci Toplulukları Yönergesi.
