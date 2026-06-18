@@ -23,7 +23,13 @@
 
 - [x] Generate program-level YİÜ brochure fact Skills from the verified 2025 brochure extraction.
 - [x] Update Skill push/audit scripts to treat the base intent pack and generated program-fact pack as one active union.
-- [ ] Probe the false no-info and wrong-facet cases before running another random 100.
+- [x] Run and independently review a fresh random 100 after publishing the program-level Skill pack.
+
+> **Evaluation Update (2026-06-18):** The post-program-Skill YİÜ Public Demo run completed `100/100` with zero transport/runtime errors: `25` Skill answers, `38` grounded RAG answers, `22` no-info replies, `11` clarifications, `2` direct answers, `1` identity answer, and `1` refusal. Independent review scored the set `6.75/10` (`52` strong, `20` usable, `11` weak, `17` bad). Program fact Skills scored `11/11` when selected, but four available facts missed Skill routing or failed in fallback. Trace review found correct YİÜ brochure chunks being rejected as `other_organization`, an unrequested `2026` rewrite causing valid 2025 values to be rejected, and verifier misses for an invented fee range and an unsupported Psychology-program claim (`docs/evaluations/yiu-routing-random-100-codex-review-2026-06-18T15-35-20-176Z.md`).
+
+- [ ] Stop organization-scope filtering from rejecting chunks belonging to the active organization.
+- [ ] Prevent query rewriting from inventing an academic year when the user did not provide one.
+- [ ] Expand program Skill fee/quota/presence phrase coverage and reject unsupported adjacent-program price/existence claims.
 
 > **Implementation Update (2026-06-18):** A generated YİÜ program-fact pack now provides one compact Skill for each of the `26` canonical brochure programs. Each Skill covers program existence, academic unit, campus/address, point type, 2025 fee/quota variants, and available 2024 base-score/rank facts; the active union contains `70` Skills and `687` non-duplicated examples. Existing one-program Skills are updated in place where their identity remains valid, while 18 overlapping fee/quota/group Skills are replaced or disabled. The original PDF table and campus pages were independently reviewed against all `77` option rows. The Tıbbi Tanıtım ve Pazarlama `330.000 TL` row uses the business-confirmed `Ücretli` correction instead of the PDF's erroneous `Burslu` label (`docs/evaluations/yiu-program-fact-skill-codex-review-2026-06-18.md`).
 
@@ -689,7 +695,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-06-18 (Added and independently verified 26 generated program-level YİÜ Skills.)
+> **Last Updated:** 2026-06-18 (Added the post-program-Skill random-100 run, independent scoring, and focused retrieval/verifier findings.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
