@@ -1,6 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
+import { Trash2 } from 'lucide-react'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { SettingsTabs } from '@/components/settings/SettingsTabs'
 import type { AiBotMode, HumanEscalationAction } from '@/types/database'
@@ -143,67 +144,94 @@ function DictionaryEditorSection({
             description={t('dictionaryDescription')}
             showBottomDivider={false}
         >
-            <div className="space-y-4">
-                <div className="space-y-3">
-                    {rows.map((entry, index) => {
-                        const entryId = entry.id ?? `dictionary-entry-${index}`
-                        return (
-                            <div key={entryId} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                                <div className="grid gap-3 md:grid-cols-[minmax(140px,220px)_1fr_auto] md:items-start">
-                                    <div className="space-y-1.5">
-                                        <label htmlFor={`${entryId}-term`} className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                            {t('dictionaryTermLabel')}
-                                        </label>
-                                        <input
-                                            id={`${entryId}-term`}
-                                            type="text"
-                                            value={entry.term}
-                                            onChange={(event) => onChange(updateDictionaryEntry(rows, entry.id, {
-                                                term: event.target.value
-                                            }))}
-                                            placeholder={t('dictionaryTermPlaceholder')}
-                                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label htmlFor={`${entryId}-meanings`} className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                            {t('dictionaryMeaningsLabel')}
-                                        </label>
-                                        <textarea
-                                            id={`${entryId}-meanings`}
-                                            rows={Math.max(2, entry.meanings.length)}
-                                            value={entry.meanings.join('\n')}
-                                            onChange={(event) => onChange(updateDictionaryEntry(rows, entry.id, {
-                                                meanings: event.target.value.split(/\r?\n/g)
-                                            }))}
-                                            placeholder={t('dictionaryMeaningsPlaceholder')}
-                                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
-                                        />
-                                        <p className="text-xs text-gray-500">{t('dictionaryMeaningsHelp')}</p>
-                                    </div>
-                                    <div className="flex items-center justify-between gap-3 md:flex-col md:items-end">
-                                        <label className="flex items-center gap-2 text-sm text-gray-700">
+            <div className="flex flex-col gap-4">
+                <p className="text-xs leading-5 text-gray-500">{t('dictionaryMeaningsHelp')}</p>
+                <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+                    <table className="w-full min-w-[640px] table-fixed text-left">
+                        <thead className="border-b border-gray-200 bg-gray-50/80">
+                            <tr>
+                                <th scope="col" className="w-48 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                    {t('dictionaryTermLabel')}
+                                </th>
+                                <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                    {t('dictionaryMeaningsLabel')}
+                                </th>
+                                <th scope="col" className="w-24 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                    {t('dictionaryEnabledLabel')}
+                                </th>
+                                <th scope="col" className="w-16 px-4 py-3">
+                                    <span className="sr-only">{t('dictionaryRemoveEntry')}</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                            {rows.map((entry, index) => {
+                                const entryId = entry.id ?? `dictionary-entry-${index}`
+                                return (
+                                    <tr key={entryId} className="align-top transition-colors hover:bg-gray-50/60">
+                                        <td className="px-4 py-3">
+                                            <label htmlFor={`${entryId}-term`} className="sr-only">
+                                                {t('dictionaryTermLabel')}
+                                            </label>
                                             <input
-                                                type="checkbox"
-                                                checked={entry.enabled}
+                                                id={`${entryId}-term`}
+                                                type="text"
+                                                value={entry.term}
                                                 onChange={(event) => onChange(updateDictionaryEntry(rows, entry.id, {
-                                                    enabled: event.target.checked
+                                                    term: event.target.value
                                                 }))}
+                                                placeholder={t('dictionaryTermPlaceholder')}
+                                                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"
                                             />
-                                            {t('dictionaryEnabledLabel')}
-                                        </label>
-                                        <button
-                                            type="button"
-                                            onClick={() => onChange(rows.filter((row) => row.id !== entry.id))}
-                                            className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
-                                        >
-                                            {t('dictionaryRemoveEntry')}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )
-                    })}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <label htmlFor={`${entryId}-meanings`} className="sr-only">
+                                                {t('dictionaryMeaningsLabel')}
+                                            </label>
+                                            <textarea
+                                                id={`${entryId}-meanings`}
+                                                rows={Math.max(2, entry.meanings.length)}
+                                                value={entry.meanings.join('\n')}
+                                                onChange={(event) => onChange(updateDictionaryEntry(rows, entry.id, {
+                                                    meanings: event.target.value.split(/\r?\n/g)
+                                                }))}
+                                                placeholder={t('dictionaryMeaningsPlaceholder')}
+                                                className="block w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"
+                                            />
+                                        </td>
+                                        <td className="px-4 py-4 text-center">
+                                            <button
+                                                type="button"
+                                                role="switch"
+                                                aria-checked={entry.enabled}
+                                                aria-label={t('dictionaryToggleEntry', { term: entry.term || `${index + 1}` })}
+                                                onClick={() => onChange(updateDictionaryEntry(rows, entry.id, {
+                                                    enabled: !entry.enabled
+                                                }))}
+                                                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2 ${entry.enabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+                                            >
+                                                <span
+                                                    aria-hidden={true}
+                                                    className={`inline-block size-5 rounded-full bg-white shadow-sm transition-transform ${entry.enabled ? 'translate-x-5' : 'translate-x-0.5'}`}
+                                                />
+                                            </button>
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <button
+                                                type="button"
+                                                aria-label={t('dictionaryRemoveEntry')}
+                                                title={t('dictionaryRemoveEntry')}
+                                                onClick={() => onChange(rows.filter((row) => row.id !== entry.id))}
+                                                className="inline-grid size-9 place-items-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30"
+                                            >
+                                                <Trash2 aria-hidden={true} size={16} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                    </table>
                 </div>
                 <button
                     type="button"

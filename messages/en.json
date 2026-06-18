@@ -2000,6 +2000,7 @@
     "dictionaryMeaningsPlaceholder": "E.g. Physiotherapy and Rehabilitation",
     "dictionaryMeaningsHelp": "Write multiple meanings on separate lines. The model chooses the best meaning from context.",
     "dictionaryEnabledLabel": "Active",
+    "dictionaryToggleEntry": "Change active status for {term}",
     "dictionaryRemoveEntry": "Remove",
     "dictionaryAddEntry": "Add dictionary entry",
     "howItWorksAction": "How it works",

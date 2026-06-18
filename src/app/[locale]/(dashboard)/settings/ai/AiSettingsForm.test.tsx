@@ -40,6 +40,12 @@ function renderForm(
                     term: 'ftr',
                     meanings: ['Fizyoterapi ve Rehabilitasyon', 'Fizyoterapi ön lisans'],
                     enabled: true
+                },
+                {
+                    id: 'dict-2',
+                    term: 'sbf',
+                    meanings: ['Sağlık Bilimleri Fakültesi'],
+                    enabled: false
                 }
             ]}
             activeTab={activeTab}
@@ -139,6 +145,12 @@ describe('AiSettingsForm', () => {
         expect(markup).toContain('Fizyoterapi ve Rehabilitasyon')
         expect(markup).toContain('Fizyoterapi ön lisans')
         expect(markup).toContain('dictionaryAddEntry')
+        expect(markup).toContain('<table')
+        expect(markup).toContain('role="switch"')
+        expect(markup).toContain('aria-checked="true"')
+        expect(markup).toContain('aria-checked="false"')
+        expect(markup).toContain('aria-label="dictionaryRemoveEntry"')
+        expect(markup.match(/dictionaryMeaningsHelp/g)).toHaveLength(1)
         expect(markup).not.toContain('botModeTitle')
         expect(markup).not.toContain('assistantInstructionsTitle')
         expect(markup).not.toContain('automaticEscalationTitle')

@@ -2000,6 +2000,7 @@
     "dictionaryMeaningsPlaceholder": "Örn. Fizyoterapi ve Rehabilitasyon",
     "dictionaryMeaningsHelp": "Birden fazla anlamı ayrı satırlara yazın. Model bağlama göre en uygun anlamı seçer.",
     "dictionaryEnabledLabel": "Aktif",
+    "dictionaryToggleEntry": "{term} için aktiflik durumunu değiştir",
     "dictionaryRemoveEntry": "Sil",
     "dictionaryAddEntry": "Yeni sözlük maddesi ekle",
     "howItWorksAction": "Nasıl çalışır?",
