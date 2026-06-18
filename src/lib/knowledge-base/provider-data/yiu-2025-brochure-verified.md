@@ -12,9 +12,9 @@ Bu dosya ham OCR çıktısı değildir. Sayfalar PNG olarak render edilip tablo 
 - Başarı sırası: 2024
 - Taban puanı: 2024
 
-## Kontrol Gerektiren Kaynak Tutarsızlığı
+## İşletme Tarafından Doğrulanan Kaynak Düzeltmesi
 
-- `Tıbbi Tanıtım ve Pazarlama (Burslu)` için ücret alanında `330.000 TL` gösterilmesi diğer burslu seçeneklerle çelişir. Ayrı bir ücretli seçenek bilgisi de bulunmadığından bu tutar ücretli program fiyatı olarak yorumlanmamalı; kayıt öncesinde aday ilişkileri birimiyle teyit edilmelidir.
+- PDF'de `Tıbbi Tanıtım ve Pazarlama (Burslu)` olarak görünen `4` kontenjanlı ve `330.000 TL` ücretli satırın etiketi hatalıdır. 18 Haziran 2026 tarihli işletme doğrulamasına göre doğru etiket `Tıbbi Tanıtım ve Pazarlama (Ücretli)` olmalıdır. Aşağıdaki doğrulanmış tabloda bu düzeltme uygulanmıştır.
 
 ## Kapak
 
@@ -118,7 +118,7 @@ Tanıtım yazısı Erol Usta imzasını taşır:
 | 207950109 | Tıbbi Laboratuvar Teknikleri (Ücretli) | TYT | 10 | 1.429.838 | 263,122 | 330.000 |
 | 207950091 | Tıbbi Laboratuvar Teknikleri (Burslu) | TYT | 9 | 521.304 | 334,689 | - |
 | 207950167 | Tıbbi Laboratuvar Teknikleri (%50 İnd.) | TYT | 55 | 1.050.102 | 287,670 | 165.000 |
-| 207950087 | Tıbbi Tanıtım ve Pazarlama (Burslu) | TYT | 4 | 767.115 | 309,532 | 330.000 |
+| 207950087 | Tıbbi Tanıtım ve Pazarlama (Ücretli) | TYT | 4 | 767.115 | 309,532 | 330.000 |
 | 207950088 | Tıbbi Tanıtım ve Pazarlama (%50 İnd.) | TYT | 30 | 2.278.037 | 215,543 | 165.000 |
 | - | Fizyoterapi (Ücretli) | TYT | 4 | - | - | 320.000 |
 | - | Fizyoterapi (Burslu) | TYT | 4 | - | - | - |

@@ -3,11 +3,15 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { auditYiuIntentSkillPack } from './audit-yiu-intent-skill-pack'
-import { chunkItems, parseIntentPack } from './push-yiu-intent-skill-pack'
+import { buildYiuActiveIntentUnion, chunkItems } from './push-yiu-intent-skill-pack'
 
 const packPath = path.join(
   process.cwd(),
   'docs/evaluations/yiu-intent-skill-pack-v2-2026-06-13.md'
+)
+const brochurePath = path.join(
+  process.cwd(),
+  'src/lib/knowledge-base/provider-data/yiu-2025-brochure-verified.md'
 )
 
 describe('YIU intent Skill pack audit', () => {
@@ -17,31 +21,39 @@ describe('YIU intent Skill pack audit', () => {
   })
 
   it('keeps brochure-derived answers aligned with verified 2025 facts', async () => {
-    const intents = parseIntentPack(await readFile(packPath, 'utf8'))
+    const intents = buildYiuActiveIntentUnion(
+      await readFile(packPath, 'utf8'),
+      await readFile(brochurePath, 'utf8')
+    )
     const bySlug = new Map(intents.map((intent) => [intent.slug, intent]))
     const skill = (slug: string) => bySlug.get(slug)?.responseText ?? ''
 
     expect(skill('hemsirelik_ucret_kontenjan')).toContain(
-      'Hemşirelik (Ücretli): kontenjan 2, ücret 490.000 TL'
+      'Ücretli: 2 kontenjan, 490.000 TL'
     )
     expect(skill('anestezi_ucret_kontenjan')).toContain(
-      'Anestezi (Ücretli): kontenjan 10'
+      'Ücretli: 10 kontenjan, 330.000 TL'
     )
     expect(skill('ameliyathane_hizmetleri_ucret_kontenjan')).toContain(
-      'Ameliyathane Hizmetleri (Burslu): kontenjan 10'
+      'Burslu: 10 kontenjan'
     )
-    expect(skill('ergoterapi_ebelik_ucret_kontenjan')).not.toMatch(/2024 taban puanı/)
-    expect(skill('shmyo_diger_programlar_ucret_kontenjan')).toContain(
-      'Biyomedikal Cihaz Teknolojisi: ücretli kontenjan 5'
+    expect(skill('ergoterapi_program_bilgileri')).toContain(
+      'Bu program için 2024 taban puanı ve başarı sırası belirtilmiyor.'
     )
-    expect(skill('tibbi_tanitim_pazarlama_tutarsizlik')).not.toContain(
-      'Tıbbi Tanıtım ve Pazarlama (Ücretli)'
+    expect(skill('biyomedikal_cihaz_teknolojisi_program_bilgileri')).toContain(
+      'Ücretli: 5 kontenjan, 330.000 TL'
+    )
+    expect(skill('tibbi_tanitim_pazarlama_ucret_kontenjan')).toContain(
+      'Ücretli: 4 kontenjan, 330.000 TL'
     )
   })
 
   it('has no duplicate triggers or source-clerk language in customer answers', async () => {
-    const audit = auditYiuIntentSkillPack(await readFile(packPath, 'utf8'))
-    expect(audit.intentCount).toBeGreaterThanOrEqual(50)
+    const audit = auditYiuIntentSkillPack(
+      await readFile(packPath, 'utf8'),
+      await readFile(brochurePath, 'utf8')
+    )
+    expect(audit.intentCount).toBe(70)
     expect(audit.duplicateTriggers).toEqual([])
     expect(audit.sourceClerkResponses).toEqual([])
     expect(audit.knownFactMismatches).toEqual([])

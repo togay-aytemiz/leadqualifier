@@ -7,6 +7,11 @@ import { createClient } from '@supabase/supabase-js'
 import { generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddings'
 import { buildSkillEmbeddingTexts } from '@/lib/skills/embeddings'
 
+import {
+  buildYiuProgramFactIntents,
+  PROGRAM_REPLACED_BASE_SLUGS,
+} from './yiu-program-fact-skills'
+
 export type ParsedIntent = {
   order: string
   slug: string
@@ -25,6 +30,7 @@ type SkillRow = {
 }
 
 const DEFAULT_DRAFT_PATH = 'docs/evaluations/yiu-intent-skill-pack-v2-2026-06-13.md'
+const DEFAULT_BROCHURE_PATH = 'src/lib/knowledge-base/provider-data/yiu-2025-brochure-verified.md'
 const DEFAULT_DEMO_SLUG = 'yiu-tanitim-gunleri-2026'
 const SKILL_TITLE_PREFIX = 'YİÜ Intent - '
 const EMBEDDING_BATCH_SIZE = 128
@@ -121,6 +127,32 @@ export function parseIntentPack(markdown: string): ParsedIntent[] {
   })
 }
 
+export function buildYiuActiveIntentUnion(baseMarkdown: string, brochureMarkdown: string) {
+  const replacedSlugs = new Set<string>(PROGRAM_REPLACED_BASE_SLUGS)
+  const programIntents = buildYiuProgramFactIntents(brochureMarkdown)
+  const programTriggers = new Set(programIntents.flatMap((intent) =>
+    intent.triggerExamples.map((trigger) =>
+      trigger.normalize('NFKC').replace(/\s+/g, ' ').trim().toLocaleLowerCase('tr-TR')
+    )
+  ))
+  const generalIntents = parseIntentPack(baseMarkdown)
+    .filter((intent) => !replacedSlugs.has(intent.slug))
+    .map((intent) => ({
+      ...intent,
+      triggerExamples: intent.triggerExamples.filter((trigger) => !programTriggers.has(
+        trigger.normalize('NFKC').replace(/\s+/g, ' ').trim().toLocaleLowerCase('tr-TR')
+      )),
+    }))
+  const intents = [...generalIntents, ...programIntents]
+    .sort((left, right) => Number(left.order) - Number(right.order))
+
+  const titles = new Set(intents.map((intent) => intent.title))
+  if (titles.size !== intents.length) {
+    throw new Error('YIU active Skill union contains duplicate titles')
+  }
+  return intents
+}
+
 function arraysEqual(left: string[], right: string[]) {
   if (left.length !== right.length) return false
   return left.every((value, index) => value === right[index])
@@ -140,16 +172,20 @@ async function main() {
   const args = new Set(process.argv.slice(2))
   const dryRun = args.has('--dry-run')
   const draftPath = process.env.YIU_INTENT_PACK_PATH?.trim() || DEFAULT_DRAFT_PATH
+  const brochurePath = process.env.YIU_BROCHURE_VERIFIED_PATH?.trim() || DEFAULT_BROCHURE_PATH
   const demoSlug = process.env.PUBLIC_DEMO_SLUG?.trim() || DEFAULT_DEMO_SLUG
-  const markdown = await readFile(path.resolve(process.cwd(), draftPath), 'utf8')
-  const intents = parseIntentPack(markdown)
+  const [markdown, brochureMarkdown] = await Promise.all([
+    readFile(path.resolve(process.cwd(), draftPath), 'utf8'),
+    readFile(path.resolve(process.cwd(), brochurePath), 'utf8'),
+  ])
+  const intents = buildYiuActiveIntentUnion(markdown, brochureMarkdown)
 
-  if (intents.length < 50) {
-    throw new Error(`Expected at least 50 intents, parsed ${intents.length}`)
+  if (intents.length < 65) {
+    throw new Error(`Expected at least 65 active intents, parsed ${intents.length}`)
   }
 
   if (dryRun) {
-    console.log(`DRY_RUN intents=${intents.length} draft=${draftPath}`)
+    console.log(`DRY_RUN intents=${intents.length} draft=${draftPath} brochure=${brochurePath}`)
     for (const intent of intents.slice(0, 5)) {
       console.log(`${intent.title} examples=${intent.triggerExamples.length}`)
     }

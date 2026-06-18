@@ -17,8 +17,19 @@ export const YIU_AI_DICTIONARY_ENTRIES: AiDictionaryDraftEntry[] = [
   { term: 'tip tr', meanings: ['Tıp Fakültesi (Türkçe)'], enabled: true },
   { term: 'tıp ing', meanings: ['Tıp Fakültesi (İngilizce)'], enabled: true },
   { term: 'tip ing', meanings: ['Tıp Fakültesi (İngilizce)'], enabled: true },
-  { term: 'FTR', meanings: ['Fizyoterapi ve Rehabilitasyon', 'Fizyoterapi ön lisans programı'], enabled: true },
+  { term: 'FTR', meanings: ['Fizyoterapi ve Rehabilitasyon'], enabled: true },
+  { term: 'FZT', meanings: ['Fizyoterapi ön lisans programı'], enabled: true },
   { term: 'DKT', meanings: ['Dil ve Konuşma Terapisi'], enabled: true },
+  { term: 'TLT', meanings: ['Tıbbi Laboratuvar Teknikleri'], enabled: true },
+  { term: 'tıbbi lab', meanings: ['Tıbbi Laboratuvar Teknikleri'], enabled: true },
+  { term: 'laboratuvar teknikerliği', meanings: ['Tıbbi Laboratuvar Teknikleri'], enabled: true },
+  { term: 'TDS', meanings: ['Tıbbi Dokümantasyon ve Sekreterlik'], enabled: true },
+  { term: 'TTP', meanings: ['Tıbbi Tanıtım ve Pazarlama'], enabled: true },
+  { term: 'TVİT', meanings: ['Tıbbi Veri İşleme Teknikerliği'], enabled: true },
+  { term: 'TST', meanings: ['Tele-Sağlık Teknikerliği'], enabled: true },
+  { term: 'BCT', meanings: ['Biyomedikal Cihaz Teknolojisi'], enabled: true },
+  { term: 'İAY', meanings: ['İlk ve Acil Yardım'], enabled: true },
+  { term: 'paramedik', meanings: ['İlk ve Acil Yardım'], enabled: true },
   { term: 'SHMYO', meanings: ['Sağlık Hizmetleri Meslek Yüksekokulu'], enabled: true },
   { term: 'SMYO', meanings: ['Sağlık Hizmetleri Meslek Yüksekokulu'], enabled: true },
   { term: 'MYO', meanings: ['Meslek Yüksekokulu'], enabled: true },
@@ -101,25 +112,19 @@ export async function seedYiuAiDictionary(options: {
     throw new Error(`Could not resolve demo channel ${demoSlug}: ${channelError?.message ?? 'missing row'}`)
   }
 
-  const { error: deleteError } = await supabase
-    .from('organization_ai_dictionary_entries')
-    .delete()
-    .eq('organization_id', channel.organization_id)
-
-  if (deleteError) {
-    throw new Error(`Failed to clear YIU AI dictionary: ${deleteError.message}`)
-  }
-
   if (entries.length > 0) {
-    const { error: insertError } = await supabase
+    const { error: upsertError } = await supabase
       .from('organization_ai_dictionary_entries')
-      .insert(entries.map((entry) => ({
-        organization_id: channel.organization_id,
-        ...entry,
-      })))
+      .upsert(
+        entries.map((entry) => ({
+          organization_id: channel.organization_id,
+          ...entry,
+        })),
+        { onConflict: 'organization_id,normalized_term' }
+      )
 
-    if (insertError) {
-      throw new Error(`Failed to seed YIU AI dictionary: ${insertError.message}`)
+    if (upsertError) {
+      throw new Error(`Failed to seed YIU AI dictionary: ${upsertError.message}`)
     }
   }
 

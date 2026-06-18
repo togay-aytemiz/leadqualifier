@@ -27,6 +27,10 @@
     "rag:yiu-pdfs:scenario-cases": "npx tsx scripts/knowledge/rag-build-yiu-scenario-cases.ts",
     "rag:file-search:ingest": "npx tsx scripts/knowledge/rag-file-search-ingest.ts",
     "ai:yiu-dictionary:seed": "npx tsx scripts/skills/seed-yiu-ai-dictionary.ts",
+    "skills:yiu-programs:build": "npx tsx scripts/skills/build-yiu-program-fact-skill-pack.ts",
+    "skills:yiu:audit": "npx tsx scripts/skills/audit-yiu-intent-skill-pack.ts",
+    "skills:yiu:push": "npx tsx scripts/skills/push-yiu-intent-skill-pack.ts",
+    "skills:yiu:verify": "npx tsx scripts/skills/verify-yiu-intent-skill-pack.ts",
     "agent:shadow:report": "npx tsx scripts/knowledge/report-agent-shadow.ts",
     "agent:shadow:acceptance": "npx tsx scripts/knowledge/agent-shadow-synthetic-acceptance.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\""
