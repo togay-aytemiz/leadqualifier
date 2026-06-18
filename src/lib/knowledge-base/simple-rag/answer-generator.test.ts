@@ -90,6 +90,38 @@ describe('generateSimpleRagAnswer', () => {
     expect(result).toMatchObject({ status: 'no_info', reason: 'unsupported_protected_value' })
   })
 
+  it('rejects an answer that attaches a supported price to the wrong requested program', async () => {
+    const result = await generateSimpleRagAnswer({
+      latestUserMessage: 'Tıbbi Görüntüleme Teknikleri ücreti nedir?',
+      standaloneQuery: 'Tıbbi Görüntüleme Teknikleri öğrenim ücreti ücret tablosu',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      chunks: [
+        {
+          id: 'C1',
+          fileId: 'file_1',
+          filename: 'brochure.md',
+          title: 'Sağlık Hizmetleri Meslek Yüksekokulu Kontenjan ve Ücretler',
+          score: 0.84,
+          content:
+            'Tıbbi Laboratuvar Teknikleri (Ücretli): kontenjan 10, ücret 330.000 TL. Anestezi (Ücretli): kontenjan 10, ücret 330.000 TL.',
+        },
+      ],
+      createCompletion: vi.fn(async () =>
+        completion({
+          status: 'answer',
+          answer: 'Tıbbi Görüntüleme Teknikleri programının öğrenim ücreti 330.000 TL’dir.',
+          used_chunk_ids: ['C1'],
+        })
+      ),
+    })
+
+    expect(result).toMatchObject({
+      status: 'no_info',
+      reason: 'unsupported_requested_subject:Tıbbi Görüntüleme Teknikleri',
+    })
+  })
+
   it('rejects unknown chunk ids', async () => {
     const result = await generateSimpleRagAnswer({
       latestUserMessage: 'Kaç yıl?',
@@ -294,6 +326,48 @@ describe('generateSimpleRagAnswer', () => {
     expect(result).toMatchObject({
       status: 'no_info',
       reason: 'unsupported_operational_claim:hasta,vaka',
+    })
+  })
+
+  it('rejects own hospital existence inferred from the founder foundation or health center wording', async () => {
+    const result = await generateSimpleRagAnswer({
+      latestUserMessage: 'Yüksek İhtisas Üniversitesi Hastanesi var mı?',
+      standaloneQuery: 'Yüksek İhtisas Üniversitesi Hastanesi var mı kendi hastanesi',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      chunks: [
+        {
+          id: 'C1',
+          fileId: 'file_1',
+          filename: 'foundation.md',
+          title: 'Kurucu Vakıf',
+          score: 0.86,
+          content:
+            'Yüksek İhtisas Üniversitesi, Türkiye Yüksek İhtisas Hastanesi Vakfı (TİVAK) tarafından kurulmuştur. Üniversitenin kurucusu olan bu vakıf tarafından hastane hizmeti sunulur.',
+        },
+        {
+          id: 'C2',
+          fileId: 'file_2',
+          filename: 'suam.md',
+          title: 'Sağlık Uygulama ve Araştırma Merkezi',
+          score: 0.81,
+          content:
+            'Sağlık Uygulama ve Araştırma Merkezi, tıp ve sağlık bilimleri alanında eğitim, araştırma ve uygulama çalışmalarını destekler.',
+        },
+      ],
+      createCompletion: vi.fn(async () =>
+        completion({
+          status: 'answer',
+          answer:
+            "Evet, Yüksek İhtisas Üniversitesi'nin Türkiye Yüksek İhtisas Hastanesi Vakfı tarafından kurulan bir hastanesi bulunmaktadır.",
+          used_chunk_ids: ['C1', 'C2'],
+        })
+      ),
+    })
+
+    expect(result).toMatchObject({
+      status: 'no_info',
+      reason: 'unsupported_hospital_identity',
     })
   })
 

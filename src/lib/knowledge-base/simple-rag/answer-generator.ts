@@ -120,6 +120,138 @@ function normalized(value: string) {
     .trim()
 }
 
+type SubjectCandidate = { normalized: string; display: string }
+
+const SUBJECT_MARKERS = new Set([
+  'anestezi',
+  'diyetetik',
+  'ebelik',
+  'ergoterapi',
+  'fakultesi',
+  'fakultesinde',
+  'fizyoterapi',
+  'hemsirelik',
+  'hizmetleri',
+  'laboratuvar',
+  'optisyenlik',
+  'programi',
+  'programinda',
+  'programinin',
+  'teknikleri',
+  'terapisi',
+  'yonetimi',
+])
+
+const SUBJECT_BOUNDARY_WORDS = new Set([
+  'acaba',
+  'bilgi',
+  'bolumunuz',
+  'fiyati',
+  'icin',
+  'kac',
+  'kampuste',
+  'kontenjani',
+  'nedir',
+  'nerede',
+  'ne',
+  'programinin',
+  'ucreti',
+  'var',
+])
+
+function subjectTokens(value: string) {
+  return Array.from(value.matchAll(/[\p{L}\p{N}]+/gu)).map((match) => ({
+    raw: match[0],
+    normalized: normalized(match[0]),
+  }))
+}
+
+function candidateKey(parts: Array<{ raw: string; normalized: string }>) {
+  return parts.map((part) => part.normalized).join(' ').trim()
+}
+
+function candidateDisplay(parts: Array<{ raw: string }>) {
+  return parts.map((part) => part.raw).join(' ').trim()
+}
+
+function namedSubjectCandidates(value: string): SubjectCandidate[] {
+  const tokens = subjectTokens(value)
+  const candidates: SubjectCandidate[] = []
+  const seen = new Set<string>()
+
+  tokens.forEach((token, index) => {
+    if (!SUBJECT_MARKERS.has(token.normalized)) return
+
+    const start = Math.max(0, index - 4)
+    const parts = tokens.slice(start, index + 1)
+    while (
+      parts.length > 1
+      && SUBJECT_BOUNDARY_WORDS.has(parts[0]?.normalized ?? '')
+    ) {
+      parts.shift()
+    }
+
+    const key = candidateKey(parts)
+    if (!key || seen.has(key)) return
+    seen.add(key)
+    candidates.push({
+      normalized: key,
+      display: candidateDisplay(parts),
+    })
+  })
+
+  return candidates
+}
+
+function unsupportedRequestedSubjects(input: {
+  question: string
+  standaloneQuery: string
+  answer: string
+  support: string
+}) {
+  const requested = new Set(
+    namedSubjectCandidates(`${input.question}\n${input.standaloneQuery}`)
+      .map((candidate) => candidate.normalized)
+  )
+  if (requested.size === 0) return []
+
+  const normalizedSupport = normalized(input.support)
+  return namedSubjectCandidates(input.answer).filter((candidate) =>
+    requested.has(candidate.normalized) && !supportContainsSubject(normalizedSupport, candidate)
+  )
+}
+
+function supportContainsSubject(normalizedSupport: string, candidate: SubjectCandidate) {
+  if (normalizedSupport.includes(candidate.normalized)) return true
+  const core = candidate.normalized
+    .replace(/\b(?:programi|programinda|programinin|bolumu|bolumunun)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const coreTokenCount = (core.match(/[\p{L}\p{N}]{2,}/gu) ?? []).length
+  return coreTokenCount >= 2 && normalizedSupport.includes(core)
+}
+
+function asksOwnHospitalIdentity(value: string) {
+  const normalizedValue = normalized(value)
+  return /\bhastane/.test(normalizedValue)
+    && /\b(?:hastaneniz|hastanesi var|kendi hastane|kendi hastaneniz|universitesi hastanesi|universite hastanesi|yiu hastanesi|hastane projesi|hastane proje|hastane kurul|hastane ne zaman)\b/.test(normalizedValue)
+}
+
+function answerClaimsOwnHospital(answer: string) {
+  const normalizedAnswer = normalized(answer)
+  return /\b(?:hastanesi|bir hastanesi|kendi hastanesi|universitesi hastanesi|universite hastanesi)\b/.test(normalizedAnswer)
+    && sentenceLikeParts(answer).some((sentence) =>
+      /\bhastane/.test(sentence)
+      && sentenceHasPositiveAvailability(sentence)
+      && !sentenceDeniesAvailability(sentence)
+    )
+}
+
+function supportDirectlyNamesOwnHospital(support: string) {
+  const normalizedSupport = normalized(support)
+  return /\b(?:kendi hastanesi|universitesi hastanesi|universite hastanesi)\b/.test(normalizedSupport)
+}
+
 function asksFacilityAvailability(value: string) {
   const normalizedValue = normalized(value)
   return /\b(?:var mi|mevcut mu|bulunuyor mu|sahip mi|available|have|has)\b/.test(normalizedValue)
@@ -340,6 +472,7 @@ export async function generateSimpleRagAnswer(input: {
           'Do not use audience-specific evidence such as international or YÖS fees for a general question unless the user identifies that audience. Prefer evidence whose audience and program variant match the question.',
           'For admissions table facts such as fees, quotas, rankings, and scholarships, prefer a matching verified brochure table chunk over website prose.',
           'For table facts, quote the matching row values directly. Do not compute totals, averages, or derived values unless the user explicitly asks for that calculation.',
+          'For any program, department, faculty, campus, hospital, office, or service named in the answer, the selected chunks must contain that same named entity. Do not attach a supported price, quota, location, or policy to a nearby or similarly named entity.',
           'If one program has separate paid, scholarship, or discount rows and the user asks for quota, fee, score, or ranking, answer with each matching row separately instead of collapsing them into one total.',
           'For broad institutional questions such as scholarships, campuses, academic units, admission steps, housing, transport, or contact, summarize the directly relevant supported facts from chunks. Do not ask for a program or return no_info just because a narrower answer would also be possible.',
           'If retrieved chunks contain a directly relevant partial answer, answer the supported part and clearly state only the missing qualifier. Prefer a useful grounded partial answer over no_info.',
@@ -426,6 +559,30 @@ export async function generateSimpleRagAnswer(input: {
     return { status: 'no_info', reason: 'unsupported_protected_value', usage, model }
   }
 
+  const unsupportedSubjects = unsupportedRequestedSubjects({
+    question: input.latestUserMessage,
+    standaloneQuery: input.standaloneQuery,
+    answer,
+    support: selectedChunks.map((chunk) => chunk.content).join('\n'),
+  })
+  if (unsupportedSubjects.length > 0) {
+    return {
+      status: 'no_info',
+      reason: `unsupported_requested_subject:${unsupportedSubjects[0]?.display ?? 'unknown'}`,
+      usage,
+      model,
+    }
+  }
+
+  const selectedSupport = selectedChunks.map((chunk) => chunk.content).join('\n')
+  if (
+    asksOwnHospitalIdentity(input.latestUserMessage)
+    && answerClaimsOwnHospital(answer)
+    && !supportDirectlyNamesOwnHospital(selectedSupport)
+  ) {
+    return { status: 'no_info', reason: 'unsupported_hospital_identity', usage, model }
+  }
+
   if (/\b(?:chunk|evidence|retrieval)\s*(?:id)?\b|\[(?:C|E)\d+\]/i.test(answer)) {
     return { status: 'no_info', reason: 'internal_mechanics_exposed', usage, model }
   }
@@ -444,7 +601,7 @@ export async function generateSimpleRagAnswer(input: {
   const unsupportedFacilityTerms = unsupportedPositiveFacilityTerms({
     question: input.latestUserMessage,
     answer,
-    support: selectedChunks.map((chunk) => chunk.content).join('\n'),
+    support: selectedSupport,
   })
   if (unsupportedFacilityTerms.length > 0) {
     return {
@@ -458,7 +615,7 @@ export async function generateSimpleRagAnswer(input: {
   const unsupportedOperationalTerms = unsupportedPositiveOperationalTerms({
     question: input.latestUserMessage,
     answer,
-    support: selectedChunks.map((chunk) => chunk.content).join('\n'),
+    support: selectedSupport,
   })
   if (unsupportedOperationalTerms.length > 0) {
     return {

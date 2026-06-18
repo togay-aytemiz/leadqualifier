@@ -69,6 +69,61 @@ describe('rewriteSimpleRagQuery', () => {
     })
   })
 
+  it('forces over-cautious broad institutional clarifications back through retrieval', async () => {
+    const createCompletion = vi.fn(async (_args: Record<string, unknown>) =>
+      completion({
+        status: 'clarify',
+        clarification_question: 'Hangi fakülte veya program için soruyorsunuz?',
+        missing_slot: 'program',
+        response_language: 'tr',
+      })
+    )
+
+    const result = await rewriteSimpleRagQuery({
+      latestUserMessage: 'Üniversitenizde lisans ve ön lisans programlarını ayrı ayrı listeler misin?',
+      recentMessages: [],
+      organizationContext: 'Yüksek İhtisas Üniversitesi',
+      responseLanguage: 'tr',
+      createCompletion,
+    })
+
+    expect(result.plan).toEqual({
+      status: 'search',
+      standaloneQuery:
+        'Yüksek İhtisas Üniversitesi Üniversitenizde lisans ve ön lisans programlarını ayrı ayrı listeler misin?',
+      responseLanguage: 'tr',
+    })
+  })
+
+  it('forces over-cautious scholarship and point-type clarifications back through retrieval', async () => {
+    const createCompletion = vi.fn(async (_args: Record<string, unknown>) =>
+      completion({
+        status: 'clarify',
+        clarification_question: 'Hangi program veya fakülte için bilgi almak istiyorsunuz?',
+        missing_slot: 'program',
+        response_language: 'tr',
+      })
+    )
+
+    const bursResult = await rewriteSimpleRagQuery({
+      latestUserMessage: 'İlk 10.000’e girene burs var mı?',
+      recentMessages: [],
+      organizationContext: 'Yüksek İhtisas Üniversitesi',
+      responseLanguage: 'tr',
+      createCompletion,
+    })
+    const eaResult = await rewriteSimpleRagQuery({
+      latestUserMessage: 'EA puan türüyle bölümünüz var mı?',
+      recentMessages: [],
+      organizationContext: 'Yüksek İhtisas Üniversitesi',
+      responseLanguage: 'tr',
+      createCompletion,
+    })
+
+    expect(bursResult.plan.status).toBe('search')
+    expect(eaResult.plan.status).toBe('search')
+  })
+
   it('passes the known organization scope so a concrete demo question does not re-ask the institution', async () => {
     const createCompletion = vi.fn(async (_args: Record<string, unknown>) =>
       completion({
@@ -299,6 +354,55 @@ describe('rewriteSimpleRagQuery', () => {
       status: 'refuse',
       refusalResponse:
         'Güvenliğiniz için kredi kartı, IBAN, TC kimlik, şifre veya ödeme bilgilerinizi burada paylaşmayın. Ödeme ve kayıt işlemleri için üniversitenin resmi kanallarını kullanın.',
+      responseLanguage: 'tr',
+    })
+  })
+
+  it('does not treat card installment policy questions as credential collection', async () => {
+    const createCompletion = vi.fn(async () =>
+      completion({
+        status: 'search',
+        standalone_query: 'Yüksek İhtisas Üniversitesi kredi kartına taksit ödeme imkanı',
+        response_language: 'tr',
+      })
+    )
+
+    const result = await rewriteSimpleRagQuery({
+      latestUserMessage: 'Kredi kartına taksit oluyor mu?',
+      recentMessages: [],
+      organizationContext: 'Yüksek İhtisas Üniversitesi',
+      responseLanguage: 'tr',
+      createCompletion,
+    })
+
+    expect(result.plan).toEqual({
+      status: 'search',
+      standaloneQuery: 'Yüksek İhtisas Üniversitesi kredi kartına taksit ödeme imkanı',
+      responseLanguage: 'tr',
+    })
+  })
+
+  it('searches card installment policy questions even when the model over-refuses', async () => {
+    const createCompletion = vi.fn(async () =>
+      completion({
+        status: 'refuse',
+        refusal_response:
+          'Güvenliğiniz için kredi kartı, IBAN, TC kimlik, şifre veya ödeme bilgilerinizi burada paylaşmayın.',
+        response_language: 'tr',
+      })
+    )
+
+    const result = await rewriteSimpleRagQuery({
+      latestUserMessage: 'Kredi kartına taksit oluyor mu?',
+      recentMessages: [],
+      organizationContext: 'Yüksek İhtisas Üniversitesi',
+      responseLanguage: 'tr',
+      createCompletion,
+    })
+
+    expect(result.plan).toEqual({
+      status: 'search',
+      standaloneQuery: 'Yüksek İhtisas Üniversitesi Kredi kartına taksit oluyor mu?',
       responseLanguage: 'tr',
     })
   })

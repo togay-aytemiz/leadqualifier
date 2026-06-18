@@ -1,5 +1,12 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Implementation Update (2026-06-18):** YİÜ simple RAG and Skill coverage were hardened against the latest random-100 failures without adding a new orchestration layer. The query rewriter now treats ordinary payment-policy questions such as credit-card installment availability as searchable policy questions rather than credential collection, while still refusing card/IBAN/TC/password handling. Grounded answers now reject positive “university hospital exists” claims when the evidence only mentions the founding hospital foundation or generic health-center wording. The YİÜ Skill pack was expanded from `61` to `62` active intents with stronger natural phrases for Tıp/Anestezi/MYO quota-fee questions and a separate program-change/yatay-geçiş intent; production Skill embeddings were refreshed to `694` rows. A targeted 7-question local demo probe completed with `5` Skill answers and `2` safe no-info answers, with no false hospital claim and no mistaken payment-safety refusal.
+
+- [x] Keep payment-policy questions searchable while preserving credential/payment-data refusal boundaries.
+- [x] Block adjacent-evidence hospital ownership/existence claims in simple RAG answers.
+- [x] Expand source-backed YİÜ Skill phrases for missed quota/fee/program-change turns and refresh production embeddings.
+- [x] Run targeted route probes for the latest random-100 failures after rebuilding and restarting the local demo.
+
 > **Implementation Update (2026-06-18):** The YİÜ admissions corpus was rebuilt from source-level website pages, approved regulations, and a tracked verified 2025 brochure extraction, then atomically switched from the legacy 135-file OpenAI store to persistent store `vs_6a338d7c24388191a43809879d974db0`. The clean corpus contains `444/444` completed files with zero failed or pending files, excludes `1,319` transient news/event/announcement pages, and removes `13` exact duplicate PDFs. Brochure fee/quota facts and all `60` YİÜ intent Skills were re-audited; the production Skills DB now has `656` refreshed embeddings. The former store remains available only as a rollback target.
 
 - [x] Build a deterministic source-level YİÜ corpus with transient-page and exact-PDF-duplicate removal.

@@ -62,7 +62,12 @@ function isConversationalDirectMessage(value: string) {
 
 function isSensitiveActionBoundary(value: string) {
   const normalized = normalizeForIntent(value)
-  return /\b(?:iban(?:i)?|kredi kart\w*|kart\w*\s+bilg|kartimi|tc kimlik|sifre|password|credit card|payment detail|odeme bilg|odeme al)\b/.test(normalized)
+  const asksPaymentPolicy =
+    /\b(?:taksit|kredi kartina taksit|kartla taksit|pos|odeme yontemi|odeme sekli)\b/.test(normalized)
+    && !/\b(?:kartimi|kart bilg\w*|kart numaram|cvv|buraya|yazsam|paylassam|paylaşsam|gondersem|göndersem|odeme alir misin|ödeme alır mısın)\b/.test(normalized)
+  if (asksPaymentPolicy) return false
+
+  return /\b(?:iban\w*|kart\w*\s+bilg\w*|kartimi|kart numaram|kredi kart\w*\s+bilg\w*|tc kimlik|sifre|password|credit card details|payment detail\w*|odeme bilg\w*|odeme al)\b/.test(normalized)
 }
 
 function sensitiveActionRefusal(responseLanguage: MvpResponseLanguage) {
@@ -83,6 +88,20 @@ function looksLikeKnowledgeQuestion(value: string) {
   if (isConversationalDirectMessage(value) || isSensitiveActionBoundary(value)) return false
   if (/[?？]/u.test(value)) return true
   return /\b(?:varmi|var mi|var mı|nerde|nerede|nereye|hangi|nedir|ne demek|nasil|nasıl|kac|kaç|ne kadar|mi|mı|mu|mü|misin|mısın|musun|müsün|miyim|mıyım|olur mu|veriyor musunuz|yapiliyor mu|yapılıyor mu|kullaniliyor mu|kullanılıyor mu|geciyor mu|geçiyor mu)\b/.test(normalized)
+}
+
+function shouldSearchInsteadOfClarify(input: {
+  latestUserMessage: string
+  organizationContext?: string | null
+}) {
+  if (!primaryOrganizationName(input.organizationContext)) return false
+  if (!looksLikeKnowledgeQuestion(input.latestUserMessage)) return false
+
+  const normalized = normalizeForIntent(input.latestUserMessage)
+  const tokenCount = (normalized.match(/[\p{L}\p{N}]{2,}/gu) ?? []).length
+  if (tokenCount < 3) return false
+
+  return /\b(?:akademik birim|bolumler|bolumunuz|bolumleriniz|programlar|programlariniz|lisans|on lisans|onlisans|fakulte|fakulteler|yuksekokul|meslek yuksekokulu|puan turu|ea|say|tyt|burs|indirim|tercih|siralam|basari sirasi|ilk \d|brosur|brosurdeki|ucretler|kontenjan\w*|kampusler|yerleskeler|taksit|odeme|kredi kart|kdv|pesin|online ode)\b/.test(normalized)
 }
 
 function primaryOrganizationName(organizationContext?: string | null) {
@@ -114,6 +133,28 @@ function enforcePlanBoundary(input: {
       status: 'refuse',
       refusalResponse: sensitiveActionRefusal(input.responseLanguage),
       responseLanguage: input.responseLanguage,
+    }
+  }
+
+  if (input.plan.status === 'refuse' && shouldSearchInsteadOfClarify(input)) {
+    return {
+      status: 'search',
+      standaloneQuery: fallbackStandaloneQuery({
+        latestUserMessage: input.latestUserMessage,
+        organizationContext: input.organizationContext,
+      }),
+      responseLanguage: input.plan.responseLanguage,
+    }
+  }
+
+  if (input.plan.status === 'clarify' && shouldSearchInsteadOfClarify(input)) {
+    return {
+      status: 'search',
+      standaloneQuery: fallbackStandaloneQuery({
+        latestUserMessage: input.latestUserMessage,
+        organizationContext: input.organizationContext,
+      }),
+      responseLanguage: input.plan.responseLanguage,
     }
   }
 

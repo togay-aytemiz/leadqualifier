@@ -82,19 +82,26 @@ Kullanıcı örnekleri:
 - Hangi programlar var?
 - Lisans bölümleri hangileri?
 - 4 yıllık bölümleriniz neler?
+- Üniversitenizde lisans ve ön lisans programlarını ayrı ayrı listeler misin?
+- Lisans ve ön lisans programlarınız neler?
 - Üniversitenizde hangi meslek yüksekokulları var?
 - Hangi MYO'lar var?
 
 Instructed cevap:
-Yüksek İhtisas Üniversitesinde öne çıkan akademik birimler şunlardır:
+Yüksek İhtisas Üniversitesinde lisans ve ön lisans düzeyinde programlar bulunur.
 
-- Tıp Fakültesi
-- Sağlık Bilimleri Fakültesi
-- Spor Bilimleri Fakültesi
-- Sağlık Hizmetleri Meslek Yüksekokulu
-- Meslek Yüksekokulu
-- Lisansüstü Eğitim Enstitüsü
-- Yabancı Diller Yüksekokulu
+Lisans tarafında öne çıkan programlar:
+- Tıp Fakültesi Türkçe ve İngilizce programları
+- Hemşirelik
+- Beslenme ve Diyetetik
+- Dil ve Konuşma Terapisi
+- Fizyoterapi ve Rehabilitasyon
+- Ergoterapi
+- Ebelik
+- Sağlık Yönetimi
+- Antrenörlük Eğitimi
+
+Ön lisans tarafında Sağlık Hizmetleri Meslek Yüksekokulu ve Meslek Yüksekokulu programları yer alır. Sağlık Hizmetleri MYO'da Anestezi, İlk ve Acil Yardım, Ameliyathane Hizmetleri, Tıbbi Laboratuvar Teknikleri, Elektronörofizyoloji, Fizyoterapi, Biyomedikal Cihaz Teknolojisi, Optisyenlik, Tıbbi Dokümantasyon ve Sekreterlik, Tıbbi Tanıtım ve Pazarlama, Tele-Sağlık Teknikerliği ve Tıbbi Veri İşleme Teknikerliği gibi programlar bulunur. Meslek Yüksekokulunda Bilgisayar Programcılığı, Grafik Tasarım, Eczane Hizmetleri ve Elektrik programları bulunur.
 
 Hangi programı düşündüğünü söylersen ücret, kontenjan, yerleşke veya eğitim süresi bilgisini ayrıca paylaşabilirim.
 
@@ -203,11 +210,9 @@ Kullanıcı örnekleri:
 - Tıbbi Laboratuvar hangi kampüste?
 - İlk ve Acil Yardım kampüsü neresi?
 - shmyo nerde
-- shmyo bölümleri hangi kampüste?
 - tlt hangi kampüste?
 - bağlum kampüste hangi programlar var?
 - baglum kampus hangi bölümler?
-- Tıbbi Görüntüleme hangi kampüste?
 - Biyomedikal hangi yerleşkede?
 - Optisyenlik nerede?
 - Anestezi nerde?
@@ -224,7 +229,6 @@ Bağlıca Yerleşkesi:
 
 Bağlum Yerleşkesi:
 - İlk ve Acil Yardım
-- Tıbbi Görüntüleme Teknikleri
 - Biyomedikal Cihaz Teknolojisi
 - Optisyenlik
 - Tıbbi Dokümantasyon ve Sekreterlik
@@ -589,6 +593,11 @@ Kullanıcı örnekleri:
 - tip kontenjan
 - tıp burslu kaç kişi
 - tıp ing kontenjan
+- tıp ing kaç kontenjan
+- tip ing kac kontenjan
+- Türkçe Tıp kontenjanı kaç?
+- İngilizce Tıp kaç kontenjan?
+- tip ing kaç kişi
 
 Instructed cevap:
 2025 Tıp Fakültesi kontenjanları şöyledir:
@@ -891,6 +900,8 @@ Kullanıcı örnekleri:
 - eşit ağırlık var mı?
 - sağlık yönetimi ea mı?
 - Sağlık Yönetimi bölümü var mı?
+- EA puan türüyle bölümünüz var mı?
+- EA puan türüyle hangi bölümü tercih edebilirim?
 
 Instructed cevap:
 Sağlık Bilimleri Fakültesinde EA puan türüyle listelenen program Sağlık Yönetimi'dir.
@@ -919,6 +930,10 @@ Kullanıcı örnekleri:
 - ön lisans sağlık bölümleri
 - tyt var mı
 - sağlık ön lisans programları
+- SHMYO programları neler?
+- Sağlık Hizmetleri MYO'da hangi bölümler var?
+- Sağlık Hizmetleri Meslek Yüksekokulu programları
+- shmyo hangi bölümler var
 
 Instructed cevap:
 Sağlık Hizmetleri Meslek Yüksekokulunda şu ön lisans programları bulunur:
@@ -993,6 +1008,8 @@ Kullanıcı örnekleri:
 - anestezi kaç tl
 - anestezi sıralama
 - anestezi kaç kişi
+- Anestezi kontenjanı nedir?
+- anestezi kaç kontenjan
 
 Instructed cevap:
 2025 Anestezi bilgileri şöyledir:
@@ -1199,6 +1216,9 @@ Kullanıcı örnekleri:
 - eczane hizmetleri kaç para
 - ağız diş sağlığı kaç para
 - iç mekan tasarımı kaç tl
+- Bilgisayar Programcılığı ücreti nedir?
+- Bilgisayar Programcılığı kontenjanı kaç?
+- bilgisayar programcılığı kaç tl
 
 Instructed cevap:
 2025 Meslek Yüksekokulu ücret ve kontenjanları şöyledir:
@@ -1263,6 +1283,8 @@ Kullanıcı örnekleri:
 - sıralama bursu kaç
 - ilk bine burs var mı?
 - ilk 10000 bursu
+- İlk 10.000’e girene burs var mı?
+- İlk 10000'e girersem burs alır mıyım?
 - derece bursu var mı?
 - yks derece bursu
 - başarı sırası bursu
@@ -1660,12 +1682,10 @@ Kullanıcı örnekleri:
 - Kesin kayıt için hangi belgeler gerekiyor?
 - Kayıt tarihleri ne zaman?
 - Ücreti ne zaman ödemem gerekiyor?
-- Kayıttan sonra bölüm değiştirebilir miyim?
 - ÖSYM kılavuzunda neye bakmalıyım?
 - kesin kayıt ne zaman?
 - kayıtlar hangi tarihte?
 - kayıt tarihleri belli mi?
-- kayıt ofisi nerede?
 - kayıt için ne lazım?
 - online kayıt var mı?
 
@@ -1738,3 +1758,55 @@ Instructed cevap:
 Kütüphane saatleri, yemekhane menüsü/ücreti, aktif topluluk listesi ve kampüs etkinlikleri gibi bilgiler dönemsel değişebilir. Bu yüzden bu tür güncel detaylarda kesin saat, fiyat veya liste vermek yerine ilgili dönem duyurusu esas alınmalıdır.
 
 Kaynak notu: Kurumsal mevzuat sayfası, Kütüphane ve Dokümantasyon Daire Başkanlığı Yönergesi, SKSDB Öğrenci Toplulukları Yönergesi.
+
+---
+
+## 67. ucretler_guncellik_resmi_kontrol
+
+Amaç: Broşürdeki ücretlerin kesinliği, güncelliği ve hangi resmi bilginin esas alınacağı sorularını cevaplamak.
+
+Kullanıcı örnekleri:
+- Broşürdeki ücretler kesin mi?
+- Bu fiyatlar güncel mi?
+- Ücretler değişebilir mi?
+- Broşürde yazan fiyat kayıt için geçerli mi?
+- ÖSYM kılavuzundaki ücret mi geçerli?
+- fiyatlar kesinleşti mi?
+- ücret tablosu son fiyat mı?
+- broşür fiyatları değişir mi?
+- kayıt olurken aynı ücreti mi öderim?
+- güncel ücretleri nereden teyit etmeliyim?
+
+Instructed cevap:
+Tanıtım broşüründeki ücretler ilgili tanıtım dönemi için adaylara sunulan program, kontenjan ve ücret bilgisini gösterir. Ancak tercih ve kesin kayıt aşamasında güncel yılın resmi ücret duyurusu, ÖSYM kılavuzu ve üniversitenin güncel kayıt bilgilendirmesi esas alınmalıdır.
+
+Burslu satırlarda ayrıca ücret tutarı verilmez; %50 indirimli satırlarda ilgili program ücretinin yarısı uygulanır. Kayıt öncesi program adını, burs/indirim türünü ve güncel yıl bilgisini birlikte kontrol etmek en güvenli yoldur.
+
+Kaynak notu: Tanıtım broşürü ücret/kontenjan tabloları, ÖSYM ve güncel kayıt duyurusu uyarıları.
+
+---
+
+## 68. kayit_sonrasi_program_degistirme
+
+Amaç: Kayıttan sonra bölüm/program değiştirme, yatay geçiş ve geçiş koşulları sorularını kayıt evrakı cevabına düşürmeden açıklamak.
+
+Kullanıcı örnekleri:
+- Kayıttan sonra bölüm değiştirebilir miyim?
+- Kayıt olduktan sonra başka bölüme geçebilir miyim?
+- Bölüm değiştirme mümkün mü?
+- Program değiştirebilir miyim?
+- Kurum içi yatay geçiş yapabilir miyim?
+- Merkezi yerleştirme puanıyla başka bölüme geçiş var mı?
+- kayıttan sonra bolum degistirme
+- bölüm değişikliği nasıl oluyor?
+- yanlış bölüm seçersem sonra değiştirebilir miyim?
+- üniversite içinde başka programa geçebilir miyim?
+
+Instructed cevap:
+Kayıttan sonra bölüm/program değiştirme doğrudan kesin kayıt işleminin parçası değildir; genellikle yatay geçiş, merkezi yerleştirme puanıyla geçiş, DGS veya ilgili akademik mevzuat kapsamında değerlendirilir.
+
+Bu süreçte başvuru dönemi, kontenjan, not ortalaması, yerleşme puanı, program koşulları ve ilgili kurul kararı gibi kriterler etkili olabilir. Bu yüzden kayıt olurken “sonra kesin değiştiririm” varsayımıyla hareket etmemek gerekir.
+
+Bölüm değiştirmeyi düşünüyorsan hangi programdan hangi programa geçmek istediğini yazarsan, konuşmayı yatay geçiş/merkezi yerleştirme kapsamına göre netleştirebilirim.
+
+Kaynak notu: Kurumsal mevzuat sayfası, yatay geçiş ve kayıt süreçlerine ilişkin yönerge başlıkları.
