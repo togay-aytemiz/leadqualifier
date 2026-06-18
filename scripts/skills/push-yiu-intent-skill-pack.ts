@@ -7,10 +7,7 @@ import { createClient } from '@supabase/supabase-js'
 import { generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddings'
 import { buildSkillEmbeddingTexts } from '@/lib/skills/embeddings'
 
-import {
-  buildYiuProgramFactIntents,
-  PROGRAM_REPLACED_BASE_SLUGS,
-} from './yiu-program-fact-skills'
+import { buildYiuProgramFactIntents, PROGRAM_REPLACED_BASE_SLUGS } from './yiu-program-fact-skills'
 
 export type ParsedIntent = {
   order: string
@@ -35,6 +32,7 @@ const DEFAULT_DEMO_SLUG = 'yiu-tanitim-gunleri-2026'
 const SKILL_TITLE_PREFIX = 'YİÜ Intent - '
 const EMBEDDING_BATCH_SIZE = 128
 const EMBEDDING_INSERT_BATCH_SIZE = 40
+const TRANSIENT_RETRY_DELAYS_MS = [1000, 2500, 5000]
 
 export function chunkItems<T>(items: T[], size: number): T[][] {
   if (!Number.isInteger(size) || size < 1) {
@@ -50,8 +48,8 @@ export function chunkItems<T>(items: T[], size: number): T[][] {
 
 function parseEnvValue(value: string) {
   const trimmed = value.trim()
-  return ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'")))
+  return (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
     ? trimmed.slice(1, -1)
     : trimmed
 }
@@ -85,9 +83,7 @@ function extractBlock(section: string, startLabel: string, endLabel: string) {
 }
 
 export function parseIntentPack(markdown: string): ParsedIntent[] {
-  const sections = markdown
-    .split(/\n---\n/g)
-    .filter((section) => /^## \d{2}\. /m.test(section))
+  const sections = markdown.split(/\n---\n/g).filter((section) => /^## \d{2}\. /m.test(section))
 
   return sections.map((section) => {
     const heading = section.match(/^## (\d{2})\. ([^\n]+)$/m)
@@ -130,21 +126,27 @@ export function parseIntentPack(markdown: string): ParsedIntent[] {
 export function buildYiuActiveIntentUnion(baseMarkdown: string, brochureMarkdown: string) {
   const replacedSlugs = new Set<string>(PROGRAM_REPLACED_BASE_SLUGS)
   const programIntents = buildYiuProgramFactIntents(brochureMarkdown)
-  const programTriggers = new Set(programIntents.flatMap((intent) =>
-    intent.triggerExamples.map((trigger) =>
-      trigger.normalize('NFKC').replace(/\s+/g, ' ').trim().toLocaleLowerCase('tr-TR')
+  const programTriggers = new Set(
+    programIntents.flatMap((intent) =>
+      intent.triggerExamples.map((trigger) =>
+        trigger.normalize('NFKC').replace(/\s+/g, ' ').trim().toLocaleLowerCase('tr-TR')
+      )
     )
-  ))
+  )
   const generalIntents = parseIntentPack(baseMarkdown)
     .filter((intent) => !replacedSlugs.has(intent.slug))
     .map((intent) => ({
       ...intent,
-      triggerExamples: intent.triggerExamples.filter((trigger) => !programTriggers.has(
-        trigger.normalize('NFKC').replace(/\s+/g, ' ').trim().toLocaleLowerCase('tr-TR')
-      )),
+      triggerExamples: intent.triggerExamples.filter(
+        (trigger) =>
+          !programTriggers.has(
+            trigger.normalize('NFKC').replace(/\s+/g, ' ').trim().toLocaleLowerCase('tr-TR')
+          )
+      ),
     }))
-  const intents = [...generalIntents, ...programIntents]
-    .sort((left, right) => Number(left.order) - Number(right.order))
+  const intents = [...generalIntents, ...programIntents].sort(
+    (left, right) => Number(left.order) - Number(right.order)
+  )
 
   const titles = new Set(intents.map((intent) => intent.title))
   if (titles.size !== intents.length) {
@@ -158,12 +160,34 @@ function arraysEqual(left: string[], right: string[]) {
   return left.every((value, index) => value === right[index])
 }
 
+async function retryTransient<T>(label: string, operation: () => Promise<T>): Promise<T> {
+  let lastError: unknown
+
+  for (let attempt = 0; attempt <= TRANSIENT_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      return await operation()
+    } catch (error) {
+      lastError = error
+      const delay = TRANSIENT_RETRY_DELAYS_MS[attempt]
+      if (!delay) break
+      console.warn(
+        `${label} failed, retrying in ${delay}ms: ${error instanceof Error ? error.message : String(error)}`
+      )
+      await new Promise((resolve) => setTimeout(resolve, delay))
+    }
+  }
+
+  throw lastError
+}
+
 function skillNeedsUpdate(existing: SkillRow | undefined, intent: ParsedIntent) {
   if (!existing) return true
-  return existing.response_text !== intent.responseText ||
+  return (
+    existing.response_text !== intent.responseText ||
     !arraysEqual(existing.trigger_examples ?? [], intent.triggerExamples) ||
     existing.enabled !== true ||
     existing.requires_human_handover !== false
+  )
 }
 
 async function main() {
@@ -205,7 +229,9 @@ async function main() {
     .single()
 
   if (channelError || !channel?.organization_id) {
-    throw new Error(`Could not resolve demo channel ${demoSlug}: ${channelError?.message ?? 'missing row'}`)
+    throw new Error(
+      `Could not resolve demo channel ${demoSlug}: ${channelError?.message ?? 'missing row'}`
+    )
   }
 
   const titles = intents.map((intent) => intent.title)
@@ -220,8 +246,9 @@ async function main() {
   const existingByTitle = new Map(
     ((existingSkills ?? []) as SkillRow[]).map((skill) => [skill.title, skill])
   )
-  const staleSkills = ((existingSkills ?? []) as SkillRow[])
-    .filter((skill) => skill.enabled && !titles.includes(skill.title))
+  const staleSkills = ((existingSkills ?? []) as SkillRow[]).filter(
+    (skill) => skill.enabled && !titles.includes(skill.title)
+  )
   const touchedSkills: Array<{
     id: string
     title: string
@@ -237,7 +264,10 @@ async function main() {
     const { error } = await supabase
       .from('skills')
       .update({ enabled: false })
-      .in('id', staleSkills.map((skill) => skill.id))
+      .in(
+        'id',
+        staleSkills.map((skill) => skill.id)
+      )
 
     if (error) {
       throw new Error(`Failed to disable stale YIU intent skills: ${error.message}`)
@@ -322,36 +352,54 @@ async function main() {
   }
 
   const embeddingInputs = touchedSkills.flatMap((skill) =>
-    buildSkillEmbeddingTexts(skill.title, skill.triggerExamples, skill.responseText).map((text) => ({
-      skillId: skill.id,
-      triggerText: text,
-    }))
+    buildSkillEmbeddingTexts(skill.title, skill.triggerExamples, skill.responseText).map(
+      (text) => ({
+        skillId: skill.id,
+        triggerText: text,
+      })
+    )
   )
 
   let embeddingRows: Array<{ skill_id: string; trigger_text: string; embedding: string }> = []
 
   for (let index = 0; index < embeddingInputs.length; index += EMBEDDING_BATCH_SIZE) {
     const batch = embeddingInputs.slice(index, index + EMBEDDING_BATCH_SIZE)
-    const embeddings = await generateEmbeddings(batch.map((input) => input.triggerText), {
-      organizationId: channel.organization_id,
-      supabase: supabase as never,
-      usageMetadata: {
-        source: 'yiu_intent_skill_pack_push',
-        demo_slug: demoSlug,
-      },
-    })
+    const batchNumber = Math.floor(index / EMBEDDING_BATCH_SIZE) + 1
+    const embeddings = await retryTransient(`embedding generation batch ${batchNumber}`, () =>
+      generateEmbeddings(
+        batch.map((input) => input.triggerText),
+        {
+          organizationId: channel.organization_id,
+          supabase: supabase as never,
+          usageMetadata: {
+            source: 'yiu_intent_skill_pack_push',
+            demo_slug: demoSlug,
+          },
+        }
+      )
+    )
 
-    embeddingRows = embeddingRows.concat(batch.map((input, batchIndex) => ({
-      skill_id: input.skillId,
-      trigger_text: input.triggerText,
-      embedding: formatEmbeddingForPgvector(embeddings[batchIndex] ?? []),
-    })))
+    embeddingRows = embeddingRows.concat(
+      batch.map((input, batchIndex) => ({
+        skill_id: input.skillId,
+        trigger_text: input.triggerText,
+        embedding: formatEmbeddingForPgvector(embeddings[batchIndex] ?? []),
+      }))
+    )
   }
 
-  for (const [batchIndex, rows] of chunkItems(embeddingRows, EMBEDDING_INSERT_BATCH_SIZE).entries()) {
-    const { error: insertEmbeddingError } = await supabase
-      .from('skill_embeddings')
-      .insert(rows)
+  for (const [batchIndex, rows] of chunkItems(
+    embeddingRows,
+    EMBEDDING_INSERT_BATCH_SIZE
+  ).entries()) {
+    const insertResult = await retryTransient(
+      `embedding insert batch ${batchIndex + 1}`,
+      async () => {
+        const { error } = await supabase.from('skill_embeddings').insert(rows)
+        return { error }
+      }
+    )
+    const insertEmbeddingError = insertResult.error
 
     if (insertEmbeddingError) {
       throw new Error(
@@ -376,18 +424,24 @@ async function main() {
 
   if (verifyEmbeddingError) throw new Error(verifyEmbeddingError.message)
 
-  console.log(JSON.stringify({
-    demoSlug,
-    organizationId: channel.organization_id,
-    displayName: channel.display_name,
-    parsed: intents.length,
-    inserted,
-    updated,
-    unchanged,
-    disabledStale,
-    yiuIntentSkillCount: skillCount ?? 0,
-    refreshedEmbeddingRows: embeddingCount ?? 0,
-  }, null, 2))
+  console.log(
+    JSON.stringify(
+      {
+        demoSlug,
+        organizationId: channel.organization_id,
+        displayName: channel.display_name,
+        parsed: intents.length,
+        inserted,
+        updated,
+        unchanged,
+        disabledStale,
+        yiuIntentSkillCount: skillCount ?? 0,
+        refreshedEmbeddingRows: embeddingCount ?? 0,
+      },
+      null,
+      2
+    )
+  )
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

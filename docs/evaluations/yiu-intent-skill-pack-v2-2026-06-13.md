@@ -221,20 +221,23 @@ Kullanıcı örnekleri:
 Instructed cevap:
 Sağlık Hizmetleri Meslek Yüksekokulu programları iki yerleşkeye dağılır:
 
-Bağlıca Yerleşkesi:
-- Anestezi
-- Ameliyathane Hizmetleri
-- Fizyoterapi
-- Tıbbi Laboratuvar Teknikleri
-
 Bağlum Yerleşkesi:
+- Anestezi
 - İlk ve Acil Yardım
-- Biyomedikal Cihaz Teknolojisi
+- Ameliyathane Hizmetleri
 - Optisyenlik
 - Tıbbi Dokümantasyon ve Sekreterlik
 - Tıbbi Tanıtım ve Pazarlama
 - Tele-Sağlık Teknikerliği
+
+Balgat Yerleşkesi:
+- Tıbbi Laboratuvar Teknikleri
+- Biyomedikal Cihaz Teknolojisi
+- Elektronörofizyoloji
+- Fizyoterapi
 - Tıbbi Veri İşleme Teknikerliği
+
+Bir program adı yazarsan yerleşkesini, adresini, ücret/kontenjan seçeneklerini ve puan türünü tek tek söyleyebilirim.
 
 Kaynak notu: Tanıtım broşürü program-yerleşke eşleşmesi.
 
@@ -346,9 +349,14 @@ Kullanıcı örnekleri:
 - Kampüsler arası servis var mı?
 
 Instructed cevap:
-Yerleşke adreslerini net olarak paylaşabilirim; ancak servis/ring güzergahı, saatleri veya servis varlığı için kesin bilgi vermem doğru olmaz.
+Yerleşke adreslerini paylaşabilirim. Servis/ring güzergahı, saatleri veya ücretleri gibi değişken ulaşım bilgileri için ise güncel dönem duyurusu esas alınmalıdır.
 
-100. Yıl / İşçi Blokları Yerleşkesi Çankaya'da, Balgat Yerleşkesi Balgat'ta, Bağlum Yerleşkesi Keçiören'de, Bağlıca Yerleşkesi Bağlıca'dadır. Hangi yerleşkeye gideceğini yazarsan adresini netleştirebilirim. Servis ve ulaşım saatleri gibi değişken bilgiler için güncel dönem duyurusu esas alınmalıdır.
+- 100. Yıl / İşçi Blokları Yerleşkesi: İşçi Blokları Mahallesi 1505. Sokak No:18/A, Çankaya / Ankara
+- Balgat Yerleşkesi: Oğuzlar Mahallesi, 1375. Sokak No:8, Balgat / Ankara
+- Bağlum Yerleşkesi: Karakaya Mahallesi, Bağlum Bulvarı No:1, Keçiören / Ankara
+- Bağlıca Yerleşkesi: Bağlıca Mahallesi, Höyük Caddesi No:1, Bağlıca / Ankara
+
+Hangi program için soruyorsan programın yerleşkesini de netleştirebilirim.
 
 Kaynak notu: Tanıtım broşürü ulaşım QR bağlantısı, yerleşke adresleri.
 
@@ -1318,6 +1326,10 @@ Kullanıcı örnekleri:
 - tercih indirimi var mı?
 - 1. sıraya yazarsam indirim alır mıyım?
 - tercih sırası indirimi
+- 1 tercih indirimi
+- birinci tercih indirimi
+- ilk tercih indirimi yüzde kaç?
+- 1 tercihe indirim var mı?
 
 Instructed cevap:
 Evet, tercih bursu bulunur.
@@ -1688,6 +1700,9 @@ Kullanıcı örnekleri:
 - kayıt tarihleri belli mi?
 - kayıt için ne lazım?
 - online kayıt var mı?
+- e-Devlet kaydı olur mu?
+- kayıt için ödeme ne zaman?
+- kesin kayıt belgeleri nelerdir?
 
 Instructed cevap:
 ÖSYM/ÖSYS ile yerleşen yerel adaylar için kesin kayıtta genel olarak şu belgeler istenir:
@@ -1701,7 +1716,7 @@ Instructed cevap:
 - Online kayıtta bir, şahsen kayıtta iki fotoğraf
 - Yatay geçiş veya DGS kaydında muafiyet dilekçesi
 
-Kayıt tarihleri ve istenen belgeler dönemsel olarak değişebilir; kesin işlem öncesinde ilgili yılın ÖSYM kılavuzu ve güncel kayıt duyurusu kontrol edilmelidir. Uluslararası öğrenci, yatay geçiş veya DGS kaydı yapacaksan belge listesi değişir; hangi tür başvuru yaptığını yazarsan doğru listeyi ayırabilirim.
+Online/e-Devlet kayıt ve şahsen kayıt ayrımı, ödeme adımı ve kesin tarihler ilgili yılın kayıt duyurusuyla netleşir. Uluslararası öğrenci, yatay geçiş veya DGS kaydı yapacaksan belge listesi değişir; hangi tür başvuru yaptığını yazarsan doğru listeyi ayırabilirim.
 
 Kaynak notu: Ana web sitesi aday öğrenci ve ücret/kontenjan yönlendirmeleri, tanıtım broşürü, ÖSYM kılavuzu uyarıları.
 
@@ -1748,12 +1763,10 @@ Kullanıcı örnekleri:
 - kulüpler var mı?
 - yemek var mı?
 - yemekhane ücretli mi?
-- spor salonu var mı?
-- kampüste revir var mı?
 - öğrenci kulüpleri neler?
 
 Instructed cevap:
-Üniversitede kütüphane/dokümantasyon ve öğrenci topluluklarıyla ilgili düzenlenmiş süreçler bulunur.
+Üniversitede kütüphane/dokümantasyon ve öğrenci topluluklarıyla ilgili düzenlenmiş süreçler bulunur. Kampüs yaşamı tarafında kütüphane, öğrenci toplulukları, yemekhane/kantin gibi başlıklarda destek alınabilir.
 
 Kütüphane saatleri, yemekhane menüsü/ücreti, aktif topluluk listesi ve kampüs etkinlikleri gibi bilgiler dönemsel değişebilir. Bu yüzden bu tür güncel detaylarda kesin saat, fiyat veya liste vermek yerine ilgili dönem duyurusu esas alınmalıdır.
 

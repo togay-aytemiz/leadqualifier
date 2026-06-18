@@ -2,6 +2,7 @@ import OpenAI from 'openai'
 
 import type { MvpResponseLanguage } from '@/lib/ai/language'
 import type { KnowledgeSearchPlanningTurn } from '@/lib/knowledge-base/query-planner'
+import { YIU_CURRENT_PROGRAMS } from '@/lib/knowledge-base/provider-data/yiu-current-programs'
 import type { RagPendingClarificationState } from '@/lib/knowledge-base/rag-eval/types'
 
 import { parseJsonObject } from './contracts'
@@ -102,31 +103,48 @@ function normalized(value: string) {
     .toLocaleLowerCase('tr-TR')
     .normalize('NFKD')
     .replace(/\p{Diacritic}/gu, '')
-    .replace(/[ıİğĞüÜşŞöÖçÇ]/g, (char) => ({
-      ı: 'i',
-      İ: 'i',
-      ğ: 'g',
-      Ğ: 'g',
-      ü: 'u',
-      Ü: 'u',
-      ş: 's',
-      Ş: 's',
-      ö: 'o',
-      Ö: 'o',
-      ç: 'c',
-      Ç: 'c',
-    }[char] ?? char))
+    .replace(
+      /[ıİğĞüÜşŞöÖçÇ]/g,
+      (char) =>
+        ({
+          ı: 'i',
+          İ: 'i',
+          ğ: 'g',
+          Ğ: 'g',
+          ü: 'u',
+          Ü: 'u',
+          ş: 's',
+          Ş: 's',
+          ö: 'o',
+          Ö: 'o',
+          ç: 'c',
+          Ç: 'c',
+        })[char] ?? char
+    )
     .replace(/\s+/g, ' ')
     .trim()
 }
+
+const CURRENT_PROGRAM_ALIASES = YIU_CURRENT_PROGRAMS.flatMap((program) => [
+  program.displayName,
+  ...program.aliases,
+]).map((name) => ({
+  display: name,
+  normalized: normalized(name)
+    .replace(/\b(?:bolumu|bolum|programi|program)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim(),
+}))
 
 type SubjectCandidate = { normalized: string; display: string }
 
 const SUBJECT_MARKERS = new Set([
   'anestezi',
+  'bolumu',
   'diyetetik',
   'ebelik',
   'ergoterapi',
+  'fakulte',
   'fakultesi',
   'fakultesinde',
   'fizyoterapi',
@@ -134,9 +152,12 @@ const SUBJECT_MARKERS = new Set([
   'hizmetleri',
   'laboratuvar',
   'optisyenlik',
+  'program',
   'programi',
   'programinda',
   'programinin',
+  'teknikerligi',
+  'teknolojisi',
   'teknikleri',
   'terapisi',
   'yonetimi',
@@ -154,9 +175,17 @@ const SUBJECT_BOUNDARY_WORDS = new Set([
   'nedir',
   'nerede',
   'ne',
+  'sizin',
+  'universite',
+  'universiteniz',
+  'universitenizde',
+  'universitesi',
   'programinin',
   'ucreti',
   'var',
+  'yiu',
+  'yuksek',
+  'ihtisas',
 ])
 
 function subjectTokens(value: string) {
@@ -167,11 +196,17 @@ function subjectTokens(value: string) {
 }
 
 function candidateKey(parts: Array<{ raw: string; normalized: string }>) {
-  return parts.map((part) => part.normalized).join(' ').trim()
+  return parts
+    .map((part) => part.normalized)
+    .join(' ')
+    .trim()
 }
 
 function candidateDisplay(parts: Array<{ raw: string }>) {
-  return parts.map((part) => part.raw).join(' ').trim()
+  return parts
+    .map((part) => part.raw)
+    .join(' ')
+    .trim()
 }
 
 function namedSubjectCandidates(value: string): SubjectCandidate[] {
@@ -184,10 +219,7 @@ function namedSubjectCandidates(value: string): SubjectCandidate[] {
 
     const start = Math.max(0, index - 4)
     const parts = tokens.slice(start, index + 1)
-    while (
-      parts.length > 1
-      && SUBJECT_BOUNDARY_WORDS.has(parts[0]?.normalized ?? '')
-    ) {
+    while (parts.length > 1 && SUBJECT_BOUNDARY_WORDS.has(parts[0]?.normalized ?? '')) {
       parts.shift()
     }
 
@@ -210,14 +242,16 @@ function unsupportedRequestedSubjects(input: {
   support: string
 }) {
   const requested = new Set(
-    namedSubjectCandidates(`${input.question}\n${input.standaloneQuery}`)
-      .map((candidate) => candidate.normalized)
+    namedSubjectCandidates(`${input.question}\n${input.standaloneQuery}`).map(
+      (candidate) => candidate.normalized
+    )
   )
   if (requested.size === 0) return []
 
   const normalizedSupport = normalized(input.support)
-  return namedSubjectCandidates(input.answer).filter((candidate) =>
-    requested.has(candidate.normalized) && !supportContainsSubject(normalizedSupport, candidate)
+  return namedSubjectCandidates(input.answer).filter(
+    (candidate) =>
+      requested.has(candidate.normalized) && !supportContainsSubject(normalizedSupport, candidate)
   )
 }
 
@@ -231,31 +265,158 @@ function supportContainsSubject(normalizedSupport: string, candidate: SubjectCan
   return coreTokenCount >= 2 && normalizedSupport.includes(core)
 }
 
+function programCatalogFactSubject(value: string) {
+  const normalizedValue = normalized(value)
+    .replace(
+      /\b(?:yuksek ihtisas universitesi|yuksek ihtisas|yiu|universitenizde|universiteniz|universite|okulunuzda|okulunuz|sizde|sizlerde|sizin)\b/g,
+      ' '
+    )
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (
+    /\b(?:saglik hizmetleri meslek yuksekokulu|meslek yuksekokulu|saglik bilimleri fakultesi|spor bilimleri fakultesi)\b/.test(
+      normalizedValue
+    )
+  ) {
+    return null
+  }
+
+  const [beforeFacet] = normalizedValue.split(
+    /\b(?:ogrenim ucreti|ucreti|ucretleri|ucret|fiyati|fiyatlari|fiyat|kac para|kontenjani|kontenjanlari|kontenjan|taban puani|taban puan|basari sirasi|puan turu|hangi kampus|kampusu|kampuste|kampus|yerleskesi|yerleske|nerede|nerde|bolumu var mi|programi var mi|var mi|varmi|nedir|ne demek)\b/u,
+    1
+  )
+  const candidate = (beforeFacet ?? '')
+    .replace(
+      /\b(?:bolumu|bolum|programi|program|fakultesi|fakulte|hakkinda|bilgi|acaba|lutfen)\b/g,
+      ' '
+    )
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (candidate.length < 3) return null
+  if (
+    /^(?:hangi|tum|butun|genel|programlar|bolumler|fakulteler|ucretler|kontenjanlar)$/.test(
+      candidate
+    )
+  ) {
+    return null
+  }
+
+  return candidate
+}
+
+function asksCurrentProgramCatalogFact(value: string) {
+  const normalizedValue = normalized(value)
+  return /\b(?:ogrenim ucreti|ucreti|ucretleri|ucret|fiyati|fiyatlari|fiyat|kac para|kontenjani|kontenjanlari|kontenjan|taban puani|taban puan|basari sirasi|puan turu|hangi kampus|kampusu|kampuste|yerleskesi|yerleske|nerede|nerde|bolumu var mi|programi var mi|var mi|varmi|nedir|ne demek)\b/.test(
+    normalizedValue
+  )
+}
+
+function looksLikeProgramSubject(subject: string) {
+  return /\b(?:bolum|program|fakulte|teknik|teknikleri|teknikerligi|teknolojisi|hizmetleri|terapisi|yonetimi|diyetetik|hemsirelik|anestezi|optisyenlik|ebelik|ergoterapi|fizyoterapi|laboratuvar|tanitim|pazarlama|dokumantasyon|sekreterlik|saglik|bilgisayar|grafik|eczane|elektrik|antrenorluk|psikoloji|goruntuleme)\b/.test(
+    subject
+  )
+}
+
+function matchesCurrentProgram(subject: string) {
+  const cleanSubject = subject
+    .replace(/\b(?:bolumu|bolum|programi|program|fakultesi|fakulte)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!cleanSubject) return false
+
+  return CURRENT_PROGRAM_ALIASES.some((entry) => {
+    if (!entry.normalized) return false
+    if (entry.normalized.length <= 3 || cleanSubject.length <= 3) {
+      return cleanSubject === entry.normalized
+    }
+    return (
+      cleanSubject === entry.normalized ||
+      cleanSubject.includes(entry.normalized) ||
+      entry.normalized.includes(cleanSubject)
+    )
+  })
+}
+
+function answerHasPositiveCatalogFact(answer: string, subject: string) {
+  const normalizedAnswer = normalized(answer)
+  const subjectPattern = termPattern(subject)
+  const sentenceMatch = sentenceLikeParts(answer).some(
+    (sentence) =>
+      subjectPattern.test(sentence) &&
+      !sentenceDeniesAvailability(sentence) &&
+      (sentenceHasPositiveAvailability(sentence) ||
+        /\b(?:tl|kontenjan|puan turu|taban puan|basari sirasi|yerleskesinde|kampuste|kampusundedir|programidir|fakultesindedir)\b/.test(
+          sentence
+        ))
+  )
+  return (
+    sentenceMatch ||
+    (subjectPattern.test(normalizedAnswer) &&
+      !sentenceDeniesAvailability(normalizedAnswer) &&
+      /\b(?:tl|kontenjan|puan turu|taban puan|basari sirasi|yerleskesinde|kampuste|kampusundedir|programidir|fakultesindedir)\b/.test(
+        normalizedAnswer
+      ))
+  )
+}
+
+function unsupportedCurrentProgramFact(input: {
+  question: string
+  standaloneQuery: string
+  answer: string
+}) {
+  const combinedQuestion = `${input.question}\n${input.standaloneQuery}`
+  if (!asksCurrentProgramCatalogFact(combinedQuestion)) return null
+
+  const subject = programCatalogFactSubject(combinedQuestion)
+  if (!subject || matchesCurrentProgram(subject)) return null
+  if (!looksLikeProgramSubject(subject)) return null
+  if (!answerHasPositiveCatalogFact(input.answer, subject)) return null
+
+  return subject
+}
+
 function asksOwnHospitalIdentity(value: string) {
   const normalizedValue = normalized(value)
-  return /\bhastane/.test(normalizedValue)
-    && /\b(?:hastaneniz|hastanesi var|kendi hastane|kendi hastaneniz|universitesi hastanesi|universite hastanesi|yiu hastanesi|hastane projesi|hastane proje|hastane kurul|hastane ne zaman)\b/.test(normalizedValue)
+  return (
+    /\bhastane/.test(normalizedValue) &&
+    /\b(?:hastaneniz|hastanesi var|kendi hastane|kendi hastaneniz|universitesi hastanesi|universite hastanesi|yiu hastanesi|hastane projesi|hastane proje|hastane kurul|hastane ne zaman)\b/.test(
+      normalizedValue
+    )
+  )
 }
 
 function answerClaimsOwnHospital(answer: string) {
   const normalizedAnswer = normalized(answer)
-  return /\b(?:hastanesi|bir hastanesi|kendi hastanesi|universitesi hastanesi|universite hastanesi)\b/.test(normalizedAnswer)
-    && sentenceLikeParts(answer).some((sentence) =>
-      /\bhastane/.test(sentence)
-      && sentenceHasPositiveAvailability(sentence)
-      && !sentenceDeniesAvailability(sentence)
+  return (
+    /\b(?:hastanesi|bir hastanesi|kendi hastanesi|universitesi hastanesi|universite hastanesi)\b/.test(
+      normalizedAnswer
+    ) &&
+    sentenceLikeParts(answer).some(
+      (sentence) =>
+        /\bhastane/.test(sentence) &&
+        sentenceHasPositiveAvailability(sentence) &&
+        !sentenceDeniesAvailability(sentence)
     )
+  )
 }
 
 function supportDirectlyNamesOwnHospital(support: string) {
   const normalizedSupport = normalized(support)
-  return /\b(?:kendi hastanesi|universitesi hastanesi|universite hastanesi)\b/.test(normalizedSupport)
+  return /\b(?:kendi hastanesi|universitesi hastanesi|universite hastanesi)\b/.test(
+    normalizedSupport
+  )
 }
 
 function asksFacilityAvailability(value: string) {
   const normalizedValue = normalized(value)
-  return /\b(?:var mi|mevcut mu|bulunuyor mu|sahip mi|available|have|has)\b/.test(normalizedValue)
-    && /\b(?:laboratuvar|lab|kadavra|mikroskop|uygulama alani|cihaz|rontgen|mr|tomografi|facility|equipment)\b/.test(normalizedValue)
+  return (
+    /\b(?:var mi|mevcut mu|bulunuyor mu|sahip mi|available|have|has)\b/.test(normalizedValue) &&
+    /\b(?:laboratuvar|lab|kadavra|mikroskop|uygulama alani|cihaz|rontgen|mr|tomografi|facility|equipment)\b/.test(
+      normalizedValue
+    )
+  )
 }
 
 function usesSpeculativeAvailability(answer: string) {
@@ -273,7 +434,8 @@ function sentenceLikeParts(value: string) {
 
 function termPattern(term: string) {
   const words = term.split(/\s+/g).filter(Boolean)
-  const suffix = '(?:lar|ler|lari|leri|larda|lerde|lardan|lerden|da|de|ta|te|dan|den|tan|ten|ya|ye|yi|yu|i|u|a|e|in|un|nin|nun|si|su|sina|sine|nda|nde|na)?'
+  const suffix =
+    '(?:lar|ler|lari|leri|larda|lerde|lardan|lerden|da|de|ta|te|dan|den|tan|ten|ya|ye|yi|yu|i|u|a|e|in|un|nin|nun|si|su|sina|sine|nda|nde|na)?'
   const pattern = words
     .map((word, index) => `${word}${index === words.length - 1 ? suffix : ''}`)
     .join('\\s+')
@@ -296,9 +458,7 @@ function requestedFacilityTerms(value: string) {
     'uygulama alani',
   ]
   const matched = candidates.filter((term) => termPattern(term).test(normalizedValue))
-  return matched.filter((term) =>
-    !matched.some((other) => other !== term && other.includes(term))
-  )
+  return matched.filter((term) => !matched.some((other) => other !== term && other.includes(term)))
 }
 
 function requestedOperationalTerms(value: string) {
@@ -331,41 +491,65 @@ function requestedOperationalTerms(value: string) {
 }
 
 function sentenceHasPositiveAvailability(sentence: string) {
-  return /\b(?:var|vardir|mevcut|bulunur|bulunuyor|bulunmaktadir|sahip|yer alir|yer almaktadir|verilir|veriliyor|verilmektedir|saglanir|saglanmaktadir)\b/i.test(sentence)
+  return /\b(?:var|vardir|mevcut|bulunur|bulunuyor|bulunmaktadir|sahip|yer alir|yer almaktadir|verilir|veriliyor|verilmektedir|saglanir|saglanmaktadir)\b/i.test(
+    sentence
+  )
 }
 
 function sentenceDeniesAvailability(sentence: string) {
-  return /\b(?:yok|bulunmuyor|bulunmamaktadir|mevcut degil|bilgi bulunmamaktadir|dogrudan bilgi bulunmamaktadir)\b/i.test(sentence)
+  return /\b(?:yok|bulunmuyor|bulunmamaktadir|mevcut degil|bilgi bulunmamaktadir|dogrudan bilgi bulunmamaktadir)\b/i.test(
+    sentence
+  )
 }
 
 function sentenceHasDirectFacilitySupport(sentence: string) {
-  if (/\b(?:bakim|onarim|kurulum|testinden|sorumlu|tekniker|mezun|gorev alabilir)\b/i.test(sentence)) {
-    return false
-  }
-
-  return sentenceHasPositiveAvailability(sentence)
-    || /\b(?:adet|tane|her ogrenci|her bir ogrenci|bire bir|imkani|olanagi|uygulamalar)\b/i.test(sentence)
-}
-
-function sentenceHasPositiveOperationalClaim(sentence: string) {
-  return sentenceHasPositiveAvailability(sentence)
-    || /\b(?:yapar|yapilir|yapilmaktadir|cikar|cikarlar|katilir|katilirlar|gorur|gorer|alir|alirlar|saglanir|saglar|garanti|garantilidir|gecerlidir|gecerli|akreditedir|denktir|calisir|ise girer|is bulur|is bulabilir|maas|az olmaz|az degildir|soz konusu degildir|genis|cesitlilik|karsilanir|sunulur)\b/i.test(sentence)
-}
-
-function sentenceDeniesOperationalClaim(sentence: string) {
-  return sentenceDeniesAvailability(sentence)
-    || /\b(?:garanti degil|garanti verilmez|kesin degil|soylemek dogru olmaz|bilgi yok|net degil|veremem|otomatik degil|dayanak yok)\b/i.test(sentence)
-}
-
-function sentenceHasDirectOperationalSupport(sentence: string) {
   if (
-    /\b(?:amac|hedef|yetistirmeyi|yetistirilir|mezun|gorev alabilir|sorumlu|bilgi ve beceri|donatilir|kariyer|istihdam alani|calisma alani|olanak saglar)\b/i.test(sentence)
+    /\b(?:bakim|onarim|kurulum|testinden|sorumlu|tekniker|mezun|gorev alabilir)\b/i.test(sentence)
   ) {
     return false
   }
 
-  return sentenceHasPositiveOperationalClaim(sentence)
-    || /\b(?:uygulamasina cikar|uygulama yapar|staj yapar|hasta gorur|vaka gorur|vaka sayisi|hasta sayisi)\b/i.test(sentence)
+  return (
+    sentenceHasPositiveAvailability(sentence) ||
+    /\b(?:adet|tane|her ogrenci|her bir ogrenci|bire bir|imkani|olanagi|uygulamalar)\b/i.test(
+      sentence
+    )
+  )
+}
+
+function sentenceHasPositiveOperationalClaim(sentence: string) {
+  return (
+    sentenceHasPositiveAvailability(sentence) ||
+    /\b(?:yapar|yapilir|yapilmaktadir|cikar|cikarlar|katilir|katilirlar|gorur|gorer|alir|alirlar|saglanir|saglar|garanti|garantilidir|gecerlidir|gecerli|akreditedir|denktir|calisir|ise girer|is bulur|is bulabilir|maas|az olmaz|az degildir|soz konusu degildir|genis|cesitlilik|karsilanir|sunulur)\b/i.test(
+      sentence
+    )
+  )
+}
+
+function sentenceDeniesOperationalClaim(sentence: string) {
+  return (
+    sentenceDeniesAvailability(sentence) ||
+    /\b(?:garanti degil|garanti verilmez|kesin degil|soylemek dogru olmaz|bilgi yok|net degil|veremem|otomatik degil|dayanak yok)\b/i.test(
+      sentence
+    )
+  )
+}
+
+function sentenceHasDirectOperationalSupport(sentence: string) {
+  if (
+    /\b(?:amac|hedef|yetistirmeyi|yetistirilir|mezun|gorev alabilir|sorumlu|bilgi ve beceri|donatilir|kariyer|istihdam alani|calisma alani|olanak saglar)\b/i.test(
+      sentence
+    )
+  ) {
+    return false
+  }
+
+  return (
+    sentenceHasPositiveOperationalClaim(sentence) ||
+    /\b(?:uygulamasina cikar|uygulama yapar|staj yapar|hasta gorur|vaka gorur|vaka sayisi|hasta sayisi)\b/i.test(
+      sentence
+    )
+  )
 }
 
 function unsupportedPositiveFacilityTerms(input: {
@@ -381,15 +565,16 @@ function unsupportedPositiveFacilityTerms(input: {
 
   return terms.filter((term) => {
     const pattern = termPattern(term)
-    const hasPositiveClaim = answerSentences.some((sentence) =>
-      pattern.test(sentence)
-      && sentenceHasPositiveAvailability(sentence)
-      && !sentenceDeniesAvailability(sentence)
+    const hasPositiveClaim = answerSentences.some(
+      (sentence) =>
+        pattern.test(sentence) &&
+        sentenceHasPositiveAvailability(sentence) &&
+        !sentenceDeniesAvailability(sentence)
     )
     if (!hasPositiveClaim) return false
 
-    return !supportSentences.some((sentence) =>
-      pattern.test(sentence) && sentenceHasDirectFacilitySupport(sentence)
+    return !supportSentences.some(
+      (sentence) => pattern.test(sentence) && sentenceHasDirectFacilitySupport(sentence)
     )
   })
 }
@@ -407,15 +592,16 @@ function unsupportedPositiveOperationalTerms(input: {
 
   return terms.filter((term) => {
     const pattern = termPattern(term)
-    const hasPositiveClaim = answerSentences.some((sentence) =>
-      pattern.test(sentence)
-      && sentenceHasPositiveOperationalClaim(sentence)
-      && !sentenceDeniesOperationalClaim(sentence)
+    const hasPositiveClaim = answerSentences.some(
+      (sentence) =>
+        pattern.test(sentence) &&
+        sentenceHasPositiveOperationalClaim(sentence) &&
+        !sentenceDeniesOperationalClaim(sentence)
     )
     if (!hasPositiveClaim) return false
 
-    return !supportSentences.some((sentence) =>
-      pattern.test(sentence) && sentenceHasDirectOperationalSupport(sentence)
+    return !supportSentences.some(
+      (sentence) => pattern.test(sentence) && sentenceHasDirectOperationalSupport(sentence)
     )
   })
 }
@@ -471,6 +657,7 @@ export async function generateSimpleRagAnswer(input: {
           'Answer only the requested facet. Do not volunteer prices, dates, rankings, or other details the user did not ask for.',
           'Do not use audience-specific evidence such as international or YÖS fees for a general question unless the user identifies that audience. Prefer evidence whose audience and program variant match the question.',
           'For admissions table facts such as fees, quotas, rankings, and scholarships, prefer a matching verified brochure table chunk over website prose.',
+          'For current program availability, fees, quotas, rankings, scores, campuses, and program variants, do not use old announcements, historical pages, unrelated course/job descriptions, or stale program mentions as proof. Prefer current verified brochure/catalog rows and current program-list chunks.',
           'For table facts, quote the matching row values directly. Do not compute totals, averages, or derived values unless the user explicitly asks for that calculation.',
           'For any program, department, faculty, campus, hospital, office, or service named in the answer, the selected chunks must contain that same named entity. Do not attach a supported price, quota, location, or policy to a nearby or similarly named entity.',
           'If one program has separate paid, scholarship, or discount rows and the user asks for quota, fee, score, or ranking, answer with each matching row separately instead of collapsing them into one total.',
@@ -554,7 +741,9 @@ export async function generateSimpleRagAnswer(input: {
   }
 
   const selectedChunks = Array.from(new Set(usedChunkIds)).map((id) => chunksById.get(id)!)
-  const support = [input.latestUserMessage, ...selectedChunks.map((chunk) => chunk.content)].join('\n')
+  const support = [input.latestUserMessage, ...selectedChunks.map((chunk) => chunk.content)].join(
+    '\n'
+  )
   if (protectedValues(answer).some((value) => !supportContainsValue(support, value))) {
     return { status: 'no_info', reason: 'unsupported_protected_value', usage, model }
   }
@@ -575,10 +764,24 @@ export async function generateSimpleRagAnswer(input: {
   }
 
   const selectedSupport = selectedChunks.map((chunk) => chunk.content).join('\n')
+  const unsupportedCatalogFact = unsupportedCurrentProgramFact({
+    question: input.latestUserMessage,
+    standaloneQuery: input.standaloneQuery,
+    answer,
+  })
+  if (unsupportedCatalogFact) {
+    return {
+      status: 'no_info',
+      reason: `unsupported_current_program:${unsupportedCatalogFact}`,
+      usage,
+      model,
+    }
+  }
+
   if (
-    asksOwnHospitalIdentity(input.latestUserMessage)
-    && answerClaimsOwnHospital(answer)
-    && !supportDirectlyNamesOwnHospital(selectedSupport)
+    asksOwnHospitalIdentity(input.latestUserMessage) &&
+    answerClaimsOwnHospital(answer) &&
+    !supportDirectlyNamesOwnHospital(selectedSupport)
   ) {
     return { status: 'no_info', reason: 'unsupported_hospital_identity', usage, model }
   }
@@ -592,8 +795,8 @@ export async function generateSimpleRagAnswer(input: {
   }
 
   if (
-    requestedOperationalTerms(`${input.latestUserMessage}\n${answer}`).length > 0
-    && usesSpeculativeAvailability(answer)
+    requestedOperationalTerms(`${input.latestUserMessage}\n${answer}`).length > 0 &&
+    usesSpeculativeAvailability(answer)
   ) {
     return { status: 'no_info', reason: 'speculative_operational_inference', usage, model }
   }

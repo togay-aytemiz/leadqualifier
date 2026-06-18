@@ -8,6 +8,9 @@
 
 ### Changed
 
+- Changed generated YİÜ program Skills to emit broad natural phrase coverage for every canonical program, covering ordinary availability, fee, quota, score/rank, faculty, campus, burslu, and `%50` wording such as `ücretli mi`, `kaç para`, `puanı kaç`, and `nerede okunuyor`. The production YİÜ Skill pack was republished and verified with `70` active Skills, `26` generated program Skills, and `2059/2059` embedding rows (`scripts/skills/yiu-program-fact-skills.ts`, `docs/evaluations/yiu-program-fact-skill-pack-2026-06-18.md`, `scripts/skills/push-yiu-intent-skill-pack.ts`).
+- Changed selected YİÜ general Skills to reduce wrong matches: SHMYO campus mappings now use the verified 2025 Bağlum/Balgat split, ulaşım/adres and kayıt answers are more direct, and the broad student-life Skill no longer captures unsupported revir/spor-salonu prompts (`docs/evaluations/yiu-intent-skill-pack-v2-2026-06-13.md`).
+- Changed YİÜ Skill publishing to retry transient embedding generation and insertion failures, preventing a network hiccup from leaving the production Skill embedding table half-refreshed (`scripts/skills/push-yiu-intent-skill-pack.ts`).
 - Changed Skill semantic indexing to include short fact lines from each Skill response, not only title and trigger examples. Skill updates now refresh embeddings when response text changes, and the YİÜ production Skill union was republished and verified with `70` active Skills and `1018/1018` embedding rows (`src/lib/skills/embeddings.ts`, `src/lib/skills/actions.ts`, `scripts/skills/push-yiu-intent-skill-pack.ts`, `scripts/skills/verify-yiu-intent-skill-pack.ts`).
 - Changed the live YİÜ Public Demo display context from `YİÜ Tanıtım Günleri 2026` to `YİÜ Tanıtım Günleri 2025` while the approved corpus and brochure facts are 2025-based, reducing accidental year leakage into query rewriting.
 - Changed YİÜ Skill publishing to combine the general intent pack with generated program facts, prune exact program-trigger duplicates from broad Skills, and disable replaced group/fact Skills. Tıbbi Tanıtım ve Pazarlama now uses the business-confirmed `Ücretli` label for its `4`-quota, `330.000 TL` row instead of the brochure's erroneous `Burslu` label (`scripts/skills/push-yiu-intent-skill-pack.ts`, `src/lib/knowledge-base/provider-data/yiu-2025-brochure-verified.md`).
@@ -26,6 +29,7 @@
 
 ### Fixed
 
+- Fixed simple RAG accepting stale/current-catalog program facts: positive fee, quota, score/rank, campus, variant, or existence claims for a non-current program subject are now rejected even if an old page names that program, while supported academic-unit program lists remain answerable (`src/lib/knowledge-base/simple-rag/answer-generator.ts`, `src/lib/knowledge-base/provider-data/yiu-current-programs.ts`, `src/lib/knowledge-base/simple-rag/answer-generator.test.ts`).
 - Fixed simple RAG over-inference where founding-hospital/foundation evidence could be converted into an unsupported positive answer that Yüksek İhtisas Üniversitesi has its own hospital (`src/lib/knowledge-base/simple-rag/answer-generator.ts`, `src/lib/knowledge-base/simple-rag/answer-generator.test.ts`).
 - Fixed subject/facet attachment for program-specific facts so a supported price/quota for a nearby named program cannot answer a different requested program (`src/lib/knowledge-base/simple-rag/answer-generator.ts`, `src/lib/knowledge-base/simple-rag/answer-generator.test.ts`).
 

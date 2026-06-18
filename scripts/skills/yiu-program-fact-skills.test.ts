@@ -19,8 +19,29 @@ describe('YIU program fact Skills', () => {
 
     expect(intents).toHaveLength(26)
     expect(new Set(intents.map((intent) => intent.slug)).size).toBe(26)
-    expect(intents.every((intent) => intent.triggerExamples.length >= 8)).toBe(true)
+    expect(intents.every((intent) => intent.triggerExamples.length >= 12)).toBe(true)
     expect(intents.every((intent) => intent.responseText.length > 200)).toBe(true)
+  })
+
+  it('expands natural fee, availability, campus, and alias phrases for each program', async () => {
+    const intents = buildYiuProgramFactIntents(await readFile(brochurePath, 'utf8'))
+    const ftr = intents.find(
+      (intent) => intent.slug === 'fizyoterapi_rehabilitasyon_ucret_kontenjan'
+    )
+    const lab = intents.find(
+      (intent) => intent.slug === 'tibbi_laboratuvar_teknikleri_ucret_kontenjan'
+    )
+
+    expect(ftr?.triggerExamples).toEqual(
+      expect.arrayContaining(['FTR nedir?', 'FTR ücretli mi?', 'FTR nerede okunuyor?'])
+    )
+    expect(lab?.triggerExamples).toEqual(
+      expect.arrayContaining([
+        'TLT kaç para?',
+        'Laboratuvar Teknikerliği bölümü var mı?',
+        'Tıbbi Laboratuvar Teknikleri yüzde 50 var mı?',
+      ])
+    )
   })
 
   it('keeps exact brochure facts and the confirmed TTP label correction', async () => {

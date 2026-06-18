@@ -49,13 +49,18 @@ describe('generateSimpleRagAnswer', () => {
     const request = createCompletion.mock.calls[0]?.[0] as {
       messages: Array<{ role: string; content: string }>
     }
-    expect(request.messages[0]?.content).toContain('Retrieved chunks are the only factual authority')
+    expect(request.messages[0]?.content).toContain(
+      'Retrieved chunks are the only factual authority'
+    )
     expect(request.messages[0]?.content).toContain('Answer only the requested facet')
     expect(request.messages[0]?.content).toContain(
       'Do not use audience-specific evidence such as international or YÖS fees'
     )
     expect(request.messages[0]?.content).toContain(
       'prefer a matching verified brochure table chunk over website prose'
+    )
+    expect(request.messages[0]?.content).toContain(
+      'do not use old announcements, historical pages, unrelated course/job descriptions, or stale program mentions'
     )
     expect(request.messages[0]?.content).toContain(
       'summarize the directly relevant supported facts from chunks'
@@ -122,6 +127,74 @@ describe('generateSimpleRagAnswer', () => {
     })
   })
 
+  it('rejects positive current-program facts from stale unsupported program evidence', async () => {
+    const result = await generateSimpleRagAnswer({
+      latestUserMessage: 'Tıbbi Görüntüleme Teknikleri ücreti nedir?',
+      standaloneQuery:
+        'Yüksek İhtisas Üniversitesi Tıbbi Görüntüleme Teknikleri öğrenim ücreti ücret tablosu',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      chunks: [
+        {
+          id: 'C1',
+          fileId: 'file_1',
+          filename: 'old-program-page.md',
+          title: 'Eski program sayfası',
+          score: 0.87,
+          content:
+            'Tıbbi Görüntüleme Teknikleri programı için eski tanıtım sayfasında ücretli kontenjan, 330.000 TL ücret ve kampüs bilgisi yer almaktadır.',
+        },
+      ],
+      createCompletion: vi.fn(async () =>
+        completion({
+          status: 'answer',
+          answer: 'Tıbbi Görüntüleme Teknikleri programının öğrenim ücreti 330.000 TL’dir.',
+          used_chunk_ids: ['C1'],
+        })
+      ),
+    })
+
+    expect(result).toMatchObject({
+      status: 'no_info',
+      reason: 'unsupported_current_program:tibbi goruntuleme teknikleri',
+    })
+  })
+
+  it('does not reject supported academic-unit program lists as a fake requested program', async () => {
+    const localChunks = [
+      {
+        id: 'C1',
+        fileId: 'file_1',
+        filename: 'brochure-campus.md',
+        title: 'Program ve Yerleşke Eşleşmeleri',
+        score: 0.92,
+        content:
+          'Sağlık Hizmetleri Meslek Yüksekokulu programları arasında Anestezi, İlk ve Acil Yardım, Tıbbi Laboratuvar Teknikleri, Biyomedikal Cihaz Teknolojisi, Optisyenlik, Tıbbi Dokümantasyon ve Sekreterlik, Tıbbi Tanıtım ve Pazarlama, Tele-Sağlık Teknikerliği ve Tıbbi Veri İşleme Teknikerliği bulunur.',
+      },
+    ]
+    const result = await generateSimpleRagAnswer({
+      latestUserMessage: 'Sağlık Hizmetleri Meslek Yüksekokulunda hangi programlar var?',
+      standaloneQuery:
+        'Yüksek İhtisas Üniversitesi Sağlık Hizmetleri Meslek Yüksekokulu program listesi tanıtım broşürü',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      chunks: localChunks,
+      createCompletion: vi.fn(async () =>
+        completion({
+          status: 'answer',
+          answer:
+            'Sağlık Hizmetleri Meslek Yüksekokulunda Anestezi, İlk ve Acil Yardım, Tıbbi Laboratuvar Teknikleri, Biyomedikal Cihaz Teknolojisi, Optisyenlik, Tıbbi Dokümantasyon ve Sekreterlik, Tıbbi Tanıtım ve Pazarlama, Tele-Sağlık Teknikerliği ve Tıbbi Veri İşleme Teknikerliği programları bulunur.',
+          used_chunk_ids: ['C1'],
+        })
+      ),
+    })
+
+    expect(result).toMatchObject({
+      status: 'answer',
+      selectedChunks: localChunks,
+    })
+  })
+
   it('rejects unknown chunk ids', async () => {
     const result = await generateSimpleRagAnswer({
       latestUserMessage: 'Kaç yıl?',
@@ -154,7 +227,8 @@ describe('generateSimpleRagAnswer', () => {
           filename: 'biomedical.md',
           title: 'Biyomedikal Cihaz Teknolojisi',
           score: 0.82,
-          content: 'Biyomedikal cihaz teknikerleri röntgen cihazlarının bakım ve onarım süreçlerinde görev alabilir.',
+          content:
+            'Biyomedikal cihaz teknikerleri röntgen cihazlarının bakım ve onarım süreçlerinde görev alabilir.',
         },
       ],
       createCompletion: vi.fn(async () =>
@@ -185,7 +259,8 @@ describe('generateSimpleRagAnswer', () => {
           filename: 'biomedical.md',
           title: 'Biyomedikal Cihaz Teknolojisi',
           score: 0.82,
-          content: 'Biyomedikal cihaz teknikerleri röntgen cihazlarının bakım, onarım, kurulum ve testinden sorumludur.',
+          content:
+            'Biyomedikal cihaz teknikerleri röntgen cihazlarının bakım, onarım, kurulum ve testinden sorumludur.',
         },
       ],
       createCompletion: vi.fn(async () =>
@@ -242,7 +317,8 @@ describe('generateSimpleRagAnswer', () => {
         filename: 'anatomy.md',
         title: 'Laboratuvar Bilgileri',
         score: 0.9,
-        content: 'Anatomi laboratuvarında iki adet kadavra ve maketlerle uygulamalar gerçekleştirilmektedir.',
+        content:
+          'Anatomi laboratuvarında iki adet kadavra ve maketlerle uygulamalar gerçekleştirilmektedir.',
       },
     ]
     const result = await generateSimpleRagAnswer({
@@ -280,7 +356,8 @@ describe('generateSimpleRagAnswer', () => {
           filename: 'first-aid.md',
           title: 'İlk ve Acil Yardım',
           score: 0.86,
-          content: 'İlk ve Acil Yardım mezunları ambulans ekiplerinde görev alabilecek bilgi ve beceriyle yetiştirilir.',
+          content:
+            'İlk ve Acil Yardım mezunları ambulans ekiplerinde görev alabilecek bilgi ve beceriyle yetiştirilir.',
         },
       ],
       createCompletion: vi.fn(async () =>
@@ -311,13 +388,15 @@ describe('generateSimpleRagAnswer', () => {
           filename: 'medicine-center.md',
           title: 'Araştırma ve Uygulama Merkezi',
           score: 0.78,
-          content: 'Merkez, sağlık alanında bilimsel araştırmalar yürütmeyi ve nitelikli insan gücü yetiştirmeyi amaçlar.',
+          content:
+            'Merkez, sağlık alanında bilimsel araştırmalar yürütmeyi ve nitelikli insan gücü yetiştirmeyi amaçlar.',
         },
       ],
       createCompletion: vi.fn(async () =>
         completion({
           status: 'answer',
-          answer: 'Vaka sayısının az olması söz konusu değildir; öğrenciler geniş hasta ve vaka çeşitliliği görür.',
+          answer:
+            'Vaka sayısının az olması söz konusu değildir; öğrenciler geniş hasta ve vaka çeşitliliği görür.',
           used_chunk_ids: ['C1'],
         })
       ),
@@ -379,7 +458,8 @@ describe('generateSimpleRagAnswer', () => {
         filename: 'first-aid.md',
         title: 'İlk ve Acil Yardım Uygulama',
         score: 0.91,
-        content: 'İlk ve Acil Yardım öğrencileri ambulans uygulamasına çıkar ve acil sağlık hizmetleri uygulamalarına katılır.',
+        content:
+          'İlk ve Acil Yardım öğrencileri ambulans uygulamasına çıkar ve acil sağlık hizmetleri uygulamalarına katılır.',
       },
     ]
     const result = await generateSimpleRagAnswer({
