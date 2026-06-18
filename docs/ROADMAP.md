@@ -1,5 +1,12 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Implementation Update (2026-06-18):** Simple non-Skill RAG now has a risk-triggered answer/evidence verifier instead of a global judge layer. The verifier only runs for positive/high-risk factual claims such as facility, service, fee, quota, campus, hospital, payment, accreditation, or contact availability; it can pass the answer, ask one verifier-proposed retry query, request one clarification, or force no-info. The routing eval report now records every retrieval attempt, kept/filtered chunk counts, top chunk filenames/scores, selected chunks, retry reason, standalone query, strict verdict, and verifier action so no-info and wrong-answer failures can be audited from the report without guessing.
+
+- [x] Add a risk-triggered answer/evidence verifier for non-Skill simple RAG without turning it into a global judge.
+- [x] Allow exactly one verifier-proposed retry query before no-info/clarification.
+- [x] Add retrieval-attempt and verifier diagnostics to the YİÜ route eval report.
+- [ ] Use the enriched eval report on the next random 100 run to separate true corpus gaps from retrieval/query/answer failures.
+
 > **Implementation Update (2026-06-18):** YİÜ simple RAG and Skill coverage were hardened against the latest random-100 failures without adding a new orchestration layer. The query rewriter now treats ordinary payment-policy questions such as credit-card installment availability as searchable policy questions rather than credential collection, while still refusing card/IBAN/TC/password handling. Grounded answers now reject positive “university hospital exists” claims when the evidence only mentions the founding hospital foundation or generic health-center wording. The YİÜ Skill pack was expanded from `61` to `62` active intents with stronger natural phrases for Tıp/Anestezi/MYO quota-fee questions and a separate program-change/yatay-geçiş intent; production Skill embeddings were refreshed to `694` rows. A targeted 7-question local demo probe completed with `5` Skill answers and `2` safe no-info answers, with no false hospital claim and no mistaken payment-safety refusal.
 
 - [x] Keep payment-policy questions searchable while preserving credential/payment-data refusal boundaries.
@@ -21,7 +28,7 @@
 - [x] Require direct answer coverage in the Skill verifier instead of adding question-specific Skill guards.
 - [x] Prevent actionable fact questions from being dropped solely because the rewriter requested clarification.
 - [x] Keep accepted follow-up turns on the resolved standalone query instead of searching the raw `evet/olur/devam` wording.
-- [ ] Add a risk-triggered answer/evidence verifier for non-Skill RAG only after measuring the post-recall random eval.
+- [x] Add a risk-triggered answer/evidence verifier for non-Skill RAG only after measuring the post-recall random eval.
 
 > **Implementation Update (2026-06-17):** Public Demo matched Skill replies now bypass Internal Agent activation so a verified Skill answer cannot be overwritten by a later clarification/refusal/no-info boundary. This fixes cases where the correct YİÜ Skill was selected but the visible answer became an English clarification such as `Could you please clarify...`. The simple RAG query rewriter now also hard-blocks payment credential requests such as IBAN, credit card, TC identity, password, and payment-detail handling before retrieval, even if the planner tries to search. YİÜ Skill Pack V2 received a focused phrase/overlap cleanup for campus, yurt, ulaşım, SAY/EA, Hemşirelik, İlk ve Acil Yardım, burs, ÇAP, and MYO questions; the production demo push updated `9` skills and refreshed `656` embedding rows.
 
@@ -662,7 +669,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-06-18 (Broadened Public Demo Skill candidate recall and prevented actionable fact questions from being dropped by over-eager clarification.)
+> **Last Updated:** 2026-06-18 (Added risk-triggered simple RAG answer verification, one verifier-proposed retry, and richer route-eval diagnostics.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.

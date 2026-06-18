@@ -29,6 +29,7 @@ export type OpenAiFileSearchDemoReply = {
 const DEFAULT_FILE_SEARCH_DEMO_SLUGS = ['yiu-tanitim-gunleri-2026']
 const DEFAULT_REWRITE_MODEL = 'gpt-4.1-mini'
 const DEFAULT_ANSWER_MODEL = 'gpt-4.1-mini'
+const DEFAULT_VERIFIER_MODEL = 'gpt-4.1-mini'
 const DEFAULT_MAX_RESULTS = 20
 const DEFAULT_SCORE_THRESHOLD = 0
 
@@ -63,6 +64,16 @@ function readAnswerModel() {
         || DEFAULT_ANSWER_MODEL
 }
 
+function readVerifierModel() {
+    return process.env.DEMO_CHAT_FILE_SEARCH_VERIFIER_MODEL?.trim()
+        || process.env.OPENAI_RAG_VERIFIER_MODEL?.trim()
+        || DEFAULT_VERIFIER_MODEL
+}
+
+function readRiskVerifierEnabled() {
+    return process.env.DEMO_CHAT_FILE_SEARCH_RISK_VERIFIER !== '0'
+}
+
 function readMaxResults() {
     const parsed = Number(process.env.DEMO_CHAT_FILE_SEARCH_MAX_RESULTS)
     if (!Number.isFinite(parsed)) return DEFAULT_MAX_RESULTS
@@ -75,8 +86,8 @@ function readScoreThreshold() {
     return Math.max(0, Math.min(1, parsed))
 }
 
-function usageModelName(rewriteModel: string, answerModel: string) {
-    return Array.from(new Set([rewriteModel, answerModel])).join('+')
+function usageModelName(...models: string[]) {
+    return Array.from(new Set(models.filter(Boolean))).join('+')
 }
 
 function mapCitationMetadata(citations: Array<{
@@ -118,6 +129,7 @@ function buildSimpleRagUnavailableReply(input: {
     const vectorStoreId = readVectorStoreId()
     const rewriteModel = readRewriteModel()
     const answerModel = readAnswerModel()
+    const verifierModel = readVerifierModel()
     const maxResults = readMaxResults()
     const scoreThreshold = readScoreThreshold()
 
@@ -134,6 +146,8 @@ function buildSimpleRagUnavailableReply(input: {
                 vector_store_id: vectorStoreId,
                 rewrite_model: rewriteModel,
                 answer_model: answerModel,
+                verifier_model: verifierModel,
+                risk_verifier_enabled: readRiskVerifierEnabled(),
                 pipeline_version: 'simple_standalone_query_v1',
                 max_results: maxResults,
                 score_threshold: scoreThreshold,
@@ -178,6 +192,7 @@ export async function buildOpenAiFileSearchDemoReply(input: {
         })
         const rewriteModel = readRewriteModel()
         const answerModel = readAnswerModel()
+        const verifierModel = readVerifierModel()
         const vectorStoreId = readVectorStoreId()
         const maxResults = readMaxResults()
         const scoreThreshold = readScoreThreshold()
@@ -200,6 +215,8 @@ export async function buildOpenAiFileSearchDemoReply(input: {
             maxResults,
             scoreThreshold,
             settings,
+            verifierModel,
+            enableRiskVerifier: readRiskVerifierEnabled(),
         })
         const answer = result.answer.trim()
         if (!answer) {
@@ -215,7 +232,7 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                 await recordAiUsage({
                     organizationId: input.channel.organizationId,
                     category: 'rag',
-                    model: usageModelName(rewriteModel, answerModel),
+                    model: usageModelName(rewriteModel, answerModel, verifierModel),
                     inputTokens: result.usage.inputTokens,
                     outputTokens: result.usage.outputTokens,
                     totalTokens: result.usage.totalTokens,
@@ -249,6 +266,8 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                     vector_store_id: vectorStoreId,
                     rewrite_model: rewriteModel,
                     answer_model: answerModel,
+                    verifier_model: verifierModel,
+                    risk_verifier_enabled: readRiskVerifierEnabled(),
                     pipeline_version: 'simple_standalone_query_v1',
                     max_results: maxResults,
                     score_threshold: scoreThreshold,

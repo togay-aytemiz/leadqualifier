@@ -265,4 +265,141 @@ describe('runSimpleRagPipeline', () => {
     expect(result.refusal).toBe(true)
     expect(result.diagnostics?.queryIntent).toBe('simple_rag_refuse')
   })
+
+  it('records retrieval attempt diagnostics for eval review', async () => {
+    const vectorSearch = vi.fn(async () => ({
+      data: [
+        {
+          file_id: 'file_1',
+          filename: 'campus.md',
+          score: 0.91,
+          attributes: null,
+          content: [{ type: 'text' as const, text: 'Bağlıca Yerleşkesi adresi Höyük Caddesi No:1.' }],
+        },
+        {
+          file_id: 'file_2',
+          filename: 'wrong.md',
+          score: 0.72,
+          attributes: null,
+          content: [{ type: 'text' as const, text: 'Ankara Yıldırım Beyazıt Üniversitesi kampüs haberi.' }],
+        },
+      ],
+    }))
+
+    const result = await runSimpleRagPipeline({
+      client: { vectorStores: { search: vectorSearch } },
+      vectorStoreId: 'vs_yiu',
+      answerModel: 'gpt-4o-mini',
+      latestUserMessage: 'Bağlıca kampüsü nerede?',
+      recentMessages: [],
+      organizationContext: 'Yüksek İhtisas Üniversitesi',
+      responseLanguage: 'tr',
+      rewriteCreateCompletion: vi.fn(async () =>
+        completion({
+          status: 'search',
+          standalone_query: 'Yüksek İhtisas Üniversitesi Bağlıca kampüsü adresi',
+          response_language: 'tr',
+        })
+      ),
+      answerCreateCompletion: vi.fn(async () =>
+        completion({
+          status: 'answer',
+          answer: 'Bağlıca Yerleşkesi Höyük Caddesi No:1 adresindedir.',
+          used_chunk_ids: ['C1'],
+        })
+      ),
+    })
+
+    expect((result.diagnostics?.simpleRag as any).retrievalAttempts).toEqual([
+      {
+        query: 'Yüksek İhtisas Üniversitesi Bağlıca kampüsü adresi',
+        rawResultCount: 2,
+        resultCount: 1,
+        droppedChunkReasons: ['other_organization'],
+        topResults: [
+          {
+            id: 'C1',
+            filename: 'campus.md',
+            title: 'campus.md',
+            score: 0.91,
+            selected: true,
+          },
+        ],
+      },
+    ])
+  })
+
+  it('uses a risk verifier to retry unsupported positive service answers before returning no-info', async () => {
+    const vectorSearch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: [
+          {
+            file_id: 'file_foundation',
+            filename: 'student-life.md',
+            score: 0.88,
+            attributes: null,
+            content: [
+              {
+                type: 'text' as const,
+                text: 'Sağlık, Kültür ve Spor Daire Başkanlığı öğrenci etkinlikleri ve sosyal faaliyetleri destekler.',
+              },
+            ],
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ data: [] })
+
+    const answerCreateCompletion = vi.fn(async () =>
+      completion({
+        status: 'answer',
+        answer: 'Evet, kampüste yemekhane bulunmaktadır.',
+        used_chunk_ids: ['C1'],
+      })
+    )
+    const verifierCreateCompletion = vi.fn(async () =>
+      completion({
+        action: 'retry_search',
+        reason: 'unsupported_service_availability:yemekhane',
+        retry_query: 'Yüksek İhtisas Üniversitesi kampüs yemekhane var mı',
+      })
+    )
+
+    const result = await runSimpleRagPipeline({
+      client: { vectorStores: { search: vectorSearch } },
+      vectorStoreId: 'vs_yiu',
+      answerModel: 'gpt-4o-mini',
+      latestUserMessage: 'Kampüste yemekhane var mı?',
+      recentMessages: [],
+      organizationContext: 'Yüksek İhtisas Üniversitesi',
+      responseLanguage: 'tr',
+      rewriteCreateCompletion: vi.fn(async () =>
+        completion({
+          status: 'search',
+          standalone_query: 'Yüksek İhtisas Üniversitesi kampüs yemekhane var mı',
+          response_language: 'tr',
+        })
+      ),
+      answerCreateCompletion,
+      verifierCreateCompletion,
+    } as any)
+
+    expect(vectorSearch).toHaveBeenCalledTimes(2)
+    expect(answerCreateCompletion).toHaveBeenCalledTimes(1)
+    expect(verifierCreateCompletion).toHaveBeenCalledOnce()
+    expect(result.answer).toBe('Bu bilgiye onaylı kaynaklarda ulaşamadım.')
+    expect(result.diagnostics).toMatchObject({
+      retryCount: 1,
+      contextualReason: 'unsupported_service_availability:yemekhane',
+      simpleRag: {
+        retryReason: 'verifier_retry:unsupported_service_availability:yemekhane',
+        answerStatus: 'no_info',
+      },
+      answerVerifier: {
+        used: true,
+        action: 'retry_search',
+        reason: 'unsupported_service_availability:yemekhane',
+      },
+    })
+  })
 })

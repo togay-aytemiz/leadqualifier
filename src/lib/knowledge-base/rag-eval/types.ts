@@ -162,9 +162,29 @@ export type RagProviderResult = {
       droppedChunkReasons?: string[]
       droppedChunkMatches?: string[]
       topScores: number[]
+      retrievalAttempts?: Array<{
+        query: string
+        rawResultCount: number
+        resultCount: number
+        droppedChunkReasons?: string[]
+        topResults: Array<{
+          id: string
+          filename: string
+          title: string
+          score: number
+          selected: boolean
+        }>
+      }>
       selectedChunkIds: string[]
       selectedFilenames: string[]
       answerStatus: 'answer' | 'clarify' | 'no_info' | 'refuse'
+    }
+    answerVerifier?: {
+      used: boolean
+      action: 'pass' | 'retry_search' | 'no_info' | 'clarify' | 'error' | 'skipped'
+      reason?: string
+      retryQuery?: string
+      model?: string
     }
     strictQuality?: {
       suggestedScore: 7 | 8 | 9

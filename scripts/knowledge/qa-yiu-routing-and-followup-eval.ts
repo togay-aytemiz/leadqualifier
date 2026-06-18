@@ -55,6 +55,14 @@ type DemoTrace = {
     matchedSkillTitle: string | null
     matchedSkillId: string | null
     ragFailureReason: string | null
+    standaloneQuery: string | null
+    ragStrictVerdict: string | null
+    ragContextualReason: string | null
+    ragRetryReason: string | null
+    ragTopResults: string[]
+    answerVerifierAction: string | null
+    answerVerifierReason: string | null
+    answerVerifierRetryQuery: string | null
 }
 
 type RouteKind =
@@ -411,9 +419,24 @@ function readNestedRecord(value: Record<string, unknown> | null | undefined, key
         : null
 }
 
+function readRecordArray(record: Record<string, unknown> | null | undefined, key: string) {
+    const value = record?.[key]
+    return Array.isArray(value) ? value : []
+}
+
 function readRecordString(record: Record<string, unknown> | null | undefined, key: string) {
     const value = record?.[key]
     return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function readRecordNumber(record: Record<string, unknown> | null | undefined, key: string) {
+    const value = record?.[key]
+    return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function readRecordBoolean(record: Record<string, unknown> | null | undefined, key: string) {
+    const value = record?.[key]
+    return typeof value === 'boolean' ? value : null
 }
 
 function extractSourceUrl(content: string | null | undefined) {
@@ -444,6 +467,31 @@ function readCitationSourcesFromMetadata(metadata: Record<string, unknown> | nul
     }
 
     return { titles: uniqueStrings(titles), urls: uniqueStrings(urls) }
+}
+
+function summarizeRetrievalAttempts(simpleRag: Record<string, unknown> | null | undefined) {
+    return readRecordArray(simpleRag, 'retrievalAttempts').flatMap((attempt, index) => {
+        if (!attempt || typeof attempt !== 'object' || Array.isArray(attempt)) return []
+        const attemptRecord = attempt as Record<string, unknown>
+        const query = readRecordString(attemptRecord, 'query') ?? `attempt ${index + 1}`
+        const topResults = readRecordArray(attemptRecord, 'topResults')
+            .flatMap((result) => {
+                if (!result || typeof result !== 'object' || Array.isArray(result)) return []
+                const resultRecord = result as Record<string, unknown>
+                const filename = readRecordString(resultRecord, 'filename') ?? readRecordString(resultRecord, 'title') ?? 'chunk'
+                const score = readRecordNumber(resultRecord, 'score')
+                const selected = readRecordBoolean(resultRecord, 'selected') === true
+                return `${filename}${score === null ? '' : `@${score.toFixed(2)}`}${selected ? '*' : ''}`
+            })
+            .slice(0, 3)
+        const droppedReasons = readRecordArray(attemptRecord, 'droppedChunkReasons')
+            .filter((value): value is string => typeof value === 'string' && Boolean(value.trim()))
+        const topSummary = topResults.length > 0 ? topResults.join(', ') : 'no kept chunks'
+        const droppedSummary = droppedReasons.length > 0
+            ? ` dropped=${Array.from(new Set(droppedReasons)).join(',')}`
+            : ''
+        return `${index + 1}. ${query} -> ${topSummary}${droppedSummary}`
+    })
 }
 
 function isNoInfoAnswer(answer: string) {
@@ -545,6 +593,9 @@ async function loadDemoTrace(input: {
     }
 
     const ragFileSearch = readMetadataRecord(metadata, 'rag_file_search')
+    const ragDiagnostics = readNestedRecord(ragFileSearch, 'diagnostics')
+    const simpleRag = readNestedRecord(ragDiagnostics, 'simpleRag')
+    const answerVerifier = readNestedRecord(ragDiagnostics, 'answerVerifier')
     return {
         conversationId,
         botMessageId: botMessage?.id ?? null,
@@ -563,7 +614,16 @@ async function loadDemoTrace(input: {
         ]),
         matchedSkillTitle: readMetadataString(metadata, 'matched_skill_title') ?? readMetadataString(metadata, 'skill_title'),
         matchedSkillId: readMetadataString(metadata, 'skill_id'),
-        ragFailureReason: readMetadataString(ragFileSearch, 'failure_reason')
+        ragFailureReason: readMetadataString(ragFileSearch, 'failure_reason'),
+        standaloneQuery: readRecordString(simpleRag, 'standaloneQuery')
+            ?? readRecordString(ragDiagnostics, 'contextualRetrievalIntent'),
+        ragStrictVerdict: readRecordString(ragDiagnostics, 'strictVerdict'),
+        ragContextualReason: readRecordString(ragDiagnostics, 'contextualReason'),
+        ragRetryReason: readRecordString(simpleRag, 'retryReason'),
+        ragTopResults: summarizeRetrievalAttempts(simpleRag),
+        answerVerifierAction: readRecordString(answerVerifier, 'action'),
+        answerVerifierReason: readRecordString(answerVerifier, 'reason'),
+        answerVerifierRetryQuery: readRecordString(answerVerifier, 'retryQuery')
     }
 }
 
@@ -578,7 +638,15 @@ function emptyTrace(conversationId: string | null, answer: string): DemoTrace {
         sourceUrls: [],
         matchedSkillTitle: null,
         matchedSkillId: null,
-        ragFailureReason: null
+        ragFailureReason: null,
+        standaloneQuery: null,
+        ragStrictVerdict: null,
+        ragContextualReason: null,
+        ragRetryReason: null,
+        ragTopResults: [],
+        answerVerifierAction: null,
+        answerVerifierReason: null,
+        answerVerifierRetryQuery: null
     }
 }
 
@@ -605,6 +673,24 @@ function markdownCell(value: string | number | null | undefined) {
     return String(value ?? '')
         .replace(/\|/g, '\\|')
         .replace(/\r?\n/g, '<br>')
+}
+
+function traceRagReason(trace: DemoTrace) {
+    return uniqueStrings([
+        trace.ragFailureReason,
+        trace.ragStrictVerdict,
+        trace.ragContextualReason,
+        trace.ragRetryReason
+    ]).join('; ') || '-'
+}
+
+function traceVerifier(trace: DemoTrace) {
+    if (!trace.answerVerifierAction) return '-'
+    return [
+        trace.answerVerifierAction,
+        trace.answerVerifierReason,
+        trace.answerVerifierRetryQuery ? `retry=${trace.answerVerifierRetryQuery}` : null
+    ].filter(Boolean).join('; ')
 }
 
 function summarizeRouting(results: RoutingResult[]) {
@@ -638,7 +724,7 @@ function renderRoutingMarkdown(input: {
 }) {
     const summary = summarizeRouting(input.results)
     const lines = [
-        '# YİÜ Random 100 Routing Eval',
+        `# YİÜ Random ${input.selected.length} Routing Eval`,
         '',
         `Run: ${input.runId}`,
         `Base URL: ${input.baseUrl}`,
@@ -660,9 +746,9 @@ function renderRoutingMarkdown(input: {
         '',
         '## Raw Results',
         '',
-        '| # | Pool ID | Question | Route | Skill | Sources | Answer | Previous score | Latency | HTTP | Error |',
-        '|---:|---:|---|---|---|---|---|---:|---:|---|---|',
-        ...input.results.map((result) => `| ${result.index} | ${result.poolId} | ${markdownCell(result.question)} | ${result.trace.route} | ${markdownCell(result.trace.matchedSkillTitle ?? '-')} | ${markdownCell(result.trace.sourceTitles.join('; ') || result.trace.sourceUrls.join('; ') || '-')} | ${markdownCell(result.answer)} | ${result.previousScore} | ${millisToSeconds(result.durationMs)} | ${result.httpStatuses.join('→') || '-'} | ${markdownCell(result.error ?? '')} |`),
+        '| # | Pool ID | Question | Route | Skill | Sources | Standalone query | RAG reason | Top retrieval | Verifier | Answer | Previous score | Latency | HTTP | Error |',
+        '|---:|---:|---|---|---|---|---|---|---|---|---|---:|---:|---|---|',
+        ...input.results.map((result) => `| ${result.index} | ${result.poolId} | ${markdownCell(result.question)} | ${result.trace.route} | ${markdownCell(result.trace.matchedSkillTitle ?? '-')} | ${markdownCell(result.trace.sourceTitles.join('; ') || result.trace.sourceUrls.join('; ') || '-')} | ${markdownCell(result.trace.standaloneQuery ?? '-')} | ${markdownCell(traceRagReason(result.trace))} | ${markdownCell(result.trace.ragTopResults.join('<br>') || '-')} | ${markdownCell(traceVerifier(result.trace))} | ${markdownCell(result.answer)} | ${result.previousScore} | ${millisToSeconds(result.durationMs)} | ${result.httpStatuses.join('→') || '-'} | ${markdownCell(result.error ?? '')} |`),
         ''
     ]
     return `${lines.join('\n')}\n`
@@ -678,7 +764,7 @@ function renderFollowupMarkdown(input: {
 }) {
     const statusCounts = summarizeFollowups(input.results)
     const lines = [
-        '# YİÜ Random 50 Skill Follow-up Eval',
+        `# YİÜ Random ${input.selected.length} Skill Follow-up Eval`,
         '',
         `Run: ${input.runId}`,
         `Base URL: ${input.baseUrl}`,
