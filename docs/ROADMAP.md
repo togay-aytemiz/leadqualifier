@@ -1,12 +1,12 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Implementation Update (2026-06-18):** Qualy AI settings now include an editable organization dictionary for abbreviations, nicknames, typos, and shorthand terms. Dictionary entries can hold multiple possible meanings and are passed to both Public Demo Skill query rewriting and simple non-Skill RAG query rewriting as scope/alias help only, never as answer evidence. This gives tenants a UI-controlled way to teach terms such as `FTR`, `DKT`, `SHMYO`, or `YIU` without adding organization-specific runtime guards. A YİÜ seed script prepares `27` starter entries, but live DB seeding is blocked until the new dictionary migration is applied with DB privileges.
+> **Implementation Update (2026-06-18):** Qualy AI settings now include an editable organization dictionary for abbreviations, nicknames, typos, and shorthand terms. Dictionary entries can hold multiple possible meanings and are passed to both Public Demo Skill query rewriting and simple non-Skill RAG query rewriting as scope/alias help only, never as answer evidence. This gives tenants a UI-controlled way to teach terms such as `FTR`, `DKT`, `SHMYO`, or `YIU` without adding organization-specific runtime guards. The linked Supabase database now has the dictionary migration and synchronized migration history; the YİÜ demo organization was seeded and verified with `27/27` active entries.
 
 - [x] Add `Settings → Qualy AI → Dictionary/Sözlük` editing for org-scoped alias entries with multiple meanings.
 - [x] Store dictionary entries in a new RLS-protected `organization_ai_dictionary_entries` table.
 - [x] Feed enabled dictionary entries into Skill and simple RAG query rewriters as alias-resolution context.
 - [x] Add a reproducible YİÜ starter dictionary seed script.
-- [ ] Apply the dictionary migration to the linked Supabase database and run the YİÜ seed once DB credentials are available.
+- [x] Apply the dictionary migration to the linked Supabase database and run the verified 27-entry YİÜ seed.
 
 > **Implementation Update (2026-06-18):** Simple non-Skill RAG now has a risk-triggered answer/evidence verifier instead of a global judge layer. The verifier only runs for positive/high-risk factual claims such as facility, service, fee, quota, campus, hospital, payment, accreditation, or contact availability; it can pass the answer, ask one verifier-proposed retry query, request one clarification, or force no-info. The routing eval report now records every retrieval attempt, kept/filtered chunk counts, top chunk filenames/scores, selected chunks, retry reason, standalone query, strict verdict, and verifier action so no-info and wrong-answer failures can be audited from the report without guessing.
 
