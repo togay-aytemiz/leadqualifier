@@ -21,6 +21,7 @@
     "rag:pending-followups:live": "npx tsx scripts/knowledge/rag-pending-state-followup-live-eval.ts",
     "rag:yiu-pdfs:download": "npx tsx scripts/knowledge/rag-download-yiu-link-pdfs.ts",
     "rag:yiu-approved-corpus:manifest": "npx tsx scripts/knowledge/rag-build-yiu-approved-corpus-manifest.ts",
+    "rag:yiu-clean-corpus:build": "npx tsx scripts/knowledge/rag-build-yiu-clean-corpus.ts",
     "rag:yiu-brochure:manifest": "npx tsx scripts/knowledge/rag-build-yiu-brochure-manifest.ts",
     "rag:yiu-pdfs:cases": "npx tsx scripts/knowledge/rag-build-yiu-link-pdf-cases.ts",
     "rag:yiu-pdfs:scenario-cases": "npx tsx scripts/knowledge/rag-build-yiu-scenario-cases.ts",

@@ -122,8 +122,18 @@ describe('rewriteSimpleRagQuery', () => {
       'Örnek Üniversitesi Tıp Fakültesi eğitim süresi education time years'
     )
     expect(request.messages[0]?.content).toContain(
+      'Örnek Üniversitesi yerel aday YKS ÖSYM ÖSYS kayıt işlemleri kayıt için gerekli belgeler'
+    )
+    expect(request.messages[0]?.content).toContain(
       'MUST include local or domestic admissions, official table, and verified brochure terms'
     )
+    expect(request.messages[0]?.content).toContain(
+      'generic registration or enrollment requirements'
+    )
+    expect(request.messages[0]?.content).toContain(
+      'domestic central-placement or local-admissions terms'
+    )
+    expect(request.messages[0]?.content).toContain('both ÖSYM and the historical ÖSYS acronym')
     expect(request.messages[0]?.content).toContain(
       'MUST include academic units, program catalog, and official brochure terms'
     )

@@ -1,6 +1,7 @@
 import { createReadStream } from 'node:fs'
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import OpenAI from 'openai'
 import { parseStoryFileManifest } from '@/lib/knowledge-base/rag-eval/manifest'
 import {
@@ -17,6 +18,7 @@ type Args = {
   maxFileWaitMs?: string
   reuseExistingFiles?: boolean
   allowPendingFiles?: boolean
+  persistent?: boolean
 }
 
 type UploadedFile = {
@@ -43,6 +45,10 @@ function parseArgs(argv: string[]): Args {
     }
     if (key === 'allow-pending-files') {
       args.allowPendingFiles = true
+      continue
+    }
+    if (key === 'persistent') {
+      args.persistent = true
       continue
     }
 
@@ -112,6 +118,23 @@ function requireEnv(name: string) {
 
 function attributeValue(value: string) {
   return value.slice(0, 512)
+}
+
+export function buildVectorStoreCreateParams(input: {
+  persistent: boolean
+  story: string
+  runId: string
+}) {
+  return {
+    name: `${input.persistent ? 'qualy-production-candidate' : 'qualy-rag-eval'}-${input.story}-${input.runId}`,
+    ...(!input.persistent
+      ? { expires_after: { anchor: 'last_active_at' as const, days: 7 } }
+      : {}),
+    metadata: {
+      qualy_purpose: input.persistent ? 'production_candidate' : 'rag_eval',
+      story: attributeValue(input.story),
+    },
+  }
 }
 
 function parseSourceContentType(value: string | undefined): BrochureSourceContentType | undefined {
@@ -296,6 +319,9 @@ async function mapWithConcurrency<T, R>(
 async function main() {
   await loadProjectEnv()
   const args = parseArgs(process.argv.slice(2))
+  if (args.persistent && args.allowPendingFiles) {
+    throw new Error('--persistent cannot be combined with --allow-pending-files')
+  }
   const manifestPath = path.resolve(requireArg(args.manifest, '--manifest is required'))
   const manifest = parseStoryFileManifest(await readFile(manifestPath, 'utf8'), process.cwd())
   const outputDir = path.resolve(
@@ -318,14 +344,13 @@ async function main() {
   const concurrency = Number.parseInt(args.concurrency ?? '4', 10)
   const batchSize = Number.parseInt(args.batchSize ?? '50', 10)
   const maxFileWaitMs = Number.parseInt(args.maxFileWaitMs ?? `${15 * 60 * 1000}`, 10)
-  const vectorStore = await openai.vectorStores.create({
-    name: `qualy-rag-eval-${manifest.story}-${runId}`,
-    expires_after: { anchor: 'last_active_at', days: 7 },
-    metadata: {
-      qualy_purpose: 'rag_eval',
-      story: attributeValue(manifest.story),
-    },
-  })
+  const vectorStore = await openai.vectorStores.create(
+    buildVectorStoreCreateParams({
+      persistent: Boolean(args.persistent),
+      story: manifest.story,
+      runId,
+    })
+  )
   const runStatePath = path.join(outputDir, `file-search-ingest-${manifest.story}-${runId}.state.json`)
   await writeFile(
     runStatePath,
@@ -599,6 +624,38 @@ async function main() {
     })),
   })
 
+  if (args.persistent) {
+    const readinessFailures = [
+      ...(finalVectorStore.file_counts.completed !== manifest.files.length
+        ? [`completed=${finalVectorStore.file_counts.completed}, expected=${manifest.files.length}`]
+        : []),
+      ...(finalVectorStore.file_counts.total !== manifest.files.length
+        ? [`total=${finalVectorStore.file_counts.total}, expected=${manifest.files.length}`]
+        : []),
+      ...(finalVectorStore.file_counts.failed > 0
+        ? [`failed=${finalVectorStore.file_counts.failed}`]
+        : []),
+      ...(finalVectorStore.file_counts.cancelled > 0
+        ? [`cancelled=${finalVectorStore.file_counts.cancelled}`]
+        : []),
+      ...(finalVectorStore.file_counts.in_progress > 0
+        ? [`in_progress=${finalVectorStore.file_counts.in_progress}`]
+        : []),
+      ...(indexedFiles.some((file) => file.status !== 'completed')
+        ? ['one or more indexed files are not completed']
+        : []),
+      ...(sourceManifest.sources.length !== manifest.files.length
+        ? [`source_manifest=${sourceManifest.sources.length}, expected=${manifest.files.length}`]
+        : []),
+      ...(finalVectorStore.expires_after || finalVectorStore.expires_at
+        ? ['persistent vector store unexpectedly has an expiration']
+        : []),
+    ]
+    if (readinessFailures.length > 0) {
+      throw new Error(`Persistent vector store is not ready: ${readinessFailures.join('; ')}`)
+    }
+  }
+
   const outputPath = path.join(outputDir, `file-search-ingest-${manifest.story}-${runId}.json`)
   await writeFile(
     outputPath,
@@ -609,6 +666,7 @@ async function main() {
         vectorStoreId: vectorStore.id,
         vectorStoreStatus: finalVectorStore.status,
         runStatePath,
+        persistent: Boolean(args.persistent),
         allowPendingFiles: Boolean(args.allowPendingFiles),
         maxFileWaitMs,
         vectorStore: {
@@ -652,7 +710,9 @@ async function main() {
   console.log(`OUTPUT ${outputPath}`)
 }
 
-main().catch((error) => {
-  console.error((error as Error).message)
-  process.exitCode = 1
-})
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  main().catch((error) => {
+    console.error((error as Error).message)
+    process.exitCode = 1
+  })
+}

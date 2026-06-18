@@ -69,7 +69,8 @@ describe('runSimpleRagPipeline', () => {
       settings.prompt
     )
     expect(result.answer).toContain('720.000 TL')
-    expect(result.answer).toContain('https://example.edu.tr/medicine')
+    expect(result.answer).not.toContain('https://example.edu.tr/medicine')
+    expect(result.citations[0]?.url).toBe('https://example.edu.tr/medicine')
     expect(result.refusal).toBe(false)
     expect(result.usage.totalTokens).toBe(70)
     expect(result.diagnostics).toMatchObject({

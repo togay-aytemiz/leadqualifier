@@ -1,12 +1,13 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import { createClient } from '@supabase/supabase-js'
 
 import { generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddings'
 import { buildSkillEmbeddingTexts } from '@/lib/skills/embeddings'
 
-type ParsedIntent = {
+export type ParsedIntent = {
   order: string
   slug: string
   title: string
@@ -27,6 +28,19 @@ const DEFAULT_DRAFT_PATH = 'docs/evaluations/yiu-intent-skill-pack-v2-2026-06-13
 const DEFAULT_DEMO_SLUG = 'yiu-tanitim-gunleri-2026'
 const SKILL_TITLE_PREFIX = 'YİÜ Intent - '
 const EMBEDDING_BATCH_SIZE = 128
+const EMBEDDING_INSERT_BATCH_SIZE = 40
+
+export function chunkItems<T>(items: T[], size: number): T[][] {
+  if (!Number.isInteger(size) || size < 1) {
+    throw new Error('Chunk size must be a positive integer')
+  }
+
+  const chunks: T[][] = []
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size))
+  }
+  return chunks
+}
 
 function parseEnvValue(value: string) {
   const trimmed = value.trim()
@@ -64,7 +78,7 @@ function extractBlock(section: string, startLabel: string, endLabel: string) {
   return (end >= 0 ? afterStart.slice(0, end) : afterStart).trim()
 }
 
-function parseIntentPack(markdown: string): ParsedIntent[] {
+export function parseIntentPack(markdown: string): ParsedIntent[] {
   const sections = markdown
     .split(/\n---\n/g)
     .filter((section) => /^## \d{2}\. /m.test(section))
@@ -282,12 +296,16 @@ async function main() {
     })))
   }
 
-  const { error: insertEmbeddingError } = await supabase
-    .from('skill_embeddings')
-    .insert(embeddingRows)
+  for (const [batchIndex, rows] of chunkItems(embeddingRows, EMBEDDING_INSERT_BATCH_SIZE).entries()) {
+    const { error: insertEmbeddingError } = await supabase
+      .from('skill_embeddings')
+      .insert(rows)
 
-  if (insertEmbeddingError) {
-    throw new Error(`Failed to insert embeddings: ${insertEmbeddingError.message}`)
+    if (insertEmbeddingError) {
+      throw new Error(
+        `Failed to insert embedding batch ${batchIndex + 1}: ${insertEmbeddingError.message}`
+      )
+    }
   }
 
   const { count: skillCount, error: verifySkillError } = await supabase
@@ -320,7 +338,9 @@ async function main() {
   }, null, 2))
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exitCode = 1
-})
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  main().catch((error) => {
+    console.error(error)
+    process.exitCode = 1
+  })
+}

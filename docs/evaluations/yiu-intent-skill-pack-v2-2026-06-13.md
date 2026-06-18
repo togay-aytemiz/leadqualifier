@@ -117,7 +117,7 @@ Kullanıcı örnekleri:
 - yerleşke adresleri
 - bağlum kampüs nerede?
 - baglum kampus
-- 100. yıl yerleşkesine nasıl giderim?
+- 100. Yıl Yerleşkesi nerede?
 - okul nerede?
 - adresiniz nedir?
 - kampusler
@@ -719,7 +719,7 @@ Instructed cevap:
 2025 Sağlık Bilimleri Fakültesi ücretleri program ve burs/indirim türüne göre değişir.
 
 Öne çıkan ücretli program tutarları:
-- Hemşirelik: 520.000 TL
+- Hemşirelik: 490.000 TL
 - Dil ve Konuşma Terapisi: 490.000 TL
 - Fizyoterapi ve Rehabilitasyon: 490.000 TL
 - Beslenme ve Diyetetik: 490.000 TL
@@ -752,9 +752,9 @@ Kullanıcı örnekleri:
 Instructed cevap:
 2025 Hemşirelik bilgileri şöyledir:
 
-- Hemşirelik (Ücretli): kontenjan 2, ücret 520.000 TL, 2024 taban puanı 294,272, başarı sırası 284.992
-- Hemşirelik (Burslu): kontenjan 12, ücret tutarı verilmez, 2024 taban puanı 391,497, başarı sırası 94.181
-- Hemşirelik (%50 İndirimli): kontenjan 66, ücret 260.000 TL, 2024 taban puanı 308,724, başarı sırası 235.073
+- Hemşirelik (Ücretli): kontenjan 2, ücret 490.000 TL, 2024 taban puanı 286,806, başarı sırası 313.101
+- Hemşirelik (Burslu): kontenjan 7, ücret tutarı verilmez, 2024 taban puanı 360,410, başarı sırası 131.581
+- Hemşirelik (%50 İndirimli): kontenjan 45, ücret 245.000 TL, 2024 taban puanı 301,991, başarı sırası 258.575
 
 Kaynak notu: Tanıtım broşürü Sağlık Bilimleri Fakültesi tablosu.
 
@@ -804,9 +804,9 @@ Kullanıcı örnekleri:
 Instructed cevap:
 2025 Fizyoterapi ve Rehabilitasyon lisans bilgileri şöyledir:
 
-- Fizyoterapi ve Rehabilitasyon (Ücretli): kontenjan 2, ücret 490.000 TL, 2024 taban puanı 241,862, başarı sırası 589.959
-- Fizyoterapi ve Rehabilitasyon (Burslu): kontenjan 7, ücret tutarı verilmez, 2024 taban puanı 367,860, başarı sırası 124.515
-- Fizyoterapi ve Rehabilitasyon (%50 İndirimli): kontenjan 40, ücret 245.000 TL, 2024 taban puanı 245,987, başarı sırası 558.678
+- Fizyoterapi ve Rehabilitasyon (Ücretli): kontenjan 2, ücret 490.000 TL, 2024 taban puanı 252,411, başarı sırası 510.665
+- Fizyoterapi ve Rehabilitasyon (Burslu): kontenjan 7, ücret tutarı verilmez, 2024 taban puanı 310,627, başarı sırası 233.156
+- Fizyoterapi ve Rehabilitasyon (%50 İndirimli): kontenjan 40, ücret 245.000 TL, 2024 taban puanı 253,403, başarı sırası 504.403
 
 Bu program Sağlık Bilimleri Fakültesindeki 4 yıllık lisans programıdır. 2 yıllık Fizyoterapi programı SHMYO altındadır.
 
@@ -860,14 +860,16 @@ Instructed cevap:
 2025 Ergoterapi ve Ebelik bilgileri şöyledir:
 
 Ergoterapi:
-- Ücretli: kontenjan 2, ücret 460.000 TL, 2024 taban puanı 231,930, başarı sırası 668.437
-- Burslu: kontenjan 5, ücret tutarı verilmez, 2024 taban puanı 315,043, başarı sırası 215.235
-- %50 İndirimli: kontenjan 31, ücret 230.000 TL, 2024 taban puanı 230,811, başarı sırası 677.165
+- Ücretli: kontenjan 6, ücret 460.000 TL
+- Burslu: kontenjan 4, ücret tutarı verilmez
+- %50 İndirimli: kontenjan 19, ücret 230.000 TL
 
 Ebelik:
-- Ücretli: kontenjan 2, ücret 460.000 TL, 2024 taban puanı 251,608, başarı sırası 513.803
-- Burslu: kontenjan 5, ücret tutarı verilmez, 2024 taban puanı 373,234, başarı sırası 116.906
-- %50 İndirimli: kontenjan 31, ücret 230.000 TL, 2024 taban puanı 266,516, başarı sırası 411.293
+- Ücretli: kontenjan 6, ücret 460.000 TL
+- Burslu: kontenjan 4, ücret tutarı verilmez
+- %50 İndirimli: kontenjan 19, ücret 230.000 TL
+
+Bu iki yeni program için geçmiş yıl taban puanı ve başarı sırası bilgisi bulunmuyor.
 
 Kaynak notu: Tanıtım broşürü Sağlık Bilimleri Fakültesi tablosu.
 
@@ -925,7 +927,7 @@ Sağlık Hizmetleri Meslek Yüksekokulunda şu ön lisans programları bulunur:
 - İlk ve Acil Yardım
 - Ameliyathane Hizmetleri
 - Tıbbi Laboratuvar Teknikleri
-- Tıbbi Görüntüleme Teknikleri
+- Elektronörofizyoloji
 - Fizyoterapi
 - Biyomedikal Cihaz Teknolojisi
 - Optisyenlik
@@ -963,11 +965,11 @@ Sık sorulan ücretli program tutarları:
 - İlk ve Acil Yardım: 330.000 TL
 - Tıbbi Laboratuvar Teknikleri: 330.000 TL
 - Ameliyathane Hizmetleri: 330.000 TL
-- Tıbbi Görüntüleme Teknikleri: 320.000 TL
 - Fizyoterapi: 320.000 TL
-- Biyomedikal Cihaz Teknolojisi: 285.000 TL
-- Optisyenlik: 285.000 TL
-- Tıbbi Dokümantasyon ve Sekreterlik: 285.000 TL
+- Biyomedikal Cihaz Teknolojisi: 330.000 TL
+- Elektronörofizyoloji: 330.000 TL
+- Optisyenlik: 330.000 TL
+- Tıbbi Dokümantasyon ve Sekreterlik: 330.000 TL
 - Tele-Sağlık Teknikerliği: 285.000 TL
 - Tıbbi Veri İşleme Teknikerliği: 285.000 TL
 
@@ -995,9 +997,9 @@ Kullanıcı örnekleri:
 Instructed cevap:
 2025 Anestezi bilgileri şöyledir:
 
-- Anestezi (Ücretli): kontenjan 5, ücret 330.000 TL, 2024 taban puanı 267,851, başarı sırası 1.353.668
-- Anestezi (Burslu): kontenjan 9, ücret tutarı verilmez, 2024 taban puanı 347,781, başarı sırası 407.337
-- Anestezi (%50 İndirimli): kontenjan 55, ücret 165.000 TL, 2024 taban puanı 283,333, başarı sırası 1.116.166
+- Anestezi (Ücretli): kontenjan 10, ücret 330.000 TL, 2024 taban puanı 296,241, başarı sırası 932.028
+- Anestezi (Burslu): kontenjan 10, ücret tutarı verilmez, 2024 taban puanı 360,865, başarı sırası 349.366
+- Anestezi (%50 İndirimli): kontenjan 50, ücret 165.000 TL, 2024 taban puanı 315,728, başarı sırası 698.670
 
 Kaynak notu: Tanıtım broşürü SHMYO tablosu.
 
@@ -1086,9 +1088,9 @@ Kullanıcı örnekleri:
 Instructed cevap:
 2025 Ameliyathane Hizmetleri bilgileri şöyledir:
 
-- Ameliyathane Hizmetleri (Ücretli): kontenjan 5, ücret 330.000 TL, 2024 taban puanı 253,483, başarı sırası 1.593.853
-- Ameliyathane Hizmetleri (Burslu): kontenjan 7, ücret tutarı verilmez, 2024 taban puanı 325,122, başarı sırası 618.751
-- Ameliyathane Hizmetleri (%50 İndirimli): kontenjan 40, ücret 165.000 TL, 2024 taban puanı 257,173, başarı sırası 1.533.977
+- Ameliyathane Hizmetleri (Ücretli): kontenjan 5, ücret 330.000 TL, 2024 taban puanı 268,669, başarı sırası 1.340.077
+- Ameliyathane Hizmetleri (Burslu): kontenjan 10, ücret tutarı verilmez, 2024 taban puanı 328,856, başarı sırası 570.522
+- Ameliyathane Hizmetleri (%50 İndirimli): kontenjan 55, ücret 165.000 TL, 2024 taban puanı 280,807, başarı sırası 1.150.818
 
 Kaynak notu: Tanıtım broşürü SHMYO tablosu.
 
@@ -1106,12 +1108,12 @@ Kullanıcı örnekleri:
 - Tıbbi Tanıtım tablosunda burslu fiyat neden var?
 
 Instructed cevap:
-2025 Tıbbi Tanıtım ve Pazarlama bilgilerinde dikkat edilmesi gereken bir tutarsızlık var.
+2025 Tıbbi Tanıtım ve Pazarlama bilgilerinde teyit gerektiren bir tutarsızlık var:
 
-- Tıbbi Tanıtım ve Pazarlama (Ücretli): kontenjan 5, ücret 330.000 TL, 2024 taban puanı 208,489, başarı sırası 2.109.484
-- Tıbbi Tanıtım ve Pazarlama (Burslu): kontenjan 4, 2024 taban puanı 309,532, başarı sırası 767.115
+- Burslu: kontenjan 4; 2024 taban puanı 309,532 ve başarı sırası 767.115. Ücret alanında 330.000 TL gösteriliyor.
+- %50 İndirimli: kontenjan 30; ücret 165.000 TL; 2024 taban puanı 215,543 ve başarı sırası 2.278.037.
 
-Burslu satırdaki ücret bilgisi diğer burslu satırlardan farklı göründüğü için bu programda burslu ücret konusunda kesin tutar söylemek doğru olmaz. Ücretli satır için 330.000 TL bilgisi kullanılabilir.
+Burslu seçenek için ücret gösterilmesi diğer burslu seçeneklerle çelişiyor. Ayrıca ayrı bir ücretli seçenek bilgisi bulunmuyor. Bu nedenle 330.000 TL'yi ücretli program fiyatı olarak sunmak doğru değildir; burslu ücret bilgisini kayıt öncesinde aday ilişkileri birimiyle teyit etmek gerekir.
 
 Kaynak notu: Doğrulanmış broşür markdown "Kontrol Gerektiren Kaynak Tutarsızlığı".
 
@@ -1167,10 +1169,8 @@ Meslek Yüksekokulunda şu ön lisans programları bulunur:
 
 - Bilgisayar Programcılığı
 - Grafik Tasarım
-- İç Mekan Tasarımı
-- Ağız ve Diş Sağlığı
-- Çocuk Gelişimi
 - Eczane Hizmetleri
+- Elektrik
 
 Meslek Yüksekokulu Balgat Yerleşkesindedir.
 
@@ -1201,22 +1201,20 @@ Kullanıcı örnekleri:
 - iç mekan tasarımı kaç tl
 
 Instructed cevap:
-2025 Meslek Yüksekokulu ücretleri şöyledir:
+2025 Meslek Yüksekokulu ücret ve kontenjanları şöyledir:
 
-- Bilgisayar Programcılığı (Ücretli): 250.000 TL
-- Bilgisayar Programcılığı (%50 İndirimli): 125.000 TL
-- Grafik Tasarım (Ücretli): 250.000 TL
-- Grafik Tasarım (%50 İndirimli): 125.000 TL
-- İç Mekan Tasarımı (Ücretli): 250.000 TL
-- İç Mekan Tasarımı (%50 İndirimli): 125.000 TL
-- Ağız ve Diş Sağlığı (Ücretli): 320.000 TL
-- Ağız ve Diş Sağlığı (%50 İndirimli): 160.000 TL
-- Çocuk Gelişimi (Ücretli): 285.000 TL
-- Çocuk Gelişimi (%50 İndirimli): 142.500 TL
-- Eczane Hizmetleri (Ücretli): 285.000 TL
-- Eczane Hizmetleri (%50 İndirimli): 142.500 TL
-
-Burslu satırlarda ayrıca ücret tutarı verilmez.
+- Bilgisayar Programcılığı (Ücretli): kontenjan 5, ücret 330.000 TL
+- Bilgisayar Programcılığı (Burslu): kontenjan 7, ücret tutarı verilmez
+- Bilgisayar Programcılığı (%50 İndirimli): kontenjan 37, ücret 165.000 TL
+- Eczane Hizmetleri (Ücretli): kontenjan 2, ücret 330.000 TL
+- Eczane Hizmetleri (Burslu): kontenjan 7, ücret tutarı verilmez
+- Eczane Hizmetleri (%50 İndirimli): kontenjan 40, ücret 165.000 TL
+- Elektrik (Ücretli): kontenjan 7, ücret 300.000 TL
+- Elektrik (Burslu): kontenjan 5, ücret tutarı verilmez
+- Elektrik (%50 İndirimli): kontenjan 27, ücret 150.000 TL
+- Grafik Tasarım (Ücretli): kontenjan 7, ücret 300.000 TL
+- Grafik Tasarım (Burslu): kontenjan 5, ücret tutarı verilmez
+- Grafik Tasarım (%50 İndirimli): kontenjan 27, ücret 150.000 TL
 
 Kaynak notu: Tanıtım broşürü Meslek Yüksekokulu tablosu.
 
@@ -1587,11 +1585,11 @@ Kullanıcı örnekleri:
 Instructed cevap:
 2025 SHMYO diğer program bilgileri şöyledir:
 
-- Tıbbi Görüntüleme Teknikleri: ücretli kontenjan 4 ve ücret 320.000 TL; burslu kontenjan 4; %50 indirimli kontenjan 21 ve ücret 160.000 TL
 - Fizyoterapi: ücretli kontenjan 4 ve ücret 320.000 TL; burslu kontenjan 4; %50 indirimli kontenjan 21 ve ücret 160.000 TL
-- Biyomedikal Cihaz Teknolojisi: ücretli kontenjan 8 ve ücret 285.000 TL; burslu kontenjan 5; %50 indirimli kontenjan 26 ve ücret 142.500 TL
-- Optisyenlik: ücretli kontenjan 8 ve ücret 285.000 TL; burslu kontenjan 5; %50 indirimli kontenjan 26 ve ücret 142.500 TL
-- Tıbbi Dokümantasyon ve Sekreterlik: ücretli kontenjan 8 ve ücret 285.000 TL; burslu kontenjan 5; %50 indirimli kontenjan 26 ve ücret 142.500 TL
+- Biyomedikal Cihaz Teknolojisi: ücretli kontenjan 5 ve ücret 330.000 TL; burslu kontenjan 5; %50 indirimli kontenjan 30 ve ücret 165.000 TL
+- Elektronörofizyoloji: ücretli kontenjan 5 ve ücret 330.000 TL; burslu kontenjan 7; %50 indirimli kontenjan 40 ve ücret 165.000 TL
+- Optisyenlik: ücretli kontenjan 5 ve ücret 330.000 TL; burslu kontenjan 7; %50 indirimli kontenjan 40 ve ücret 165.000 TL
+- Tıbbi Dokümantasyon ve Sekreterlik: ücretli kontenjan 5 ve ücret 330.000 TL; burslu kontenjan 8; %50 indirimli kontenjan 45 ve ücret 165.000 TL
 
 Kaynak notu: Tanıtım broşürü Sağlık Hizmetleri Meslek Yüksekokulu 2025 kontenjan ve fiyat tablosu.
 
@@ -1672,9 +1670,18 @@ Kullanıcı örnekleri:
 - online kayıt var mı?
 
 Instructed cevap:
-Kayıt tarihleri ve kesin kayıt adımları dönemsel olarak güncellenir; bu yüzden kesin tarih için ilgili yılın ÖSYM kılavuzu ve üniversitenin güncel kayıt duyurusu esas alınmalıdır.
+ÖSYM/ÖSYS ile yerleşen yerel adaylar için kesin kayıtta genel olarak şu belgeler istenir:
 
-Düşündüğün programı yazarsan kontenjan, ücret, puan türü, öğretim dili, hazırlık koşulu ve özel koşulları birlikte özetleyebilirim.
+- ÖSYS sonuç belgesi
+- Lise diplomasının aslı ve fotokopisi veya e-Devlet mezuniyet belgesi
+- Gerekliyse ek puana esas mezuniyet alanını gösteren resmi belge
+- Onaylı kimlik örneği ve ikametgâh beyanı
+- Askerlik çağındaki erkek adaylar için askerlik durum belgesi
+- Öğrenim ücretinin yatırıldığını gösteren banka dekontu
+- Online kayıtta bir, şahsen kayıtta iki fotoğraf
+- Yatay geçiş veya DGS kaydında muafiyet dilekçesi
+
+Kayıt tarihleri ve istenen belgeler dönemsel olarak değişebilir; kesin işlem öncesinde ilgili yılın ÖSYM kılavuzu ve güncel kayıt duyurusu kontrol edilmelidir. Uluslararası öğrenci, yatay geçiş veya DGS kaydı yapacaksan belge listesi değişir; hangi tür başvuru yaptığını yazarsan doğru listeyi ayırabilirim.
 
 Kaynak notu: Ana web sitesi aday öğrenci ve ücret/kontenjan yönlendirmeleri, tanıtım broşürü, ÖSYM kılavuzu uyarıları.
 

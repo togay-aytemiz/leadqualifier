@@ -219,8 +219,8 @@ function buildCategoryMarkdown(input: {
   return [
     `# ${input.label}`,
     '',
-    'Kaynak: Yüksek İhtisas Üniversitesi tanıtım broşürü.',
-    'Kaynak türü: Doğrulanmış broşür markdown çıkarımı.',
+    'Yüksek İhtisas Üniversitesi tanıtım bilgileri.',
+    'Kontenjan ve fiyat bilgileri 2025; başarı sırası ve taban puanı bilgileri 2024 yılına aittir.',
     `Kategori: ${input.sourceGroup}`,
     `Hazırlama tarihi: ${input.generatedAt}`,
     '',
@@ -290,7 +290,13 @@ async function main() {
   const args = parseArgs(process.argv.slice(2))
   const verifiedPath = path.resolve(
     args.verified ??
-      path.join('tmp', 'rag-evals', 'yiu-brochure', 'yiu-admissions-brochure-verified.md')
+      path.join(
+        'src',
+        'lib',
+        'knowledge-base',
+        'provider-data',
+        'yiu-2025-brochure-verified.md'
+      )
   )
   const baseManifestPath = path.resolve(
     args.baseManifest ?? path.join('tmp', 'rag-evals', 'yiu-approved-corpus', 'manifest.json')

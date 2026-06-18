@@ -64,15 +64,6 @@ function selectedCitations(chunks: SimpleRagChunk[]): RagProviderCitation[] {
   return citations
 }
 
-function appendCitationUrls(answer: string, citations: RagProviderCitation[]) {
-  const urls = Array.from(
-    new Set(citations.map((citation) => citation.url?.trim()).filter((url): url is string => Boolean(url)))
-  )
-  return [answer.trim(), ...urls.filter((url) => !answer.includes(url))]
-    .filter(Boolean)
-    .join('\n')
-}
-
 function stateWasUsed(state: RagPendingClarificationState | null | undefined) {
   return Boolean(state && (state.originalQuestion || state.clarificationQuestion))
 }
@@ -435,7 +426,7 @@ export async function runSimpleRagPipeline(input: {
   const citations = selectedCitations(finalGenerated.selectedChunks)
   return {
     provider: 'openai_file_search_validated',
-    answer: appendCitationUrls(finalGenerated.answer, citations),
+    answer: finalGenerated.answer,
     citations,
     refusal: false,
     timingsMs: { total: Date.now() - startedAt, retrieval: retrievalMs, generation: finalGenerationMs },

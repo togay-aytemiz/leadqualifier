@@ -83,6 +83,11 @@ describe('YIU brochure manifest builder', () => {
     expect(files[0]?.markdown).toContain('İletişim: 0 (312) 329 10 10')
     expect(files[0]?.markdown).not.toContain('Internal note')
 
+    const tip = files.find((file) => file.localPath.endsWith('brochure-01-tip.md'))
+    expect(tip?.markdown).toContain(
+      'Kontenjan ve fiyat bilgileri 2025; başarı sırası ve taban puanı bilgileri 2024 yılına aittir.'
+    )
+
     const shmyo = files.find((file) => file.localPath.endsWith('brochure-04-shmyo.md'))
     expect(shmyo?.markdown).toContain('Kontrol Gerektiren Kaynak Tutarsızlığı')
     expect(shmyo?.markdown).toContain('Tıbbi Tanıtım ve Pazarlama')

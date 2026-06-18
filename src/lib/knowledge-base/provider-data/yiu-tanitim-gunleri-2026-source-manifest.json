@@ -1,50 +1,1352 @@
 {
-  "corpusScope": "yiu-tanitim-gunleri-2026-approved-corpus",
-  "vectorStoreId": "vs_6a2cfa3598b88191ad8a77ab9a9c6a09",
-  "generatedAt": "2026-06-13T06:37:35.718Z",
-  "sourceCount": 135,
+  "corpusScope": "yiu-tanitim-gunleri-2026-clean-corpus",
+  "vectorStoreId": "vs_6a338d7c24388191a43809879d974db0",
+  "generatedAt": "2026-06-18T06:50:08.648Z",
+  "sourceCount": 444,
   "sourcesByFilename": {
-    "yiu-website-academic-001.md": {
-      "title": "YİÜ Website - Academic - 001"
+    "0001-tip-puanlari-ankara-tip-fakultesi-ve-ankara-da-tip-bolumleri-c4897a2a4c.md": {
+      "title": "YİÜ Web - Tıp Puanları. Ankara Tıp Fakültesi ve Ankara'da Tıp Bölümleri",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/aday-ogrenci"
     },
-    "yiu-website-academic-002.md": {
-      "title": "YİÜ Website - Academic - 002"
+    "0002-academic-calendars-547a199936.md": {
+      "title": "YİÜ Web - Academic Calendars",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/akademik-takvim"
     },
-    "yiu-website-admissions-001.md": {
-      "title": "YİÜ Website - Admissions - 001"
+    "0003-arastirma-merkezleri-f6015524f5.md": {
+      "title": "YİÜ Web - Araştırma Merkezleri",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/arastirma-merkezleri"
     },
-    "yiu-website-announcements-001.md": {
-      "title": "YİÜ Website - Announcements - 001"
+    "0004-center-for-environmental-studies-application-and-research-cscuam-1db6082ac3.md": {
+      "title": "YİÜ Web - Center for Environmental Studies, Application and Research (CSCUAM)",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/arastirma-merkezleri/arastirma-ve-uygulama-merkezleri/cevre-sorunlari-calismalari-uygulama-ve-arastirma-merkezi-cscuam"
     },
-    "yiu-website-announcements-002.md": {
-      "title": "YİÜ Website - Announcements - 002"
+    "0005-experimental-studies-application-and-research-center-cfc736e087.md": {
+      "title": "YİÜ Web - Experimental Studies Application and Research Center",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/arastirma-merkezleri/arastirma-ve-uygulama-merkezleri/deneysel-calismalar-uygulama-ve-arastirma-merkezi"
     },
-    "yiu-website-announcements-003.md": {
-      "title": "YİÜ Website - Announcements - 003"
+    "0006-language-and-speech-disorders-education-application-and-research-center-dkbeuam-0c44352d5a.md": {
+      "title": "YİÜ Web - Language and Speech Disorders Education, Application and Research Center (DKBEUAM)",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/arastirma-merkezleri/arastirma-ve-uygulama-merkezleri/dil-ve-konusma-bozukluklari-egitimi-uygulama-ve-arastirma-merkezi-dkbeuam"
     },
-    "yiu-website-contact-admin-001.md": {
-      "title": "YİÜ Website - Contact Admin - 001"
+    "0007-women-s-issues-application-and-research-center-yiukam-4ac0a59eb7.md": {
+      "title": "YİÜ Web - Women's Issues Application and Research Center (YIUKAM)",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/arastirma-merkezleri/arastirma-ve-uygulama-merkezleri/kadin-sorunlari-uygulama-ve-arastirma-merkezi-yiukam"
     },
-    "yiu-website-events-001.md": {
-      "title": "YİÜ Website - Events - 001"
+    "0008-career-planning-application-and-research-center-kpuam-02f8a876a1.md": {
+      "title": "YİÜ Web - Career Planning, Application and Research Center (KPUAM)",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/arastirma-merkezleri/arastirma-ve-uygulama-merkezleri/kariyer-planlama-uygulama-ve-arastirma-merkezi-kpuam"
     },
-    "yiu-website-events-002.md": {
-      "title": "YİÜ Website - Events - 002"
+    "0009-risky-baby-monitoring-application-and-research-center-rbtuam-da8f2d4b3c.md": {
+      "title": "YİÜ Web - Risky Baby Monitoring Application and Research Center (RBTUAM)",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/arastirma-merkezleri/arastirma-ve-uygulama-merkezleri/riskli-bebek-takibi-uygulama-ve-arastirma-merkezi-rbtuam"
     },
-    "yiu-website-general-001.md": {
-      "title": "YİÜ Website - General - 001"
+    "0010-civil-society-studies-application-and-research-center-e15dab1f12.md": {
+      "title": "YİÜ Web - Civil Society Studies, Application and Research Center",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/arastirma-merkezleri/arastirma-ve-uygulama-merkezleri/sivil-toplum-calismalari-uygulama-ve-arastirma-merkezi"
     },
-    "yiu-website-general-002.md": {
-      "title": "YİÜ Website - General - 002"
+    "0011-continuing-education-application-and-research-center-yiusem-71a8757c17.md": {
+      "title": "YİÜ Web - Continuing Education Application and Research Center (YIUSEM)",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/arastirma-merkezleri/arastirma-ve-uygulama-merkezleri/surekli-egitim-uygulama-ve-arastirma-merkezi-yiusem"
     },
-    "yiu-website-institutional-001.md": {
-      "title": "YİÜ Website - İnstitutional - 001"
+    "0012-distance-education-application-and-research-center-f4cadf764f.md": {
+      "title": "YİÜ Web - Distance Education Application and Research Center",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/arastirma-merkezleri/arastirma-ve-uygulama-merkezleri/uzaktan-egitim-uygulama-ve-arastirma-merkezi"
     },
-    "yiu-website-news-001.md": {
-      "title": "YİÜ Website - News - 001"
+    "0013-aging-studies-application-and-research-center-a11a922b3a.md": {
+      "title": "YİÜ Web - Aging Studies Application and Research Center",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/arastirma-merkezleri/arastirma-ve-uygulama-merkezleri/yaslilik-calismalari-uygulama-ve-arastirma-merkezi"
     },
-    "yiu-website-news-002.md": {
-      "title": "YİÜ Website - News - 002"
+    "0014-scientific-research-projects-bap-a5872b39ce.md": {
+      "title": "YİÜ Web - Scientific Research Projects (BAP)",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/arastirma-merkezleri/bilimsel-arastirma-projeleri/bilimsel-arastirma-projeleri-bap"
+    },
+    "0015-health-sciences-research-ethics-committee-77b52154e3.md": {
+      "title": "YİÜ Web - Health Sciences Research Ethics Committee",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/arastirma-merkezleri/etik-kurulu/saglik-bilimleri-arastirma-etik-kurulu"
+    },
+    "0016-sosyal-ve-beseri-bilimler-arastirma-etik-kurulu-4bfe3c9b2c.md": {
+      "title": "YİÜ Web - Sosyal ve Beşeri Bilimler Araştırma Etik Kurulu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/arastirma-merkezleri/etik-kurulu/sosyal-ve-beseri-bilimler-arastirma-etik-kurulu"
+    },
+    "0017-technology-transfer-office-tto-823291f2de.md": {
+      "title": "YİÜ Web - Technology Transfer Office (TTO)",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/arastirma-merkezleri/teknoloji-transfer-ofisi/teknoloji-transfer-ofisi-tto"
+    },
+    "0018-iletisim-f49e6737ce.md": {
+      "title": "YİÜ Web - İletişim",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/iletisim"
+    },
+    "0019-aday-ogrenci-20dc2e1596.md": {
+      "title": "YİÜ Web - Aday Öğrenci",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/landing"
+    },
+    "0020-alumni-information-system-e53e761796.md": {
+      "title": "YİÜ Web - Alumni Information System",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/mezun-bilgi-sistemi"
+    },
+    "0021-obs-efea07da9f.md": {
+      "title": "YİÜ Web - OBS",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/obs"
+    },
+    "0022-special-conditions-71d01e67c3.md": {
+      "title": "YİÜ Web - Special Conditions",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/ozel-kosullar"
+    },
+    "0023-lisansustu-egitim-enstitusu-8b9adb223e.md": {
+      "title": "YİÜ Web - Lisansüstü Eğitim Enstitüsü",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu"
+    },
+    "0024-academic-staff-79bd4adb20.md": {
+      "title": "YİÜ Web - Academic Staff",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/akademik-personel"
+    },
+    "0025-academic-calendar-7a14b62a94.md": {
+      "title": "YİÜ Web - Academic Calendar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/akademik-takvim"
+    },
+    "0026-anatomy-master-s-program-with-thesis-3f919f16b7.md": {
+      "title": "YİÜ Web - Anatomy Master's Program with Thesis",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/anabilim-dallari-programlar/anatomi-tezli-yuksek-lisans-programi"
+    },
+    "0027-dogum-ve-kadin-hastaliklari-hemsireligi-tezli-yuksek-lisans-programi-5a67e99362.md": {
+      "title": "YİÜ Web - Doğum ve Kadın Hastalıkları Hemşireliği Tezli Yüksek Lisans Programı",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/anabilim-dallari-programlar/dogum-ve-kadin-hastaliklari-hemsireligi-tezli-yuksek-lisans-programi"
+    },
+    "0028-fizyoloji-tezli-yuksek-lisans-programi-786456d7bf.md": {
+      "title": "YİÜ Web - Fizyoloji Tezli Yüksek Lisans Programı",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/anabilim-dallari-programlar/fizyoloji-tezli-yuksek-lisans-programi"
+    },
+    "0029-physiotherapy-and-rehabilitation-master-s-program-with-thesis-1574a95692.md": {
+      "title": "YİÜ Web - Physiotherapy and Rehabilitation Master's Program with Thesis",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/anabilim-dallari-programlar/fizyoterapi-ve-rehabilitasyon-tezli-yuksek-lisans-programi"
+    },
+    "0030-histology-and-embryology-master-s-program-with-thesis-00f9c7432f.md": {
+      "title": "YİÜ Web - Histology and Embryology Master's Program with Thesis",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/anabilim-dallari-programlar/histoloji-ve-embriyoloji-tezli-yuksek-lisans-programi"
+    },
+    "0031-internal-medicine-nursing-master-s-program-with-thesis-4a77e882d1.md": {
+      "title": "YİÜ Web - Internal Medicine Nursing Master's Program with Thesis",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/anabilim-dallari-programlar/ic-hastaliklari-hemsireligi-tezli-yuksek-lisans-programi"
+    },
+    "0032-psychiatric-nursing-master-s-program-with-thesis-d19b69ea4c.md": {
+      "title": "YİÜ Web - Psychiatric Nursing Master's Program with Thesis",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/anabilim-dallari-programlar/psikiyatri-hemsireligi-tezli-yuksek-lisans-programi"
+    },
+    "0033-saglik-yonetimi-tezli-yuksek-lisans-programi-3a87a20dad.md": {
+      "title": "YİÜ Web - Sağlık Yönetimi Tezli Yüksek Lisans Programı",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/anabilim-dallari-programlar/saglik-yonetimi-tezli-yuksek-lisans-programi"
+    },
+    "0034-healthcare-management-non-thesis-master-s-program-2ac33a9125.md": {
+      "title": "YİÜ Web - Healthcare Management Non-Thesis Master's Program",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/anabilim-dallari-programlar/saglik-yonetimi-tezsiz-yuksek-lisans-programi"
+    },
+    "0035-medical-biochemistry-master-s-program-with-thesis-df9ab74c43.md": {
+      "title": "YİÜ Web - Medical Biochemistry Master's Program with Thesis",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/anabilim-dallari-programlar/tibbi-biyokimya-tezli-yuksek-lisans-programi"
+    },
+    "0036-medical-genetics-master-s-program-with-thesis-cc28749d89.md": {
+      "title": "YİÜ Web - Medical Genetics Master's Program with Thesis",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/anabilim-dallari-programlar/tibbi-genetik-tezli-yuksek-lisans-programi"
+    },
+    "0037-medical-microbiology-master-s-program-with-thesis-07ba10ffa9.md": {
+      "title": "YİÜ Web - Medical Microbiology Master's Program with Thesis",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/anabilim-dallari-programlar/tibbi-mikrobiyoloji-tezli-yuksek-lisans-programi"
+    },
+    "0038-applications-4ee5d0350f.md": {
+      "title": "YİÜ Web - Applications",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/basvurular"
+    },
+    "0039-useful-links-76898157e9.md": {
+      "title": "YİÜ Web - Useful Links",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/faydali-linkler"
+    },
+    "0040-forms-d68d0a8b81.md": {
+      "title": "YİÜ Web - Forms",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/formlar"
+    },
+    "0041-gorev-tanimlari-a728100a8c.md": {
+      "title": "YİÜ Web - Görev Tanımları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/gorev-tanimlari"
+    },
+    "0042-about-us-68ce0a0a6e.md": {
+      "title": "YİÜ Web - About Us",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/hakkinda"
+    },
+    "0043-iletisim-2c3de8cc50.md": {
+      "title": "YİÜ Web - İletişim",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/iletisim"
+    },
+    "0044-cizelgeler-aeb932ea5a.md": {
+      "title": "YİÜ Web - Çizelgeler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/kalite/dokumanlar-ve-raporlar/cizelgeler"
+    },
+    "0045-formlar-318f072650.md": {
+      "title": "YİÜ Web - Formlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/kalite/dokumanlar-ve-raporlar/formlar"
+    },
+    "0046-gorev-yetki-ve-sorumluluklar-c26da1aeb9.md": {
+      "title": "YİÜ Web - Görev, Yetki ve Sorumluluklar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/kalite/dokumanlar-ve-raporlar/gorev-yetki-ve-sorumluluklar"
+    },
+    "0047-is-akis-semalari-73f5ec7eec.md": {
+      "title": "YİÜ Web - İş Akış Şemaları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/kalite/dokumanlar-ve-raporlar/is-akis-semalari"
+    },
+    "0048-kilavuzlar-8ee8de463d.md": {
+      "title": "YİÜ Web - Kılavuzlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/kalite/dokumanlar-ve-raporlar/kilavuzlar"
+    },
+    "0049-puko-dongusu-44447c53ed.md": {
+      "title": "YİÜ Web - PUKÖ Döngüsü",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/kalite/dokumanlar-ve-raporlar/puko-dongusu"
+    },
+    "0050-yonergeler-34c1cbda1f.md": {
+      "title": "YİÜ Web - Yönergeler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/kalite/dokumanlar-ve-raporlar/yonergeler"
+    },
+    "0051-yonetmelikler-612d4ca4a0.md": {
+      "title": "YİÜ Web - Yönetmelikler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/kalite/dokumanlar-ve-raporlar/yonetmelikler"
+    },
+    "0052-faaliyetler-ve-duyurular-ea0790b3d6.md": {
+      "title": "YİÜ Web - Faaliyetler ve Duyurular",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/kalite/faaliyetler-ve-duyurular"
+    },
+    "0053-birim-kalite-komisyonu-830e89944e.md": {
+      "title": "YİÜ Web - Birim Kalite Komisyonu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/kalite/kurumsal-bilgiler/birim-kalite-komisyonu"
+    },
+    "0054-birim-kalite-ogrenci-temsilcileri-f3752e4712.md": {
+      "title": "YİÜ Web - Birim Kalite Öğrenci Temsilcileri",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/kalite/kurumsal-bilgiler/birim-kalite-ogrenci-temsilcileri"
+    },
+    "0055-iletisim-d4f13fabfe.md": {
+      "title": "YİÜ Web - İletişim",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/kalite/paydas-katilimi-ve-iletisim/iletisim"
+    },
+    "0056-boards-3a95a40c31.md": {
+      "title": "YİÜ Web - Boards",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/kurullar-komisyonlar"
+    },
+    "0057-legislation-1d17b08321.md": {
+      "title": "YİÜ Web - Legislation",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/mevzuat"
+    },
+    "0058-organization-chart-6cc3d04dbe.md": {
+      "title": "YİÜ Web - Organization Chart",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/organizasyon-semasi"
+    },
+    "0059-yonetim-9344079434.md": {
+      "title": "YİÜ Web - Yönetim",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/yonetim"
+    },
+    "0060-saglik-bilimleri-fakultesi-66318abe76.md": {
+      "title": "YİÜ Web - Sağlık Bilimleri Fakültesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi"
+    },
+    "0061-academic-calendar-c40bab793e.md": {
+      "title": "YİÜ Web - Academic Calendar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/akademik-takvim"
+    },
+    "0062-department-of-nutrition-and-dietetics-2def6200e3.md": {
+      "title": "YİÜ Web - DEPARTMENT OF NUTRITION AND DIETETICS",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/bolum/beslenme-ve-diyetetik-bolumu"
+    },
+    "0063-department-of-language-and-speaking-therapy-3c124fc390.md": {
+      "title": "YİÜ Web - DEPARTMENT OF LANGUAGE AND SPEAKING THERAPY",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/bolum/dil-ve-konusma-terapisi-bolumu"
+    },
+    "0064-ebelik-bolumu-cc57b657b8.md": {
+      "title": "YİÜ Web - EBELİK BÖLÜMÜ",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/bolum/ebelik-bolumu"
+    },
+    "0065-ergoterapi-bolumu-805e4abb3c.md": {
+      "title": "YİÜ Web - ERGOTERAPİ BÖLÜMÜ",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/bolum/ergoterapi-bolumu"
+    },
+    "0066-physiotherapy-and-rehabilitation-department-9f28024b44.md": {
+      "title": "YİÜ Web - PHYSIOTHERAPY AND REHABILITATION DEPARTMENT",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/bolum/fizyoterapi-ve-rehabilitasyon-bolumu"
+    },
+    "0067-department-of-nursing-19285ea509.md": {
+      "title": "YİÜ Web - DEPARTMENT OF NURSING",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/bolum/hemsirelik-bolumu"
+    },
+    "0068-health-management-department-29f16d2dab.md": {
+      "title": "YİÜ Web - HEALTH MANAGEMENT DEPARTMENT",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/bolum/saglik-yonetimi-bolumu"
+    },
+    "0069-dean-s-message-4e5cfc552a.md": {
+      "title": "YİÜ Web - Dean's Message",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/fakulte-hakkinda/dekanin-mesaji"
+    },
+    "0070-education-plan-31c842b3b4.md": {
+      "title": "YİÜ Web - Education Plan",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/fakulte-hakkinda/egitim-plani"
+    },
+    "0071-boards-50d85c57b6.md": {
+      "title": "YİÜ Web - Boards",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/fakulte-hakkinda/kurullar"
+    },
+    "0072-management-ddf4e17bfe.md": {
+      "title": "YİÜ Web - Management",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/fakulte-hakkinda/yonetim"
+    },
+    "0073-forms-and-petitions-d5cc579ead.md": {
+      "title": "YİÜ Web - Forms and Petitions",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/formlar-ve-dilekceler"
+    },
+    "0074-cizelgeler-f5f1e31759.md": {
+      "title": "YİÜ Web - Çizelgeler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/kalite/dokumanlar-ve-raporlar/cizelgeler"
+    },
+    "0075-formlar-e01d7292e3.md": {
+      "title": "YİÜ Web - Formlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/kalite/dokumanlar-ve-raporlar/formlar"
+    },
+    "0076-gorev-yetki-ve-sorumluluklar-be0a43025e.md": {
+      "title": "YİÜ Web - Görev, Yetki ve Sorumluluklar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/kalite/dokumanlar-ve-raporlar/gorev-yetki-ve-sorumluluklar"
+    },
+    "0077-is-akis-semalari-4966714201.md": {
+      "title": "YİÜ Web - İş Akış Şemaları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/kalite/dokumanlar-ve-raporlar/is-akis-semalari"
+    },
+    "0078-listeler-6f9594b42f.md": {
+      "title": "YİÜ Web - Listeler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/kalite/dokumanlar-ve-raporlar/listeler"
+    },
+    "0079-organizasyon-semasi-86f65e3561.md": {
+      "title": "YİÜ Web - Organizasyon Şeması",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/kalite/dokumanlar-ve-raporlar/organizasyon-semasi"
+    },
+    "0080-puko-dongusu-37be525848.md": {
+      "title": "YİÜ Web - PUKÖ Döngüsü",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/kalite/dokumanlar-ve-raporlar/puko-dongusu"
+    },
+    "0081-raporlar-83926a6cff.md": {
+      "title": "YİÜ Web - Raporlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/kalite/dokumanlar-ve-raporlar/raporlar"
+    },
+    "0082-talimatlar-45442a8577.md": {
+      "title": "YİÜ Web - Talimatlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/kalite/dokumanlar-ve-raporlar/talimatlar"
+    },
+    "0083-yonergeler-53962f3355.md": {
+      "title": "YİÜ Web - Yönergeler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/kalite/dokumanlar-ve-raporlar/yonergeler"
+    },
+    "0084-birim-kalite-komisyon-toplanti-kararlari-99e643dead.md": {
+      "title": "YİÜ Web - Birim Kalite Komisyon Toplantı Kararları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/kalite/kurumsal-bilgiler/birim-kalite-komisyon-toplanti-kararlari"
+    },
+    "0085-birim-kalite-komisyonu-ea6ef5c86f.md": {
+      "title": "YİÜ Web - Birim Kalite Komisyonu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/kalite/kurumsal-bilgiler/birim-kalite-komisyonu"
+    },
+    "0086-birim-kalite-ogrenci-temsilcileri-032e7cd7f2.md": {
+      "title": "YİÜ Web - Birim Kalite Öğrenci Temsilcileri",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/kalite/kurumsal-bilgiler/birim-kalite-ogrenci-temsilcileri"
+    },
+    "0087-misyon-vizyon-degerler-df5d98c149.md": {
+      "title": "YİÜ Web - Misyon-Vizyon-Değerler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/kalite/kurumsal-bilgiler/misyon-vizyon-degerler"
+    },
+    "0088-summer-school-d4c923f3bd.md": {
+      "title": "YİÜ Web - Summer School",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/yaz-okulu"
+    },
+    "0089-spor-bilimleri-fakultesi-e57588019d.md": {
+      "title": "YİÜ Web - Spor Bilimleri Fakültesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/spor-bilimleri-fakultesi"
+    },
+    "0090-akademik-takvim-4fdce616f3.md": {
+      "title": "YİÜ Web - Akademik Takvim",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/spor-bilimleri-fakultesi/akademik-takvim"
+    },
+    "0091-coaching-education-department-d0f5a226da.md": {
+      "title": "YİÜ Web - Coaching Education Department",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/spor-bilimleri-fakultesi/bolum/antrenorluk-egitimi-bolumu"
+    },
+    "0092-fakulte-kurulu-44a4b48557.md": {
+      "title": "YİÜ Web - Fakülte Kurulu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/spor-bilimleri-fakultesi/fakulte-hakkinda/fakulte-kurulu"
+    },
+    "0093-iletisim-4744034a49.md": {
+      "title": "YİÜ Web - İletişim",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/spor-bilimleri-fakultesi/iletisim"
+    },
+    "0094-formlar-a8e6e949ab.md": {
+      "title": "YİÜ Web - Formlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/spor-bilimleri-fakultesi/kalite/dokumanlar-ve-raporlar/formlar"
+    },
+    "0095-gorev-yetki-ve-sorumluluklar-8edb08ad21.md": {
+      "title": "YİÜ Web - Görev, Yetki ve Sorumluluklar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/spor-bilimleri-fakultesi/kalite/dokumanlar-ve-raporlar/gorev-yetki-ve-sorumluluklar"
+    },
+    "0096-is-akis-semalari-9d5f61b7dc.md": {
+      "title": "YİÜ Web - İş Akış Şemaları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/spor-bilimleri-fakultesi/kalite/dokumanlar-ve-raporlar/is-akis-semalari"
+    },
+    "0097-organizasyon-semasi-d47bc9a64a.md": {
+      "title": "YİÜ Web - Organizasyon Şeması",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/spor-bilimleri-fakultesi/kalite/dokumanlar-ve-raporlar/organizasyon-semasi"
+    },
+    "0098-puko-dongusu-845aad3e91.md": {
+      "title": "YİÜ Web - PUKÖ Döngüsü",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/spor-bilimleri-fakultesi/kalite/dokumanlar-ve-raporlar/puko-dongusu"
+    },
+    "0099-yonergeler-a773702c3b.md": {
+      "title": "YİÜ Web - Yönergeler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/spor-bilimleri-fakultesi/kalite/dokumanlar-ve-raporlar/yonergeler"
+    },
+    "0100-birim-kalite-ogrenci-temsilcileri-1e805cb31f.md": {
+      "title": "YİÜ Web - Birim Kalite Öğrenci Temsilcileri",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/spor-bilimleri-fakultesi/kalite/kurumsal-bilgiler/birim-kalite-ogrenci-temsilcileri"
+    },
+    "0101-misyon-vizyon-degerler-8950b766e1.md": {
+      "title": "YİÜ Web - Misyon - Vizyon - Değerler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/spor-bilimleri-fakultesi/kalite/kurumsal-bilgiler/misyon-vizyon-degerler"
+    },
+    "0102-tip-fakultesi-424115e653.md": {
+      "title": "YİÜ Web - Tıp Fakültesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi"
+    },
+    "0103-academic-calendar-bdc933130a.md": {
+      "title": "YİÜ Web - Academic Calendar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/akademik-takvim"
+    },
+    "0104-surgical-medical-sciences-c82fa67ab0.md": {
+      "title": "YİÜ Web - SURGICAL MEDICAL SCIENCES",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/bolum/cerrahi-tip-bilimleri"
+    },
+    "0105-internal-medical-sciences-3c3675c3bd.md": {
+      "title": "YİÜ Web - INTERNAL MEDICAL SCIENCES",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/bolum/dahili-tip-bilimleri"
+    },
+    "0106-basic-medical-sciences-e02ac67c85.md": {
+      "title": "YİÜ Web - BASIC MEDICAL SCIENCES",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/bolum/temel-tip-bilimleri"
+    },
+    "0107-courses-content-9a31a22e0d.md": {
+      "title": "YİÜ Web - Courses Content",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/dersler-programlar-sinavlar-akademik-takvim/ders-icerikleri"
+    },
+    "0108-2019-2020-929669a781.md": {
+      "title": "YİÜ Web - 2019-2020",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/dersler-programlar-sinavlar-akademik-takvim/ders-programlari-ve-akademik-takvim/2019-2020"
+    },
+    "0109-2020-2021-a76bc998fd.md": {
+      "title": "YİÜ Web - 2020-2021",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/dersler-programlar-sinavlar-akademik-takvim/ders-programlari-ve-akademik-takvim/2020-2021"
+    },
+    "0110-2021-2022-4027af3589.md": {
+      "title": "YİÜ Web - 2021-2022",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/dersler-programlar-sinavlar-akademik-takvim/ders-programlari-ve-akademik-takvim/2021-2022"
+    },
+    "0111-2022-2023-927bdeca5a.md": {
+      "title": "YİÜ Web - 2022-2023",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/dersler-programlar-sinavlar-akademik-takvim/ders-programlari-ve-akademik-takvim/2022-2023"
+    },
+    "0112-2023-2024-f44f0b8f41.md": {
+      "title": "YİÜ Web - 2023-2024",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/dersler-programlar-sinavlar-akademik-takvim/ders-programlari-ve-akademik-takvim/2023-2024"
+    },
+    "0113-2024-2025-365ec1c907.md": {
+      "title": "YİÜ Web - 2024-2025",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/dersler-programlar-sinavlar-akademik-takvim/ders-programlari-ve-akademik-takvim/2024-2025"
+    },
+    "0114-2025-2026-6133263b24.md": {
+      "title": "YİÜ Web - 2025-2026",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/dersler-programlar-sinavlar-akademik-takvim/ders-programlari-ve-akademik-takvim/2025-2026"
+    },
+    "0115-elective-courses-df87ca69de.md": {
+      "title": "YİÜ Web - Elective Courses",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/dersler-programlar-sinavlar-akademik-takvim/secmeli-dersler"
+    },
+    "0116-internship-guides-6132472b1f.md": {
+      "title": "YİÜ Web - Internship Guides",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/dersler-programlar-sinavlar-akademik-takvim/staj-rehberleri"
+    },
+    "0117-open-sources-of-information-e7c0665c0d.md": {
+      "title": "YİÜ Web - Open Sources of Information",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/fakulte-hakkinda/acik-bilgi-kaynaklari"
+    },
+    "0118-aims-and-goals-965bbbc936.md": {
+      "title": "YİÜ Web - Aims and Goals",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/fakulte-hakkinda/amac-ve-hedefler"
+    },
+    "0119-petitions-and-forms-4a981a7a85.md": {
+      "title": "YİÜ Web - Petitions and Forms",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/fakulte-hakkinda/dilekceler-ve-formlar"
+    },
+    "0120-boards-83eae4ee08.md": {
+      "title": "YİÜ Web - Boards",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/fakulte-hakkinda/kurullar"
+    },
+    "0121-mission-and-vision-d0b5c8769b.md": {
+      "title": "YİÜ Web - Mission and Vision",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/fakulte-hakkinda/misyonumuz-ve-vizyonumuz"
+    },
+    "0122-our-history-fc94764730.md": {
+      "title": "YİÜ Web - Our History",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/fakulte-hakkinda/tarihcemiz"
+    },
+    "0123-management-e026695f1a.md": {
+      "title": "YİÜ Web - Management",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/fakulte-hakkinda/yonetim"
+    },
+    "0124-forms-e309b60e49.md": {
+      "title": "YİÜ Web - Forms",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/kalite/dokumanlar-ve-raporlar/formlar"
+    },
+    "0125-gorev-yetki-ve-sorumluluklar-b2c224677a.md": {
+      "title": "YİÜ Web - Görev, Yetki ve Sorumluluklar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/kalite/dokumanlar-ve-raporlar/gorev-yetki-ve-sorumluluklar"
+    },
+    "0126-is-akis-semalari-9acbb06932.md": {
+      "title": "YİÜ Web - İş Akış Şemaları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/kalite/dokumanlar-ve-raporlar/is-akis-semalari"
+    },
+    "0127-kilavuzlar-e312ac0950.md": {
+      "title": "YİÜ Web - Kılavuzlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/kalite/dokumanlar-ve-raporlar/kilavuzlar"
+    },
+    "0128-organizasyon-semasi-d55a6f6315.md": {
+      "title": "YİÜ Web - Organizasyon Şeması",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/kalite/dokumanlar-ve-raporlar/organizasyon-semasi"
+    },
+    "0129-puko-dongusu-422a5d9e94.md": {
+      "title": "YİÜ Web - PUKÖ Döngüsü",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/kalite/dokumanlar-ve-raporlar/puko-dongusu"
+    },
+    "0130-usul-ve-esaslar-3e0d9b6445.md": {
+      "title": "YİÜ Web - Usul ve Esaslar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/kalite/dokumanlar-ve-raporlar/usul-ve-esaslar"
+    },
+    "0131-yonergeler-a3f313ce41.md": {
+      "title": "YİÜ Web - Yönergeler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/kalite/dokumanlar-ve-raporlar/yonergeler"
+    },
+    "0132-akran-degerlendirmeleri-7436f3dd93.md": {
+      "title": "YİÜ Web - Akran Değerlendirmeleri",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/kalite/ic-degerlendirme/akran-degerlendirmeleri"
+    },
+    "0133-birim-kalite-komisyonu-57ce7c8d47.md": {
+      "title": "YİÜ Web - Birim Kalite Komisyonu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/kalite/kurumsal-bilgiler/birim-kalite-komisyonu"
+    },
+    "0134-birim-kalite-ogrenci-temsilcileri-9462010029.md": {
+      "title": "YİÜ Web - Birim Kalite Öğrenci Temsilcileri",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/kalite/kurumsal-bilgiler/birim-kalite-ogrenci-temsilcileri"
+    },
+    "0135-faydali-baglantilar-da79ce8dbb.md": {
+      "title": "YİÜ Web - Faydalı Bağlantılar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/kalite/paydas-katilimi-ve-iletisim/faydali-baglantilar"
+    },
+    "0136-iletisim-714c820e86.md": {
+      "title": "YİÜ Web - İletişim",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/kalite/paydas-katilimi-ve-iletisim/iletisim"
+    },
+    "0137-keyps-geriye-donuk-veriler-ac360cf790.md": {
+      "title": "YİÜ Web - KEYPS (Geriye dönük veriler)",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/keyps-geriye-donuk-veriler"
+    },
+    "0138-yonergeler-b1be4b478d.md": {
+      "title": "YİÜ Web - Yönergeler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/mevzuatlar/yonergeler"
+    },
+    "0139-program-information-08c2f97ce1.md": {
+      "title": "YİÜ Web - Program Information",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/program-bilgileri"
+    },
+    "0140-ders-detaylari-8949b3bb61.md": {
+      "title": "YİÜ Web - Ders Detayları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/program-bilgileri/ders-detayi?BolumId=1"
+    },
+    "0141-ders-detaylari-9a31aca149.md": {
+      "title": "YİÜ Web - Ders Detayları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/program-bilgileri/ders-detayi?BolumId=10"
+    },
+    "0142-ders-detaylari-fda39cad88.md": {
+      "title": "YİÜ Web - Ders Detayları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/program-bilgileri/ders-detayi?BolumId=11"
+    },
+    "0143-ders-detaylari-8a85004b7a.md": {
+      "title": "YİÜ Web - Ders Detayları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/program-bilgileri/ders-detayi?BolumId=12"
+    },
+    "0144-ders-detaylari-f0100f5d71.md": {
+      "title": "YİÜ Web - Ders Detayları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/program-bilgileri/ders-detayi?BolumId=13"
+    },
+    "0145-ders-detaylari-0c3eae745f.md": {
+      "title": "YİÜ Web - Ders Detayları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/program-bilgileri/ders-detayi?BolumId=14"
+    },
+    "0146-ders-detaylari-a8f27d7fc4.md": {
+      "title": "YİÜ Web - Ders Detayları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/program-bilgileri/ders-detayi?BolumId=4"
+    },
+    "0147-ders-detaylari-e8e0b58cce.md": {
+      "title": "YİÜ Web - Ders Detayları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/program-bilgileri/ders-detayi?BolumId=5"
+    },
+    "0148-ders-detaylari-42c987660b.md": {
+      "title": "YİÜ Web - Ders Detayları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/program-bilgileri/ders-detayi?BolumId=6"
+    },
+    "0149-ders-detaylari-1474cd9a28.md": {
+      "title": "YİÜ Web - Ders Detayları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/program-bilgileri/ders-detayi?BolumId=7"
+    },
+    "0150-ders-detaylari-1b5570f053.md": {
+      "title": "YİÜ Web - Ders Detayları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/program-bilgileri/ders-detayi?BolumId=8"
+    },
+    "0151-ders-detaylari-1b1df5aacc.md": {
+      "title": "YİÜ Web - Ders Detayları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/program-bilgileri/ders-detayi?BolumId=9"
+    },
+    "0152-akademik-tesvik-duzenleme-denetleme-ve-itiraz-komisyonu-ebc6cf2320.md": {
+      "title": "YİÜ Web - Akademik Teşvik Düzenleme, Denetleme ve İtiraz Komisyonu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/kurullar-ve-komisyonlar/akademik-tesvik-duzenleme-denetleme-ve-itiraz-komisyonu"
+    },
+    "0153-akademik-yukseltilme-ve-atanma-kurulu-cb9f5519e4.md": {
+      "title": "YİÜ Web - Akademik Yükseltilme ve Atanma Kurulu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/kurullar-ve-komisyonlar/akademik-yukseltilme-ve-atanma-kurulu"
+    },
+    "0154-bagimlilikla-mucadele-94941012c6.md": {
+      "title": "YİÜ Web - Bağımlılıkla Mücadele",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/kurullar-ve-komisyonlar/bagimlilikla-mucadele"
+    },
+    "0155-burs-komisyonu-be38401235.md": {
+      "title": "YİÜ Web - Burs Komisyonu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/kurullar-ve-komisyonlar/burs-komisyonu"
+    },
+    "0156-universite-yayin-komisyonu-8c6a5275f1.md": {
+      "title": "YİÜ Web - Üniversite Yayın Komisyonu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/kurullar-ve-komisyonlar/universite-yayin-komisyonu"
+    },
+    "0157-yabanci-uyruklu-ogretim-elemani-inceleme-ve-degerlendirme-komisyonu-f019b71549.md": {
+      "title": "YİÜ Web - Yabancı Uyruklu Öğretim Elemanı İnceleme ve Değerlendirme Komisyonu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/kurullar-ve-komisyonlar/yabanci-uyruklu-ogretim-elemani-inceleme-ve-degerlendirme-komisyonu"
+    },
+    "0158-ataturk-ilkeleri-ve-inkilap-tarihi-e87a67c1f2.md": {
+      "title": "YİÜ Web - Atatürk İlkeleri ve İnkılap Tarihi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/ortak-dersler/ataturk-ilkeleri-ve-inkilap-tarihi"
+    },
+    "0159-ingilizce-965caca51f.md": {
+      "title": "YİÜ Web - İngilizce",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/ortak-dersler/ingilizce"
+    },
+    "0160-turk-dili-c71c16afec.md": {
+      "title": "YİÜ Web - Türk Dili",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/ortak-dersler/turk-dili"
+    },
+    "0161-meslek-yuksekokulu-c9f284a866.md": {
+      "title": "YİÜ Web - Meslek Yüksekokulu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu"
+    },
+    "0162-academic-calendar-ae4e67a7b1.md": {
+      "title": "YİÜ Web - Academic Calendar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/akademik-takvim"
+    },
+    "0163-computer-programming-program-d14257cd8e.md": {
+      "title": "YİÜ Web - COMPUTER PROGRAMMING PROGRAM",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/bolum/bilgisayar-programciligi-programi"
+    },
+    "0164-pharmaceutical-services-program-48b443d369.md": {
+      "title": "YİÜ Web - PHARMACEUTICAL SERVICES PROGRAM",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/bolum/eczane-hizmetleri-programi"
+    },
+    "0165-elektrik-programi-2f8d199cc3.md": {
+      "title": "YİÜ Web - ELEKTRİK PROGRAMI",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/bolum/elektrik-programi"
+    },
+    "0166-grafik-tasarimi-programi-189f208af2.md": {
+      "title": "YİÜ Web - GRAFİK TASARIMI PROGRAMI",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/bolum/grafik-tasarimi-programi"
+    },
+    "0167-consulting-hours-e297a216df.md": {
+      "title": "YİÜ Web - Consulting Hours",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/danismanlik-saatleri"
+    },
+    "0168-about-us-978dacc5a0.md": {
+      "title": "YİÜ Web - About Us",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/hakkimizda"
+    },
+    "0169-communication-and-transportation-aab2409f9f.md": {
+      "title": "YİÜ Web - Communication and Transportation",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/iletisim-ve-ulasim"
+    },
+    "0170-our-staff-bd2ed08468.md": {
+      "title": "YİÜ Web - Our Staff",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/kadromuz"
+    },
+    "0171-cizelgeler-215ddab038.md": {
+      "title": "YİÜ Web - Çizelgeler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/cizelgeler"
+    },
+    "0172-formlar-222ad72904.md": {
+      "title": "YİÜ Web - Formlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/formlar"
+    },
+    "0173-gorev-yetki-ve-sorumluluklar-5940e38a63.md": {
+      "title": "YİÜ Web - Görev, Yetki ve Sorumluluklar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/gorev-yetki-ve-sorumluluklar"
+    },
+    "0174-is-akis-semalari-968cad80da.md": {
+      "title": "YİÜ Web - İş Akış Şemaları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/is-akis-semalari"
+    },
+    "0175-kilavuzlar-ead90fee5f.md": {
+      "title": "YİÜ Web - Kılavuzlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/kilavuzlar"
+    },
+    "0176-oz-degerlendirme-raporlar-e441efd06f.md": {
+      "title": "YİÜ Web - Öz Değerlendirme Raporlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/oz-degerlendirme-raporlar"
+    },
+    "0177-puko-dongusu-e3d5a9fd76.md": {
+      "title": "YİÜ Web - PUKÖ Döngüsü",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/puko-dongusu"
+    },
+    "0178-yonergeler-21d5f9c328.md": {
+      "title": "YİÜ Web - Yönergeler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/yonergeler"
+    },
+    "0179-birim-kalite-ogrenci-temsilcileri-b6f5df74f2.md": {
+      "title": "YİÜ Web - Birim Kalite Öğrenci Temsilcileri",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/kalite/kurumsal-bilgiler/birim-kalite-ogrenci-temsilcileri"
+    },
+    "0180-misyon-vizyon-degerler-bdb9fb391c.md": {
+      "title": "YİÜ Web - Misyon - Vizyon - Değerler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/kalite/kurumsal-bilgiler/misyon-vizyon-degerler"
+    },
+    "0181-iletisim-9390a41e8b.md": {
+      "title": "YİÜ Web - İletişim",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/kalite/paydas-katilimi-ve-iletisim/iletisim"
+    },
+    "0182-graduate-unit-680b49f194.md": {
+      "title": "YİÜ Web - Graduate Unit",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/mezun-birimi"
+    },
+    "0183-internship-procedures-1449a3aeed.md": {
+      "title": "YİÜ Web - Internship Procedures",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/meslek-yuksekokulu/staj-islemleri"
+    },
+    "0184-saglik-hizmetleri-meslek-yuksekokulu-c047a9e36d.md": {
+      "title": "YİÜ Web - Sağlık Hizmetleri Meslek Yüksekokulu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu"
+    },
+    "0185-academic-staff-2734fc679e.md": {
+      "title": "YİÜ Web - Academic Staff",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/akademik-kadro"
+    },
+    "0186-academic-calendar-b8c6819731.md": {
+      "title": "YİÜ Web - Academic Calendar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/akademik-takvim"
+    },
+    "0187-biomedical-device-technology-13334019ac.md": {
+      "title": "YİÜ Web - BIOMEDICAL DEVICE TECHNOLOGY",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/bolum/elektronik-ve-otomasyon-bolumu-br-biyomedikal-cihaz-teknolojisi"
+    },
+    "0188-medical-data-processing-technicianship-60c01ec9e7.md": {
+      "title": "YİÜ Web - MEDICAL DATA PROCESSING TECHNICIANSHIP",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/bolum/istatistik-bolumu-br-tibbi-veri-isleme-teknikerligi"
+    },
+    "0189-physiotherapy-f50d9aa504.md": {
+      "title": "YİÜ Web - PHYSIOTHERAPY",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/bolum/terapi-ve-rehabilitasyon-bolumu-br-fizyoterapi"
+    },
+    "0190-operating-room-services-03132bd780.md": {
+      "title": "YİÜ Web - OPERATING ROOM SERVICES",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/bolum/tibbi-hizmetler-ve-teknikler-bolumu-br-ameliyathane-hizmetleri"
+    },
+    "0191-anesthesia-a2ab465ba8.md": {
+      "title": "YİÜ Web - ANESTHESIA",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/bolum/tibbi-hizmetler-ve-teknikler-bolumu-br-anestezi"
+    },
+    "0192-electroneurophysiology-a30cb61d42.md": {
+      "title": "YİÜ Web - ELECTRONEUROPHYSIOLOGY",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/bolum/tibbi-hizmetler-ve-teknikler-bolumu-br-elektronorofizyoloji"
+    },
+    "0193-emergency-and-first-aid-92eb13a012.md": {
+      "title": "YİÜ Web - EMERGENCY AND FIRST AID",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/bolum/tibbi-hizmetler-ve-teknikler-bolumu-br-ilk-ve-acil-yardim"
+    },
+    "0194-opticianry-69d2ac81ac.md": {
+      "title": "YİÜ Web - OPTICIANRY",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/bolum/tibbi-hizmetler-ve-teknikler-bolumu-br-optisyenlik"
+    },
+    "0195-medical-documentation-and-secretariat-419a90f374.md": {
+      "title": "YİÜ Web - MEDICAL DOCUMENTATION AND SECRETARIAT",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/bolum/tibbi-hizmetler-ve-teknikler-bolumu-br-tibbi-dokumantasyon-ve-sekreterlik"
+    },
+    "0196-medical-laboratory-techniques-8c219a08d4.md": {
+      "title": "YİÜ Web - MEDICAL LABORATORY TECHNIQUES",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/bolum/tibbi-hizmetler-ve-teknikler-bolumu-br-tibbi-laboratuvar-teknikleri"
+    },
+    "0197-medical-promotion-and-marketing-945b1df833.md": {
+      "title": "YİÜ Web - MEDICAL PROMOTION AND MARKETING",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/bolum/tibbi-hizmetler-ve-teknikler-bolumu-br-tibbi-tanitim-ve-pazarlama"
+    },
+    "0198-telehealth-technicianship-0387a9f313.md": {
+      "title": "YİÜ Web - TELEHEALTH TECHNICIANSHIP",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/bolum/veri-tabani-ag-tasarimi-ve-yonetimi-bolumu-br-tele-saglik-teknikerligi"
+    },
+    "0199-double-major-programs-06166550d2.md": {
+      "title": "YİÜ Web - Double Major Programs",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/cift-anadal-programlari"
+    },
+    "0200-open-sources-of-information-6fa618ef19.md": {
+      "title": "YİÜ Web - Open Sources of Information",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/egitim-ogretim-koordinasyon-birimi/acik-bilgi-kaynaklari"
+    },
+    "0201-disabled-student-unit-d59edd2d04.md": {
+      "title": "YİÜ Web - Disabled Student Unit",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/egitim-ogretim-koordinasyon-birimi/engelli-ogrenci-birimi"
+    },
+    "0202-career-planning-unit-e713183239.md": {
+      "title": "YİÜ Web - Career Planning Unit",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/egitim-ogretim-koordinasyon-birimi/kariyer-planlama-birimi"
+    },
+    "0203-graduate-unit-ce79ae83d8.md": {
+      "title": "YİÜ Web - Graduate Unit",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/egitim-ogretim-koordinasyon-birimi/mezun-birimi"
+    },
+    "0204-student-societies-abe6744c63.md": {
+      "title": "YİÜ Web - Student Societies",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/egitim-ogretim-koordinasyon-birimi/ogrenci-topluluklari"
+    },
+    "0205-instructor-office-and-consulting-hours-8517da784c.md": {
+      "title": "YİÜ Web - Instructor Office and Consulting Hours",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/egitim-ogretim-koordinasyon-birimi/ogretim-elemani-ofis-ve-danismanlik-saatleri"
+    },
+    "0206-galleries-927847d92c.md": {
+      "title": "YİÜ Web - Galleries",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/galeriler"
+    },
+    "0207-administrative-staff-4c7d570331.md": {
+      "title": "YİÜ Web - Administrative Staff",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/hakkimizda/idari-personel"
+    },
+    "0208-legislation-6ff3c81abf.md": {
+      "title": "YİÜ Web - Legislation",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/hakkimizda/mevzuat"
+    },
+    "0209-student-quality-ambassadors-c00534d6c6.md": {
+      "title": "YİÜ Web - Student Quality Ambassadors",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/hakkimizda/ogrenci-kalite-elcileri"
+    },
+    "0210-our-history-33501e3ff0.md": {
+      "title": "YİÜ Web - Our History",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/hakkimizda/tarihcemiz"
+    },
+    "0211-management-fc94330df6.md": {
+      "title": "YİÜ Web - Management",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/hakkimizda/yonetim"
+    },
+    "0212-cizelgeler-452f0787ae.md": {
+      "title": "YİÜ Web - Çizelgeler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/cizelgeler"
+    },
+    "0213-formlar-183e05930e.md": {
+      "title": "YİÜ Web - Formlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/formlar"
+    },
+    "0214-gorev-yetki-ve-sorumluluklar-a36652b68d.md": {
+      "title": "YİÜ Web - Görev, Yetki ve Sorumluluklar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/gorev-yetki-ve-sorumluluklar"
+    },
+    "0215-is-akis-semalari-133126b71b.md": {
+      "title": "YİÜ Web - İş Akış Şemaları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/is-akis-semalari"
+    },
+    "0216-kilavuzlar-fb5d806938.md": {
+      "title": "YİÜ Web - Kılavuzlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/kilavuzlar"
+    },
+    "0217-organizasyon-semasi-331bd8bdb0.md": {
+      "title": "YİÜ Web - Organizasyon Şeması",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/organizasyon-semasi"
+    },
+    "0218-oz-degerlendirme-raporlar-835aa49961.md": {
+      "title": "YİÜ Web - Öz Değerlendirme Raporlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/oz-degerlendirme-raporlar"
+    },
+    "0219-puko-dongusu-22b842b78c.md": {
+      "title": "YİÜ Web - PUKÖ Döngüsü",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/puko-dongusu"
+    },
+    "0220-talimatlar-63797ca9e5.md": {
+      "title": "YİÜ Web - Talimatlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/talimatlar"
+    },
+    "0221-yonergeler-2835b3836f.md": {
+      "title": "YİÜ Web - Yönergeler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/dokumanlar-ve-raporlar/yonergeler"
+    },
+    "0222-faaliyetler-ve-duyurular-6284f583b1.md": {
+      "title": "YİÜ Web - Faaliyetler ve Duyurular",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/faaliyetler-ve-duyurular"
+    },
+    "0223-akran-degerlendirmeleri-f127608413.md": {
+      "title": "YİÜ Web - Akran Değerlendirmeleri",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/ic-degerlendirme/akran-degerlendirmeleri"
+    },
+    "0224-anket-raporlari-ve-eylem-planlari-b5332b7d88.md": {
+      "title": "YİÜ Web - Anket Raporları ve Eylem Planları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/ic-degerlendirme/anket-raporlari-ve-eylem-planlari"
+    },
+    "0225-birim-kalite-komisyon-toplanti-kararlari-30b3833df3.md": {
+      "title": "YİÜ Web - Birim Kalite Komisyon Toplantı Kararları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/kurumsal-bilgiler/birim-kalite-komisyon-toplanti-kararlari"
+    },
+    "0226-birim-kalite-komisyonu-4c1b891083.md": {
+      "title": "YİÜ Web - Birim Kalite Komisyonu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/kurumsal-bilgiler/birim-kalite-komisyonu"
+    },
+    "0227-birim-kalite-ogrenci-temsilcileri-f0565ea9f1.md": {
+      "title": "YİÜ Web - Birim Kalite Öğrenci Temsilcileri",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/kurumsal-bilgiler/birim-kalite-ogrenci-temsilcileri"
+    },
+    "0228-kalite-politikamiz-ac58d5bddf.md": {
+      "title": "YİÜ Web - Kalite Politikamız",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/kurumsal-bilgiler/kalite-politikamiz"
+    },
+    "0229-misyon-vizyon-degerler-ff95987b0c.md": {
+      "title": "YİÜ Web - Misyon - Vizyon - Değerler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/kurumsal-bilgiler/misyon-vizyon-degerler"
+    },
+    "0230-danisma-kurulu-f8204b2b99.md": {
+      "title": "YİÜ Web - Danışma Kurulu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/paydas-katilimi-ve-iletisim/danisma-kurulu"
+    },
+    "0231-faydali-baglantilar-0f0455a81a.md": {
+      "title": "YİÜ Web - Faydalı Bağlantılar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kalite/paydas-katilimi-ve-iletisim/faydali-baglantilar"
+    },
+    "0232-cbiko-distance-education-gate-user-manual-0f0093a98e.md": {
+      "title": "YİÜ Web - CBIKO Distance Education Gate User Manual",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kilavuzlar-ve-rehberler/cbiko-uzaktan-egitim-kapisi-kullanim-kilavuzu"
+    },
+    "0233-cbiko-talent-gate-registration-guide-6eb36c0419.md": {
+      "title": "YİÜ Web - CBIKO Talent Gate Registration Guide",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kilavuzlar-ve-rehberler/cbiko-yetenek-kapisi-kayit-kilavuzu"
+    },
+    "0234-iskur-internship-application-guide-1eea376767.md": {
+      "title": "YİÜ Web - İŞKUR Internship Application Guide",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kilavuzlar-ve-rehberler/iskur-staj-basvuru-kilavuzu"
+    },
+    "0235-medu-distance-education-management-system-8110aad67c.md": {
+      "title": "YİÜ Web - MEDU Distance Education Management System",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kilavuzlar-ve-rehberler/medu-uzaktan-egitim-yonetim-sistemi"
+    },
+    "0236-obs-entry-guide-24cece7999.md": {
+      "title": "YİÜ Web - OBS Entry Guide",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kilavuzlar-ve-rehberler/obs-giris-rehberi"
+    },
+    "0237-distance-education-system-online-course-introduction-guide-920edca031.md": {
+      "title": "YİÜ Web - Distance Education System Online Course Introduction Guide",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kilavuzlar-ve-rehberler/uzaktan-egitim-sistemi-cevrimici-ders-giris-rehberi"
+    },
+    "0238-distance-education-system-user-manual-6ae4dfb5c5.md": {
+      "title": "YİÜ Web - Distance Education System User Manual",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kilavuzlar-ve-rehberler/uzaktan-egitim-sistemi-kullanim-kilavuzu"
+    },
+    "0239-distance-education-system-zoom-user-manual-5ee2fd0459.md": {
+      "title": "YİÜ Web - Distance Education System Zoom User Manual",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kilavuzlar-ve-rehberler/uzaktan-egitim-sistemi-zoom-kullanim-kilavuzu"
+    },
+    "0240-boards-and-commissions-257b655dcd.md": {
+      "title": "YİÜ Web - Boards and Commissions",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/kurullar-ve-komisyonlar"
+    },
+    "0241-introductory-presentation-3308ebfcd7.md": {
+      "title": "YİÜ Web - Introductory Presentation",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/tanitim-sunumu"
+    },
+    "0242-yabanci-diller-yuksekokulu-e09dc31ae9.md": {
+      "title": "YİÜ Web - Yabancı Diller Yüksekokulu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu"
+    },
+    "0243-academic-staff-335e9d5eb5.md": {
+      "title": "YİÜ Web - Academic Staff",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/akademik-kadro"
+    },
+    "0244-academic-calendar-97c26d9303.md": {
+      "title": "YİÜ Web - Academic Calendar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/akademik-takvim"
+    },
+    "0245-units-fff32f398a.md": {
+      "title": "YİÜ Web - Units",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/birimler"
+    },
+    "0246-unit-structure-and-content-fc6c798570.md": {
+      "title": "YİÜ Web - Unit Structure and Content",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/birimlerin-yapisi-ve-icerigi"
+    },
+    "0247-about-us-7126df0067.md": {
+      "title": "YİÜ Web - About us",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/hakkimizda"
+    },
+    "0248-administrative-staff-1dc8b12466.md": {
+      "title": "YİÜ Web - Administrative Staff",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/idari-kadro"
+    },
+    "0249-bidr-da908b515e.md": {
+      "title": "YİÜ Web - BİDR",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/kalite/dokumanlar-ve-raporlar/bidr"
+    },
+    "0250-formlar-7f23114c88.md": {
+      "title": "YİÜ Web - Formlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/kalite/dokumanlar-ve-raporlar/formlar"
+    },
+    "0251-gorev-yetki-ve-sorumluluklar-dbc334e164.md": {
+      "title": "YİÜ Web - Görev, Yetki ve Sorumluluklar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/kalite/dokumanlar-ve-raporlar/gorev-yetki-ve-sorumluluklar"
+    },
+    "0252-is-akis-semalari-f0c5df7952.md": {
+      "title": "YİÜ Web - İş Akış Şemaları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/kalite/dokumanlar-ve-raporlar/is-akis-semalari"
+    },
+    "0253-puko-dongusu-3accd7d143.md": {
+      "title": "YİÜ Web - PUKÖ Döngüsü",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/kalite/dokumanlar-ve-raporlar/puko-dongusu"
+    },
+    "0254-birim-kalite-komisyonu-1498c16efc.md": {
+      "title": "YİÜ Web - Birim Kalite Komisyonu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/kalite/kurumsal-bilgiler/birim-kalite-komisyonu"
+    },
+    "0255-birim-kalite-ogrenci-temsilcileri-21a8687d5e.md": {
+      "title": "YİÜ Web - Birim Kalite Öğrenci Temsilcileri",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/kalite/kurumsal-bilgiler/birim-kalite-ogrenci-temsilcileri"
+    },
+    "0256-misyon-vizyon-degerler-7641ab51bf.md": {
+      "title": "YİÜ Web - Misyon - Vizyon - Değerler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/kalite/kurumsal-bilgiler/misyon-vizyon-degerler"
+    },
+    "0257-boards-and-commissions-283d529566.md": {
+      "title": "YİÜ Web - Boards and Commissions",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/kurullar-ve-komisyonlar"
+    },
+    "0258-legislation-and-guidelines-655e17c9f2.md": {
+      "title": "YİÜ Web - Legislation and Guidelines",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/mevzuat-ve-yonergeler"
+    },
+    "0259-exemption-conditions-8a4a74c788.md": {
+      "title": "YİÜ Web - Exemption Conditions",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/muafiyet-sartlari"
+    },
+    "0260-proficiency-exams-5e3729fba8.md": {
+      "title": "YİÜ Web - Proficiency Exams",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/yabanci-diller-yuksekokulu/muafiyet-sinavlari"
+    },
+    "0261-is-sagligi-guvencesi-f71fd6c4e3.md": {
+      "title": "YİÜ Web - İş Sağlığı Güvencesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/e-hizmetler/diger/is-sagligi-guvencesi"
+    },
+    "0262-yeni-kablosuz-ag-yapilanmasi-hakkinda-403bd250ef.md": {
+      "title": "YİÜ Web - Yeni Kablosuz Ağ Yapılanması hakkında.",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/e-hizmetler/diger/yeni-kablosuz-ag-yapilanmasi-hakkinda"
+    },
+    "0263-daire-baskanliklari-f89f087c99.md": {
+      "title": "YİÜ Web - Daire Başkanlıkları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/daire-baskanliklari"
+    },
+    "0264-press-promotion-and-public-relations-department-3b62193e61.md": {
+      "title": "YİÜ Web - Press, Promotion and Public Relations Department",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/daire-baskanliklari/basin-tanitim-ve-halkla-iliskiler-daire-baskanligi"
+    },
+    "0265-it-department-5e16c433cb.md": {
+      "title": "YİÜ Web - IT Department",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/daire-baskanliklari/bilgi-islem-daire-baskanligi"
+    },
+    "0266-department-of-administrative-and-financial-affairs-60620752dc.md": {
+      "title": "YİÜ Web - Department of Administrative and Financial Affairs",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/daire-baskanliklari/idari-ve-mali-isler-daire-baskanligi"
+    },
+    "0267-library-and-documentation-department-b810e09ae8.md": {
+      "title": "YİÜ Web - Library and Documentation Department",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/daire-baskanliklari/kutuphane-ve-dokumantasyon-daire-baskanligi"
+    },
+    "0268-student-affairs-department-a55d1c24d7.md": {
+      "title": "YİÜ Web - Student Affairs Department",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/daire-baskanliklari/ogrenci-isleri-daire-baskanligi"
+    },
+    "0269-personnel-department-674eb28187.md": {
+      "title": "YİÜ Web - Personnel Department",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/daire-baskanliklari/personel-daire-baskanligi"
+    },
+    "0270-saglik-kultur-ve-spor-daire-baskanligi-496bbcea58.md": {
+      "title": "YİÜ Web - Sağlık, Kültür ve Spor Daire Başkanlığı",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/daire-baskanliklari/saglik-kultur-ve-spor-daire-baskanligi"
+    },
+    "0271-strategy-development-department-5e2d6fccf9.md": {
+      "title": "YİÜ Web - Strategy Development Department",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/daire-baskanliklari/strateji-gelistirme-daire-baskanligi"
+    },
+    "0272-construction-and-technical-department-0a5c152fe8.md": {
+      "title": "YİÜ Web - Construction and Technical Department",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/daire-baskanliklari/yapi-isleri-ve-teknik-daire-baskanligi"
+    },
+    "0273-genel-sekreterlik-a48f830aba.md": {
+      "title": "YİÜ Web - Genel Sekreterlik",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/genel-sekreterlik"
+    },
+    "0274-koordinatorlukler-2b6bfc076d.md": {
+      "title": "YİÜ Web - Koordinatörlükler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/koordinatorlukler"
+    },
+    "0275-office-of-science-communication-cbfada016b.md": {
+      "title": "YİÜ Web - Office of Science Communication",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/koordinatorlukler/bilim-iletisim-ofisi"
+    },
+    "0276-engelli-ogrenci-birimi-7ac6c8dc49.md": {
+      "title": "YİÜ Web - Engelli Öğrenci Birimi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/koordinatorlukler/engelli-ogrenci-birimi"
+    },
+    "0277-erasmus-koordinatorlugu-d0e407a000.md": {
+      "title": "YİÜ Web - Erasmus Koordinatörlüğü",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/koordinatorlukler/erasmus-koordinatorlugu"
+    },
+    "0278-is-sagligi-ve-guvenligi-koordinatorlugu-3bf88bd7c8.md": {
+      "title": "YİÜ Web - İş Sağlığı ve Güvenliği Koordinatörlüğü",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/koordinatorlukler/is-sagligi-ve-guvenligi-koordinatorlugu"
+    },
+    "0279-quality-assurance-systems-ffe5f95409.md": {
+      "title": "YİÜ Web - Quality Assurance Systems",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/koordinatorlukler/kalite-guvence-sistemleri"
+    },
+    "0280-ogrenci-topluluklari-0192b9fd4e.md": {
+      "title": "YİÜ Web - Öğrenci Toplulukları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/koordinatorlukler/ogrenci-topluluklari"
+    },
+    "0281-social-contribution-coordination-6697bbd8a5.md": {
+      "title": "YİÜ Web - Social Contribution Coordination",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/koordinatorlukler/toplumsal-katki-koordinatorlugu"
+    },
+    "0282-international-relations-and-exchange-programs-coordination-office-52ed03f82c.md": {
+      "title": "YİÜ Web - International Relations and Exchange Programs Coordination Office",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/koordinatorlukler/uluslararasi-iliskiler-ve-degisim-programlari-koordinatorlugu"
+    },
+    "0283-uluslararasi-ogrenci-koordinatorlugu-67353bdcbd.md": {
+      "title": "YİÜ Web - Uluslararası Öğrenci Koordinatörlüğü",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/koordinatorlukler/uluslararasi-ogrenci-koordinatorlugu"
+    },
+    "0284-yiu-101-introduction-to-university-life-course-coordinator-e178d54218.md": {
+      "title": "YİÜ Web - YIU 101 Introduction to University Life Course Coordinator",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/koordinatorlukler/yiu-101-universite-hayatina-giris-dersi-koordinatorlugu"
+    },
+    "0285-editorial-office-60f1291272.md": {
+      "title": "YİÜ Web - Editorial Office",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/mudurlukler/yazi-isleri-mudurlugu"
+    },
+    "0286-legal-consultancy-department-0617051953.md": {
+      "title": "YİÜ Web - Legal Consultancy Department",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/musavirlikler/hukuk-musavirligi"
+    },
+    "0287-danisma-kurulu-e7d1e1a6ca.md": {
+      "title": "YİÜ Web - Danışma Kurulu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/kurumsal-bilgiler/danisma-kurulu"
+    },
+    "0288-degisim-yonetim-modeli-7199d4e0fb.md": {
+      "title": "YİÜ Web - Değişim Yönetim Modeli",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/kurumsal-bilgiler/degisim-yonetim-modeli"
+    },
+    "0289-kurumsal-kimlik-1ff8d203ac.md": {
+      "title": "YİÜ Web - Kurumsal Kimlik",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/kurumsal-bilgiler/kurumsal-kimlik"
+    },
+    "0290-mevzuat-9c43157f4b.md": {
+      "title": "YİÜ Web - Mevzuat",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/kurumsal-bilgiler/mevzuat"
+    },
+    "0291-misyon-ve-vizyon-ffe6cad189.md": {
+      "title": "YİÜ Web - Misyon ve Vizyon",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/kurumsal-bilgiler/misyon-ve-vizyon"
+    },
+    "0292-politikalarimiz-9e218bc52e.md": {
+      "title": "YİÜ Web - Politikalarımız",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/kurumsal-bilgiler/politikalarimiz"
+    },
+    "0293-tarihce-33941de2ab.md": {
+      "title": "YİÜ Web - Tarihçe",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/kurumsal-bilgiler/tarihce"
+    },
+    "0294-dekanlar-047570ba6e.md": {
+      "title": "YİÜ Web - Dekanlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/yonetim/dekanlar"
+    },
+    "0295-enstitu-muduru-258fa5e8e1.md": {
+      "title": "YİÜ Web - Enstitü Müdürü",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/yonetim/enstitu-muduru"
+    },
+    "0296-kurucu-vakif-c95636508c.md": {
+      "title": "YİÜ Web - Kurucu Vakıf",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/yonetim/kurucu-vakif"
+    },
+    "0297-mutevelli-heyet-1d38bb952a.md": {
+      "title": "YİÜ Web - Mütevelli Heyet",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/yonetim/mutevelli-heyet"
+    },
+    "0298-rektor-6e33ed099f.md": {
+      "title": "YİÜ Web - Rektör",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/yonetim/rektor"
+    },
+    "0299-rektor-danismanlari-fc4d98102b.md": {
+      "title": "YİÜ Web - Rektör Danışmanları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/yonetim/rektor-danismanlari"
+    },
+    "0300-rektor-yardimcilari-169de2306e.md": {
+      "title": "YİÜ Web - Rektör Yardımcıları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/yonetim/rektor-yardimcilari"
+    },
+    "0301-senato-4ee55fcd60.md": {
+      "title": "YİÜ Web - Senato",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/yonetim/senato"
+    },
+    "0302-yonetim-kurulu-35701d23d9.md": {
+      "title": "YİÜ Web - Yönetim Kurulu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/yonetim/yonetim-kurulu"
+    },
+    "0303-yuksekokul-mudurleri-5972fbc730.md": {
+      "title": "YİÜ Web - Yüksekokul Müdürleri",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/yonetim/yuksekokul-mudurleri"
+    },
+    "0304-2021-2022-egitim-ogretim-yili-akademik-takvimi-4cfe840550.md": {
+      "title": "YİÜ Web - 2021-2022 Eğitim Öğretim Yılı Akademik Takvimi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/akademik-takvim/2021-2022-egitim-ogretim-yili-akademik-takvimi"
+    },
+    "0305-2022-2023-egitim-ogretim-yili-akademik-takvimi-74617394d5.md": {
+      "title": "YİÜ Web - 2022-2023 Eğitim Öğretim Yılı Akademik Takvimi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/akademik-takvim/2022-2023-egitim-ogretim-yili-akademik-takvimi"
+    },
+    "0306-2023-2024-egitim-ogretim-yili-akademik-takvimi-bca224c9f6.md": {
+      "title": "YİÜ Web - 2023-2024 Eğitim Öğretim Yılı Akademik Takvimi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/akademik-takvim/2023-2024-egitim-ogretim-yili-akademik-takvimi"
+    },
+    "0307-2024-2025-egitim-ogretim-yili-akademik-takvimi-2ec542ef76.md": {
+      "title": "YİÜ Web - 2024-2025 Eğitim Öğretim Yılı Akademik Takvimi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/akademik-takvim/2024-2025-egitim-ogretim-yili-akademik-takvimi"
+    },
+    "0308-2025-2026-egitim-ogretim-yili-akademik-takvimi-39039ff02c.md": {
+      "title": "YİÜ Web - 2025-2026 Eğitim Öğretim Yılı Akademik Takvimi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/akademik-takvim/2025-2026-egitim-ogretim-yili-akademik-takvimi"
+    },
+    "0309-erasmus-deneyimleri-2631ac741b.md": {
+      "title": "YİÜ Web - Erasmus+ Deneyimleri",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/erasmus/erasmus-deneyimleri"
+    },
+    "0310-erasmus-organizasyon-semasi-e0b3ca3269.md": {
+      "title": "YİÜ Web - Erasmus Organizasyon Şeması",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/erasmus/erasmus-organizasyon-semasi"
+    },
+    "0311-erasmus-programi-b1721d541e.md": {
+      "title": "YİÜ Web - Erasmus + Programı",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/erasmus/erasmus-programi"
+    },
+    "0312-formlar-ve-dilekceler-d3d26223ff.md": {
+      "title": "YİÜ Web - Formlar ve Dilekçeler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/erasmus/formlar-ve-dilekceler"
+    },
+    "0313-iletisim-4d95cce2cd.md": {
+      "title": "YİÜ Web - İletişim",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/erasmus/iletisim"
+    },
+    "0314-mevzuatlar-56050b6d07.md": {
+      "title": "YİÜ Web - Mevzuatlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/erasmus/mevzuatlar"
+    },
+    "0315-ogrenci-hareketliligi-9a1edca755.md": {
+      "title": "YİÜ Web - Öğrenci Hareketliliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/erasmus/ogrenci-hareketliligi"
+    },
+    "0316-online-basvuru-8422d6a2b9.md": {
+      "title": "YİÜ Web - Online Başvuru",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/erasmus/online-basvuru"
+    },
+    "0317-personel-hareketliligi-06782ac7de.md": {
+      "title": "YİÜ Web - Personel Hareketliliği",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/erasmus/personel-hareketliligi"
+    },
+    "0318-af-kanunu-basvuru-8abad5b847.md": {
+      "title": "YİÜ Web - Af Kanunu Başvuru",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/genel/af-kanunu-basvuru"
+    },
+    "0319-bilgi-paketi-20315b41b2.md": {
+      "title": "YİÜ Web - Bilgi Paketi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/genel/bilgi-paketi"
+    },
+    "0320-vocational-school-534695bca8.md": {
+      "title": "YİÜ Web - Vocational School",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/genel/bilgi-paketi/meslek-yuksekokulu"
+    },
+    "0321-faculty-of-health-sciences-b53f374481.md": {
+      "title": "YİÜ Web - Faculty of Health Sciences",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/genel/bilgi-paketi/saglik-bilimleri-fakultesi"
+    },
+    "0322-vocational-school-of-health-services-7124d5b248.md": {
+      "title": "YİÜ Web - Vocational School of Health Services",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/genel/bilgi-paketi/saglik-hizmetleri-meslek-yuksekokulu"
+    },
+    "0323-spor-bilimleri-fakultesi-965cf1b6de.md": {
+      "title": "YİÜ Web - Spor Bilimleri Fakültesi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/genel/bilgi-paketi/spor-bilimleri-fakultesi"
+    },
+    "0324-faculty-of-medicine-34c2db0fd7.md": {
+      "title": "YİÜ Web - Faculty of Medicine",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/genel/bilgi-paketi/tip-fakultesi"
+    },
+    "0325-burs-ve-indirim-imkanlari-e0c3352697.md": {
+      "title": "YİÜ Web - Burs ve İndirim İmkanları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/genel/burs-ve-indirim-imkanlari"
+    },
+    "0326-dikey-gecis-dc62a5b3cc.md": {
+      "title": "YİÜ Web - Dikey Geçiş",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/genel/dikey-gecis"
+    },
+    "0327-formlar-e19d9fc395.md": {
+      "title": "YİÜ Web - Formlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/genel/formlar"
+    },
+    "0328-kayit-islemleri-ve-ucretler-c1194e5502.md": {
+      "title": "YİÜ Web - Kayıt İşlemleri ve Ücretler",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/genel/kayit-islemleri-ve-ucretler"
+    },
+    "0329-ogrenci-bilgi-formu-46f564c56a.md": {
+      "title": "YİÜ Web - Öğrenci Bilgi Formu",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/genel/ogrenci-bilgi-formu"
+    },
+    "0330-ogrenci-kabul-kosullari-f339ee96c9.md": {
+      "title": "YİÜ Web - Öğrenci Kabul Koşulları",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/genel/ogrenci-kabul-kosullari"
+    },
+    "0331-ogrenci-konsey-secimi-054fd4df63.md": {
+      "title": "YİÜ Web - Öğrenci Konsey Seçimi",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/genel/ogrenci-konsey-secimi"
+    },
+    "0332-yatay-gecis-172b96639d.md": {
+      "title": "YİÜ Web - Yatay Geçiş",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/genel/yatay-gecis"
+    },
+    "0333-degisim-programlari-koordinatorlugu-1d121f09e8.md": {
+      "title": "YİÜ Web - Değişim Programları Koordinatörlüğü",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/uluslararasi/degisim-programlari-koordinatorlugu"
+    },
+    "0334-uluslararasi-iliskiler-ve-degisim-programlari-koordinatorlugu-a7281bd5b1.md": {
+      "title": "YİÜ Web - Uluslararası İlişkiler ve Değişim Programları Koordinatörlüğü",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/uluslararasi/uluslararasi-iliskiler-ve-degisim-programlari-koordinatorlugu"
+    },
+    "0335-yurtlar-6757216b35.md": {
+      "title": "YİÜ Web - Yurtlar",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sayfa/yurtlar/yurtlar/yurtlar"
+    },
+    "0336-sikca-sorulan-sorular-9905cf9aa6.md": {
+      "title": "YİÜ Web - Sıkça Sorulan Sorular",
+      "url": "https://yuksekihtisasuniversitesi.edu.tr/sikca-sorulan-sorular"
     },
     "001-mevzuat-komisyonu-is-akis-semasi.pdf": {
       "title": "Mevzuat Komisyonu İş Akış Şeması",
@@ -326,42 +1628,6 @@
       "title": "Tıp Fakültesi Çevrimiçi Sınav Yönergesi",
       "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/915912161ee4557687388a5c92e7ff70.pdf"
     },
-    "071-tip-fakultesi-donem-vi-intorn-hekimlik-egitimi-yonergesi.pdf": {
-      "title": "Tıp Fakültesi Dönem VI İntörn Hekimlik Eğitimi Yönergesi",
-      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/deabad129ce52da610b163277668b04e.pdf"
-    },
-    "072-tip-fakultesi-egitim-ogretim-ve-sinav-uygulamalari-yonergesi.pdf": {
-      "title": "Tıp Fakültesi Eğitim Öğretim Ve Sınav Uygulamaları Yönergesi",
-      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/fdad57054cd0c8ff8a7909c1d3cc533f.pdf"
-    },
-    "073-tip-fakultesi-egitim-ogretim-ve-sinav-yonergesi.pdf": {
-      "title": "Tıp Fakültesi Eğitim- Öğretim Ve Sınav Yönergesi",
-      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/cff0702b4f846d9c0b52b39eb77def36.pdf"
-    },
-    "074-tip-fakultesi-elestirel-dusunce-ve-sanat-kurulu.pdf": {
-      "title": "Tıp Fakültesi Eleştirel Düşünce Ve Sanat Kurulu",
-      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/4d66c0e9e78d7f1ab5b15439838d68ef.pdf"
-    },
-    "075-tip-fakultesi-iletisim-becerileri-egitimi-kurulu-yonergesi.pdf": {
-      "title": "Tıp Fakültesi İletişim Becerileri Eğitimi Kurulu Yönergesi",
-      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/9bf39c94d623a1f0a1a1e6a7996be3e1.pdf"
-    },
-    "076-tip-fakultesi-kanita-dayali-tip-kurulu-yonergesi.pdf": {
-      "title": "Tıp Fakültesi Kanıta Dayalı Tıp Kurulu Yönergesi",
-      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/bda1e5e2007d33d3be953a103d8e19e8.pdf"
-    },
-    "077-tip-fakultesi-klinik-beceri-egitimi-yonergesi.pdf": {
-      "title": "Tıp Fakültesi Klinik Beceri Eğitimi Yönergesi",
-      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/60012139826c06ed834be9e277a731e1.pdf"
-    },
-    "078-tip-fakultesi-koordinatorler-kurulu-yonergesi.pdf": {
-      "title": "Tıp Fakültesi Koordinatörler Kurulu Yönergesi",
-      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/33438b351fc383b3680a67599c0aa5c9.pdf"
-    },
-    "079-tip-fakultesi-olcme-ve-degerlendirme-kurulu-yonergesi.pdf": {
-      "title": "Tıp Fakültesi Ölçme Ve Değerlendirme Kurulu Yönergesi",
-      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/fcaaf4bf5e6bfe47506fcce19515055a.pdf"
-    },
     "080-tip-fakultesi-olcme-ve-degerlendirme-yonergesi.pdf": {
       "title": "Tıp Fakültesi Ölçme Ve Değerlendirme Yönergesi",
       "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/c9448b6bdb9342c4546f4f9135baa0c2.pdf"
@@ -369,22 +1635,6 @@
     "081-tip-fakultesi-olcme-degerlendirme-yonergesi.pdf": {
       "title": "Tıp Fakültesi Ölçme-Değerlendirme Yönergesi",
       "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/26a2c177d42f3ecffdbdb71f0cfeedcc.pdf"
-    },
-    "082-tip-fakultesi-program-gelistirme-ve-degerlendirme-kurulu-yonergesi.pdf": {
-      "title": "Tıp Fakültesi Program Geliştirme Ve Değerlendirme Kurulu Yönergesi",
-      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/e1ef915ff355df54ff1274ca51363cf8.pdf"
-    },
-    "083-tip-fakultesi-secmeli-ders-kurulu-yonergesi.pdf": {
-      "title": "Tıp Fakültesi Seçmeli Ders Kurulu Yönergesi",
-      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/5f3c54bec49b1612efbc33823c17849d.pdf"
-    },
-    "084-tip-fakultesi-tipta-uzmanlik-egitimi-yonergesi.pdf": {
-      "title": "Tıp Fakültesi Tıpta Uzmanlık Eğitimi Yönergesi",
-      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/22acdbc3a3eb5906a1d5324cc930bb16.pdf"
-    },
-    "085-tip-fakultesi-ulusal-cekirdek-egitimi-programi-kurulu-yonergesi.pdf": {
-      "title": "Tıp Fakültesi Ulusal Çekirdek Eğitimi Programı Kurulu Yönergesi",
-      "url": "https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/2e72712d4d2ebe454f3f68630ebd3641.pdf"
     },
     "086-dil-ve-konusma-terapisi-bolumu-uygulamali-egitimler-yonergesi.pdf": {
       "title": "Dil Ve Konuşma Terapisi Bölümü Uygulamalı Eğitimler Yönergesi",

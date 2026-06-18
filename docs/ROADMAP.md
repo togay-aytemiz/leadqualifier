@@ -1,5 +1,13 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Implementation Update (2026-06-18):** The YİÜ admissions corpus was rebuilt from source-level website pages, approved regulations, and a tracked verified 2025 brochure extraction, then atomically switched from the legacy 135-file OpenAI store to persistent store `vs_6a338d7c24388191a43809879d974db0`. The clean corpus contains `444/444` completed files with zero failed or pending files, excludes `1,319` transient news/event/announcement pages, and removes `13` exact duplicate PDFs. Brochure fee/quota facts and all `60` YİÜ intent Skills were re-audited; the production Skills DB now has `656` refreshed embeddings. The former store remains available only as a rollback target.
+
+- [x] Build a deterministic source-level YİÜ corpus with transient-page and exact-PDF-duplicate removal.
+- [x] Replace ad hoc brochure extraction with a tracked, tested 2025 fee/quota fact source.
+- [x] Re-audit all YİÜ intent Skills for duplicate phrases, stale facts, and source-clerk language.
+- [x] Ingest and validate a persistent `444`-file OpenAI store before atomically changing the runtime manifest.
+- [x] Refresh all production YİÜ Skill embeddings in bounded database batches.
+
 > **Implementation Update (2026-06-18):** Public Demo non-exact Skill routing now uses a recall-first candidate pool instead of a narrow top-three semantic match. The Skill query rewriter is instructed not to ask clarification merely because the active institution, year, or a narrower filter is omitted when the organization context and requested fact are clear. The route searches up to `8` Skill candidates at a lower candidate threshold, includes both rewritten and original actionable fact queries when useful, and lets the LLM verifier choose the best supplied Skill by direct subject/facet coverage. The verifier now requires the Skill answer itself to cover the requested fact; nearby-topic candidates fall through to RAG instead of relying on question-specific runtime guards. Over-eager `needs_clarification` from the rewriter no longer stops Skill search for concrete questions such as quota, campus, ÇAP, fee, duration, or registration facts.
 
 - [x] Broaden Public Demo semantic Skill candidate recall before verifier selection.
