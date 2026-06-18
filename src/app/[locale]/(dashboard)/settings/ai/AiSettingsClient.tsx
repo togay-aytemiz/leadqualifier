@@ -8,16 +8,40 @@ import AiSettingsForm, { type AiSettingsTabId } from './AiSettingsForm'
 import { AiInstructionsHelpModal } from './AiInstructionsHelpModal'
 import type { OrganizationAiSettings } from '@/types/database'
 import { updateOrgAiSettings } from '@/lib/ai/settings'
+import { updateOrgAiDictionaryEntries } from '@/lib/ai/dictionary'
+import {
+    sanitizeAiDictionaryEntries,
+    type AiDictionaryDraftEntry,
+} from '@/lib/ai/dictionary-core'
 import { UnsavedChangesDialog } from '@/components/settings/UnsavedChangesDialog'
 import { useUnsavedChangesGuard } from '@/components/settings/useUnsavedChangesGuard'
 import type { OrganizationOnboardingShellState } from '@/lib/onboarding/state'
 
 interface AiSettingsClientProps {
     initialSettings: Omit<OrganizationAiSettings, 'organization_id' | 'created_at' | 'updated_at'>
+    initialDictionaryEntries: AiDictionaryDraftEntry[]
     onboardingState: Pick<OrganizationOnboardingShellState, 'completedSteps' | 'totalSteps' | 'isComplete'> | null
 }
 
-export default function AiSettingsClient({ initialSettings, onboardingState }: AiSettingsClientProps) {
+function normalizeDictionaryForCompare(entries: AiDictionaryDraftEntry[]) {
+    return sanitizeAiDictionaryEntries(entries)
+        .map((entry) => ({
+            term: entry.term,
+            meanings: entry.meanings,
+            enabled: entry.enabled !== false,
+        }))
+        .sort((left, right) => left.term.localeCompare(right.term, 'tr'))
+}
+
+function dictionariesEqual(left: AiDictionaryDraftEntry[], right: AiDictionaryDraftEntry[]) {
+    return JSON.stringify(normalizeDictionaryForCompare(left)) === JSON.stringify(normalizeDictionaryForCompare(right))
+}
+
+export default function AiSettingsClient({
+    initialSettings,
+    initialDictionaryEntries,
+    onboardingState
+}: AiSettingsClientProps) {
     const locale = useLocale()
     const t = useTranslations('aiSettings')
     const tSidebar = useTranslations('Sidebar')
@@ -41,6 +65,8 @@ export default function AiSettingsClient({ initialSettings, onboardingState }: A
     const [assistantIntakeRule, setAssistantIntakeRule] = useState(initialSettings.assistant_intake_rule)
     const [assistantNeverDo, setAssistantNeverDo] = useState(initialSettings.assistant_never_do)
     const [assistantOtherInstructions, setAssistantOtherInstructions] = useState(initialSettings.assistant_other_instructions)
+    const [dictionaryBaseline, setDictionaryBaseline] = useState(initialDictionaryEntries)
+    const [dictionaryEntries, setDictionaryEntries] = useState(initialDictionaryEntries)
     const [activeTab, setActiveTab] = useState<AiSettingsTabId>('general')
     const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
@@ -56,7 +82,7 @@ export default function AiSettingsClient({ initialSettings, onboardingState }: A
             : t('botModeLockedByOnboarding')
         : null
 
-    const isDirty = useMemo(() => {
+    const settingsDirty = useMemo(() => {
         return (
             botName !== baseline.bot_name ||
             botMode !== baseline.bot_mode ||
@@ -92,6 +118,11 @@ export default function AiSettingsClient({ initialSettings, onboardingState }: A
         assistantOtherInstructions,
         baseline
     ])
+    const dictionaryDirty = useMemo(
+        () => !dictionariesEqual(dictionaryEntries, dictionaryBaseline),
+        [dictionaryEntries, dictionaryBaseline]
+    )
+    const isDirty = settingsDirty || dictionaryDirty
 
     const localizedHandoverMessage = locale === 'tr' ? hotLeadHandoverMessageTr : hotLeadHandoverMessageEn
     const localizedDisclaimerMessage = locale === 'tr' ? botDisclaimerMessageTr : botDisclaimerMessageEn
@@ -151,40 +182,47 @@ export default function AiSettingsClient({ initialSettings, onboardingState }: A
         setSaveError(null)
         setSaved(false)
         try {
-            const savedSettings = await updateOrgAiSettings({
-                mode: 'flexible',
-                bot_name: botName,
-                bot_mode: botMode,
-                bot_disclaimer_enabled: botDisclaimerEnabled,
-                bot_disclaimer_message_tr: botDisclaimerMessageTr,
-                bot_disclaimer_message_en: botDisclaimerMessageEn,
-                allow_lead_extraction_during_operator: allowLeadExtractionDuringOperator,
-                hot_lead_score_threshold: hotLeadScoreThreshold,
-                hot_lead_action: hotLeadAction,
-                hot_lead_handover_message_tr: hotLeadHandoverMessageTr,
-                hot_lead_handover_message_en: hotLeadHandoverMessageEn,
-                match_threshold: matchThreshold,
-                assistant_role: assistantRole,
-                assistant_intake_rule: assistantIntakeRule,
-                assistant_never_do: assistantNeverDo,
-                assistant_other_instructions: assistantOtherInstructions
-            })
-            setBaseline(savedSettings)
-            setBotName(savedSettings.bot_name)
-            setBotMode(savedSettings.bot_mode)
-            setBotDisclaimerEnabled(savedSettings.bot_disclaimer_enabled)
-            setBotDisclaimerMessageTr(savedSettings.bot_disclaimer_message_tr)
-            setBotDisclaimerMessageEn(savedSettings.bot_disclaimer_message_en)
-            setAllowLeadExtractionDuringOperator(savedSettings.allow_lead_extraction_during_operator)
-            setHotLeadScoreThreshold(savedSettings.hot_lead_score_threshold)
-            setHotLeadAction(savedSettings.hot_lead_action)
-            setHotLeadHandoverMessageTr(savedSettings.hot_lead_handover_message_tr)
-            setHotLeadHandoverMessageEn(savedSettings.hot_lead_handover_message_en)
-            setMatchThreshold(savedSettings.match_threshold)
-            setAssistantRole(savedSettings.assistant_role)
-            setAssistantIntakeRule(savedSettings.assistant_intake_rule)
-            setAssistantNeverDo(savedSettings.assistant_never_do)
-            setAssistantOtherInstructions(savedSettings.assistant_other_instructions)
+            if (settingsDirty) {
+                const savedSettings = await updateOrgAiSettings({
+                    mode: 'flexible',
+                    bot_name: botName,
+                    bot_mode: botMode,
+                    bot_disclaimer_enabled: botDisclaimerEnabled,
+                    bot_disclaimer_message_tr: botDisclaimerMessageTr,
+                    bot_disclaimer_message_en: botDisclaimerMessageEn,
+                    allow_lead_extraction_during_operator: allowLeadExtractionDuringOperator,
+                    hot_lead_score_threshold: hotLeadScoreThreshold,
+                    hot_lead_action: hotLeadAction,
+                    hot_lead_handover_message_tr: hotLeadHandoverMessageTr,
+                    hot_lead_handover_message_en: hotLeadHandoverMessageEn,
+                    match_threshold: matchThreshold,
+                    assistant_role: assistantRole,
+                    assistant_intake_rule: assistantIntakeRule,
+                    assistant_never_do: assistantNeverDo,
+                    assistant_other_instructions: assistantOtherInstructions
+                })
+                setBaseline(savedSettings)
+                setBotName(savedSettings.bot_name)
+                setBotMode(savedSettings.bot_mode)
+                setBotDisclaimerEnabled(savedSettings.bot_disclaimer_enabled)
+                setBotDisclaimerMessageTr(savedSettings.bot_disclaimer_message_tr)
+                setBotDisclaimerMessageEn(savedSettings.bot_disclaimer_message_en)
+                setAllowLeadExtractionDuringOperator(savedSettings.allow_lead_extraction_during_operator)
+                setHotLeadScoreThreshold(savedSettings.hot_lead_score_threshold)
+                setHotLeadAction(savedSettings.hot_lead_action)
+                setHotLeadHandoverMessageTr(savedSettings.hot_lead_handover_message_tr)
+                setHotLeadHandoverMessageEn(savedSettings.hot_lead_handover_message_en)
+                setMatchThreshold(savedSettings.match_threshold)
+                setAssistantRole(savedSettings.assistant_role)
+                setAssistantIntakeRule(savedSettings.assistant_intake_rule)
+                setAssistantNeverDo(savedSettings.assistant_never_do)
+                setAssistantOtherInstructions(savedSettings.assistant_other_instructions)
+            }
+            if (dictionaryDirty) {
+                const savedDictionaryEntries = await updateOrgAiDictionaryEntries(dictionaryEntries)
+                setDictionaryBaseline(savedDictionaryEntries)
+                setDictionaryEntries(savedDictionaryEntries)
+            }
             setSaved(true)
             if (typeof window !== 'undefined') {
                 window.dispatchEvent(new CustomEvent('ai-settings-updated'))
@@ -220,6 +258,7 @@ export default function AiSettingsClient({ initialSettings, onboardingState }: A
         setAssistantIntakeRule(baseline.assistant_intake_rule)
         setAssistantNeverDo(baseline.assistant_never_do)
         setAssistantOtherInstructions(baseline.assistant_other_instructions)
+        setDictionaryEntries(dictionaryBaseline)
         setSaved(false)
         setSaveError(null)
     }
@@ -264,6 +303,7 @@ export default function AiSettingsClient({ initialSettings, onboardingState }: A
                         assistantIntakeRule={assistantIntakeRule}
                         assistantNeverDo={assistantNeverDo}
                         assistantOtherInstructions={assistantOtherInstructions}
+                        dictionaryEntries={dictionaryEntries}
                         activeTab={activeTab}
                         onActiveTabChange={setActiveTab}
                         onBotNameChange={setBotName}
@@ -279,6 +319,7 @@ export default function AiSettingsClient({ initialSettings, onboardingState }: A
                         onAssistantIntakeRuleChange={setAssistantIntakeRule}
                         onAssistantNeverDoChange={setAssistantNeverDo}
                         onAssistantOtherInstructionsChange={setAssistantOtherInstructions}
+                        onDictionaryEntriesChange={setDictionaryEntries}
                         onOpenHowItWorks={() => setIsHowItWorksOpen(true)}
                     />
                 </div>

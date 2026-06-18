@@ -1,10 +1,12 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
+    getOrgAiDictionaryEntriesMock,
     getOrgAiSettingsMock,
     recordAiUsageMock,
     runSimpleRagPipelineMock,
 } = vi.hoisted(() => ({
+    getOrgAiDictionaryEntriesMock: vi.fn(),
     getOrgAiSettingsMock: vi.fn(),
     recordAiUsageMock: vi.fn(),
     runSimpleRagPipelineMock: vi.fn(),
@@ -18,6 +20,10 @@ vi.mock('openai', () => ({
 
 vi.mock('@/lib/ai/settings', () => ({
     getOrgAiSettings: getOrgAiSettingsMock,
+}))
+
+vi.mock('@/lib/ai/dictionary', () => ({
+    getOrgAiDictionaryEntries: getOrgAiDictionaryEntriesMock,
 }))
 
 vi.mock('@/lib/ai/usage', () => ({
@@ -41,6 +47,10 @@ const channel = {
 }
 
 describe('buildOpenAiFileSearchDemoReply', () => {
+    beforeEach(() => {
+        getOrgAiDictionaryEntriesMock.mockResolvedValue([])
+    })
+
     afterEach(() => {
         vi.unstubAllEnvs()
         vi.clearAllMocks()
@@ -48,6 +58,18 @@ describe('buildOpenAiFileSearchDemoReply', () => {
 
     it('routes the demo directly through the simple standalone-query pipeline', async () => {
         vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+        getOrgAiDictionaryEntriesMock.mockResolvedValue([
+            {
+                id: 'dict-1',
+                organization_id: 'org-1',
+                term: 'ftr',
+                normalized_term: 'ftr',
+                meanings: ['Fizyoterapi ve Rehabilitasyon', 'Fizyoterapi ön lisans'],
+                enabled: true,
+                created_at: '2026-06-18T00:00:00Z',
+                updated_at: '2026-06-18T00:00:00Z',
+            },
+        ])
         getOrgAiSettingsMock.mockResolvedValue({
             bot_name: 'Qualy',
             prompt: 'Bol emoji kullan, Gen-Z gibi konuş.',
@@ -111,6 +133,7 @@ describe('buildOpenAiFileSearchDemoReply', () => {
                 bot_name: 'Qualy',
                 prompt: 'Bol emoji kullan, Gen-Z gibi konuş.',
             },
+            dictionaryContext: 'ftr => Fizyoterapi ve Rehabilitasyon | Fizyoterapi ön lisans',
         }))
         expect(result?.replyText).toContain('Tıp Fakültesi için 2025 broşüründe')
         expect(result?.replyText).toContain('https://example.edu.tr/brochure.pdf')

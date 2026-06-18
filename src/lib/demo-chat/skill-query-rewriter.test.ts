@@ -88,6 +88,46 @@ describe('rewriteDemoSkillQuery', () => {
         )
     })
 
+    it('passes editable dictionary context as alias help, not answer evidence', async () => {
+        const createCompletion = vi.fn().mockResolvedValue({
+            choices: [{
+                message: {
+                    content: JSON.stringify({
+                        query: 'Fizyoterapi ve Rehabilitasyon ücreti',
+                        subject: 'Fizyoterapi ve Rehabilitasyon',
+                        facet: 'ücret',
+                        needs_clarification: false,
+                        used_history: false,
+                        decision: 'standalone',
+                        reason: 'The dictionary expands ftr.',
+                    }),
+                },
+            }],
+        })
+
+        await rewriteDemoSkillQuery({
+            latestUserMessage: 'ftr ücreti nedir?',
+            responseLanguage: 'tr',
+            organizationContext: 'Yüksek İhtisas Üniversitesi',
+            dictionaryContext: 'ftr => Fizyoterapi ve Rehabilitasyon | Fizyoterapi ön lisans',
+            recentMessages: [],
+            createCompletion,
+        })
+
+        const request = createCompletion.mock.calls[0]?.[0] as {
+            messages: Array<{ role: string; content: string }>
+        }
+        expect(request.messages[0]?.content).toContain(
+            'Use the organization dictionary only to understand aliases'
+        )
+        expect(request.messages[0]?.content).toContain(
+            'If a dictionary term has multiple meanings, choose from message and history context'
+        )
+        expect(request.messages[1]?.content).toContain(
+            'Organization dictionary:\nftr => Fizyoterapi ve Rehabilitasyon | Fizyoterapi ön lisans'
+        )
+    })
+
     it('combines a missing slot answer with the previous requested fact', async () => {
         const createCompletion = vi.fn().mockResolvedValue({
             choices: [{

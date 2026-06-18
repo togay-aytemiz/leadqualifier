@@ -22,6 +22,8 @@ import {
 } from '@/lib/demo-chat/maintenance'
 import { resolveMvpResponseLanguage, type MvpResponseLanguage } from '@/lib/ai/language'
 import { getOrgAiSettings } from '@/lib/ai/settings'
+import { getOrgAiDictionaryEntries } from '@/lib/ai/dictionary'
+import { formatAiDictionaryContext } from '@/lib/ai/dictionary-core'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { searchKnowledgeBase, searchKnowledgeBaseFocusedEvidence } from '@/lib/knowledge-base/actions'
 import { matchExactSkillTriggers, matchSkills } from '@/lib/skills/actions'
@@ -1927,6 +1929,11 @@ async function tryIntentAwareDemoSkillReply(input: {
         channelDisplayName: input.channel.displayName,
         settings: assistantSettings,
     }) || input.channel.displayName || input.channel.slug
+    const dictionaryEntries = await getOrgAiDictionaryEntries(input.channel.organizationId, {
+        supabase: input.supabase,
+        enabledOnly: true,
+    })
+    const dictionaryContext = formatAiDictionaryContext(dictionaryEntries)
 
     let rewrite: DemoSkillQueryRewriteResult | null = null
     try {
@@ -1935,6 +1942,7 @@ async function tryIntentAwareDemoSkillReply(input: {
             recentMessages: conversationHistory,
             organizationContext,
             assistantInstructionContext: buildDemoAssistantInstructionContext(assistantSettings),
+            dictionaryContext,
             responseLanguage,
         })
         const rewriteResult = await waitForPipelineResult(

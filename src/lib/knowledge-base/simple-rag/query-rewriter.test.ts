@@ -203,6 +203,35 @@ describe('rewriteSimpleRagQuery', () => {
     )
   })
 
+  it('passes editable dictionary context to the RAG query rewriter as alias help', async () => {
+    const createCompletion = vi.fn(async (_args: Record<string, unknown>) =>
+      completion({
+        status: 'search',
+        standalone_query: 'Yüksek İhtisas Üniversitesi Dil ve Konuşma Terapisi kontenjanı',
+        response_language: 'tr',
+      })
+    )
+
+    await rewriteSimpleRagQuery({
+      latestUserMessage: 'dkt kontenjanı kaç?',
+      recentMessages: [],
+      organizationContext: 'Yüksek İhtisas Üniversitesi',
+      dictionaryContext: 'dkt => Dil ve Konuşma Terapisi',
+      responseLanguage: 'tr',
+      createCompletion,
+    })
+
+    const request = createCompletion.mock.calls[0]?.[0] as {
+      messages: Array<{ role: string; content: string }>
+    }
+    expect(request.messages[0]?.content).toContain(
+      'Use the organization dictionary only to understand aliases'
+    )
+    expect(request.messages[1]?.content).toContain(
+      'Organization dictionary:\ndkt => Dil ve Konuşma Terapisi'
+    )
+  })
+
   it('allows a direct conversational response without searching the knowledge base', async () => {
     const createCompletion = vi.fn(async () =>
       completion({

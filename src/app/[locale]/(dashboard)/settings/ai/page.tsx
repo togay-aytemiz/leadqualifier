@@ -4,6 +4,7 @@ import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access
 import { DashboardRouteIntlProvider } from '@/components/i18n/DashboardRouteIntlProvider'
 import { getDashboardShellData } from '@/lib/dashboard/shell-data'
 import { getOrgAiSettings } from '@/lib/ai/settings'
+import { getOrgAiDictionaryEntries } from '@/lib/ai/dictionary'
 import { getOrganizationOnboardingState } from '@/lib/onboarding/state'
 
 export default async function AiSettingsPage() {
@@ -37,11 +38,13 @@ export default async function AiSettingsPage() {
         ?? await getOrganizationOnboardingState(organizationId)
     const aiSettings = shellData.aiSettings
         ?? await getOrgAiSettings(organizationId, { locale, onboardingState })
+    const dictionaryEntries = await getOrgAiDictionaryEntries(organizationId)
 
     return (
         <DashboardRouteIntlProvider includeDashboardShell={false} namespaces={['aiSettings', 'Sidebar', 'unsavedChanges']}>
             <AiSettingsClient
                 initialSettings={aiSettings}
+                initialDictionaryEntries={dictionaryEntries}
                 onboardingState={onboardingState}
             />
         </DashboardRouteIntlProvider>

@@ -14,7 +14,7 @@ const TEST_ASSISTANT_NEVER_DO = 'assistant_never_do'
 const TEST_ASSISTANT_OTHER = 'assistant_other'
 
 function renderForm(
-    activeTab: 'general' | 'behaviorAndLogic' | 'escalation',
+    activeTab: 'general' | 'behaviorAndLogic' | 'escalation' | 'dictionary',
     options?: { isBotModeLocked?: boolean; botModeLockHelperText?: string }
 ) {
     return renderToStaticMarkup(
@@ -34,6 +34,14 @@ function renderForm(
             assistantIntakeRule={TEST_ASSISTANT_INTAKE_RULE}
             assistantNeverDo={TEST_ASSISTANT_NEVER_DO}
             assistantOtherInstructions={TEST_ASSISTANT_OTHER}
+            dictionaryEntries={[
+                {
+                    id: 'dict-1',
+                    term: 'ftr',
+                    meanings: ['Fizyoterapi ve Rehabilitasyon', 'Fizyoterapi ön lisans'],
+                    enabled: true
+                }
+            ]}
             activeTab={activeTab}
             onActiveTabChange={() => {}}
             onBotNameChange={() => {}}
@@ -49,18 +57,20 @@ function renderForm(
             onAssistantIntakeRuleChange={() => {}}
             onAssistantNeverDoChange={() => {}}
             onAssistantOtherInstructionsChange={() => {}}
+            onDictionaryEntriesChange={() => {}}
             onOpenHowItWorks={() => {}}
         />
     )
 }
 
 describe('AiSettingsForm', () => {
-    it('renders all three tab labels', () => {
+    it('renders all four tab labels', () => {
         const markup = renderForm('general')
 
         expect(markup).toContain('tabs.general')
         expect(markup).toContain('tabs.behaviorAndLogic')
         expect(markup).toContain('tabs.escalation')
+        expect(markup).toContain('tabs.dictionary')
     })
 
     it('shows general settings in General tab', () => {
@@ -116,5 +126,21 @@ describe('AiSettingsForm', () => {
         expect(markup).not.toContain('humanEscalationTitle')
         expect(markup).not.toContain('botModeTitle')
         expect(markup).not.toContain('assistantInstructionsTitle')
+    })
+
+    it('shows editable dictionary entries in Dictionary tab', () => {
+        const markup = renderForm('dictionary')
+
+        expect(markup).toContain('dictionaryTitle')
+        expect(markup).toContain('dictionaryDescription')
+        expect(markup).toContain('dictionaryTermLabel')
+        expect(markup).toContain('dictionaryMeaningsLabel')
+        expect(markup).toContain('ftr')
+        expect(markup).toContain('Fizyoterapi ve Rehabilitasyon')
+        expect(markup).toContain('Fizyoterapi ön lisans')
+        expect(markup).toContain('dictionaryAddEntry')
+        expect(markup).not.toContain('botModeTitle')
+        expect(markup).not.toContain('assistantInstructionsTitle')
+        expect(markup).not.toContain('automaticEscalationTitle')
     })
 })

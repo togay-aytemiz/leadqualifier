@@ -13,6 +13,7 @@ const {
     buildRagContextMock,
     createClientMock,
     generateGroundedRagAnswerMock,
+    getOrgAiDictionaryEntriesMock,
     getOrgAiSettingsMock,
     polishGroundedRagAnswerMock,
     processInboundAiPipelineMock,
@@ -32,6 +33,7 @@ const {
     buildRagContextMock: vi.fn(),
     createClientMock: vi.fn(),
     generateGroundedRagAnswerMock: vi.fn(),
+    getOrgAiDictionaryEntriesMock: vi.fn(),
     getOrgAiSettingsMock: vi.fn(),
     polishGroundedRagAnswerMock: vi.fn(),
     processInboundAiPipelineMock: vi.fn(),
@@ -78,6 +80,10 @@ vi.mock('@/lib/skills/actions', () => ({
 
 vi.mock('@/lib/ai/settings', () => ({
     getOrgAiSettings: getOrgAiSettingsMock,
+}))
+
+vi.mock('@/lib/ai/dictionary', () => ({
+    getOrgAiDictionaryEntries: getOrgAiDictionaryEntriesMock,
 }))
 
 vi.mock('@/lib/ai/usage', () => ({
@@ -297,6 +303,7 @@ describe('demo chat API route', () => {
             prompt: 'Samimi cevap ver.',
             bot_name: 'Qualy',
         })
+        getOrgAiDictionaryEntriesMock.mockResolvedValue([])
         generateGroundedRagAnswerMock.mockResolvedValue({
             answer: '',
             usedGeneration: false,

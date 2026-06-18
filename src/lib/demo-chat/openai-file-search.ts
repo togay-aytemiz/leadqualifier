@@ -2,6 +2,8 @@ import OpenAI from 'openai'
 import sourceManifest from '@/lib/knowledge-base/provider-data/yiu-tanitim-gunleri-2026-source-manifest.json'
 import { resolveMvpResponseLanguage } from '@/lib/ai/language'
 import { getOrgAiSettings } from '@/lib/ai/settings'
+import { getOrgAiDictionaryEntries } from '@/lib/ai/dictionary'
+import { formatAiDictionaryContext } from '@/lib/ai/dictionary-core'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { runSimpleRagPipeline } from '@/lib/knowledge-base/simple-rag/pipeline'
 import type { KnowledgeSearchPlanningTurn } from '@/lib/knowledge-base/query-planner'
@@ -186,10 +188,17 @@ export async function buildOpenAiFileSearchDemoReply(input: {
     }
 
     try {
-        const settings = await getOrgAiSettings(input.channel.organizationId, {
-            supabase: input.supabase,
-            locale: responseLanguage,
-        })
+        const [settings, dictionaryEntries] = await Promise.all([
+            getOrgAiSettings(input.channel.organizationId, {
+                supabase: input.supabase,
+                locale: responseLanguage,
+            }),
+            getOrgAiDictionaryEntries(input.channel.organizationId, {
+                supabase: input.supabase,
+                enabledOnly: true,
+            }),
+        ])
+        const dictionaryContext = formatAiDictionaryContext(dictionaryEntries)
         const rewriteModel = readRewriteModel()
         const answerModel = readAnswerModel()
         const verifierModel = readVerifierModel()
@@ -209,6 +218,7 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                 settings,
             }),
             assistantInstructionContext: buildDemoAssistantInstructionContext(settings),
+            dictionaryContext,
             pendingClarification: input.pendingClarification,
             responseLanguage,
             citationSourcesByFilename: sourceManifest.sourcesByFilename,
@@ -275,6 +285,7 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                     timings_ms: result.timingsMs,
                     diagnostics: result.diagnostics,
                     usage: result.usage,
+                    dictionary_entry_count: dictionaryEntries.length,
                     conversation_history_turn_count: conversationHistoryCount,
                 },
                 ...(result.diagnostics?.pendingClarification

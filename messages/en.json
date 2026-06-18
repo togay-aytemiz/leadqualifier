@@ -1940,7 +1940,8 @@
     "tabs": {
       "general": "General",
       "behaviorAndLogic": "Behavior and Logic",
-      "escalation": "Escalation"
+      "escalation": "Escalation",
+      "dictionary": "Dictionary"
     },
     "botModeTitle": "Bot mode",
     "botModeDescription": "Applies to Telegram/WhatsApp/Instagram. Simulator is unaffected.",
@@ -1991,6 +1992,16 @@
     "assistantNeverDoDescription": "Write clear boundaries and behaviors the assistant must avoid.",
     "assistantOtherInstructionsLabel": "Other instructions",
     "assistantOtherInstructionsDescription": "Use this for extra working rules that are specific to your business.",
+    "dictionaryTitle": "Dictionary",
+    "dictionaryDescription": "Define abbreviations, nicknames, and terms users may write. These entries only help the AI understand the message; they do not replace answer sources.",
+    "dictionaryTermLabel": "Term",
+    "dictionaryTermPlaceholder": "E.g. FTR",
+    "dictionaryMeaningsLabel": "Meanings",
+    "dictionaryMeaningsPlaceholder": "E.g. Physiotherapy and Rehabilitation",
+    "dictionaryMeaningsHelp": "Write multiple meanings on separate lines. The model chooses the best meaning from context.",
+    "dictionaryEnabledLabel": "Active",
+    "dictionaryRemoveEntry": "Remove",
+    "dictionaryAddEntry": "Add dictionary entry",
     "howItWorksAction": "How it works",
     "howItWorksPill": "Guide",
     "howItWorksTitle": "How AI assistant instructions work",

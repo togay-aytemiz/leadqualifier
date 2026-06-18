@@ -4,8 +4,9 @@ import { useTranslations } from 'next-intl'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { SettingsTabs } from '@/components/settings/SettingsTabs'
 import type { AiBotMode, HumanEscalationAction } from '@/types/database'
+import type { AiDictionaryDraftEntry } from '@/lib/ai/dictionary-core'
 
-export type AiSettingsTabId = 'general' | 'behaviorAndLogic' | 'escalation'
+export type AiSettingsTabId = 'general' | 'behaviorAndLogic' | 'escalation' | 'dictionary'
 
 interface AiSettingsFormProps {
     botName: string
@@ -23,6 +24,7 @@ interface AiSettingsFormProps {
     assistantIntakeRule: string
     assistantNeverDo: string
     assistantOtherInstructions: string
+    dictionaryEntries: AiDictionaryDraftEntry[]
     activeTab: AiSettingsTabId
     onActiveTabChange: (value: AiSettingsTabId) => void
     onBotNameChange: (value: string) => void
@@ -38,6 +40,7 @@ interface AiSettingsFormProps {
     onAssistantIntakeRuleChange: (value: string) => void
     onAssistantNeverDoChange: (value: string) => void
     onAssistantOtherInstructionsChange: (value: string) => void
+    onDictionaryEntriesChange: (value: AiDictionaryDraftEntry[]) => void
     onOpenHowItWorks: () => void
 }
 
@@ -107,6 +110,113 @@ function InstructionTextarea({ id, label, description, value, onChange }: Instru
     )
 }
 
+function createDraftDictionaryEntry(): AiDictionaryDraftEntry {
+    return {
+        id: `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        term: '',
+        meanings: [''],
+        enabled: true
+    }
+}
+
+function updateDictionaryEntry(
+    entries: AiDictionaryDraftEntry[],
+    id: string | undefined,
+    patch: Partial<AiDictionaryDraftEntry>
+) {
+    return entries.map((entry) => entry.id === id ? { ...entry, ...patch } : entry)
+}
+
+function DictionaryEditorSection({
+    entries,
+    onChange
+}: {
+    entries: AiDictionaryDraftEntry[]
+    onChange: (value: AiDictionaryDraftEntry[]) => void
+}) {
+    const t = useTranslations('aiSettings')
+    const rows = entries.length > 0 ? entries : [createDraftDictionaryEntry()]
+
+    return (
+        <SettingsSection
+            title={t('dictionaryTitle')}
+            description={t('dictionaryDescription')}
+            showBottomDivider={false}
+        >
+            <div className="space-y-4">
+                <div className="space-y-3">
+                    {rows.map((entry, index) => {
+                        const entryId = entry.id ?? `dictionary-entry-${index}`
+                        return (
+                            <div key={entryId} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                                <div className="grid gap-3 md:grid-cols-[minmax(140px,220px)_1fr_auto] md:items-start">
+                                    <div className="space-y-1.5">
+                                        <label htmlFor={`${entryId}-term`} className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                            {t('dictionaryTermLabel')}
+                                        </label>
+                                        <input
+                                            id={`${entryId}-term`}
+                                            type="text"
+                                            value={entry.term}
+                                            onChange={(event) => onChange(updateDictionaryEntry(rows, entry.id, {
+                                                term: event.target.value
+                                            }))}
+                                            placeholder={t('dictionaryTermPlaceholder')}
+                                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label htmlFor={`${entryId}-meanings`} className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                            {t('dictionaryMeaningsLabel')}
+                                        </label>
+                                        <textarea
+                                            id={`${entryId}-meanings`}
+                                            rows={Math.max(2, entry.meanings.length)}
+                                            value={entry.meanings.join('\n')}
+                                            onChange={(event) => onChange(updateDictionaryEntry(rows, entry.id, {
+                                                meanings: event.target.value.split(/\r?\n/g)
+                                            }))}
+                                            placeholder={t('dictionaryMeaningsPlaceholder')}
+                                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
+                                        />
+                                        <p className="text-xs text-gray-500">{t('dictionaryMeaningsHelp')}</p>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-3 md:flex-col md:items-end">
+                                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                                            <input
+                                                type="checkbox"
+                                                checked={entry.enabled}
+                                                onChange={(event) => onChange(updateDictionaryEntry(rows, entry.id, {
+                                                    enabled: event.target.checked
+                                                }))}
+                                            />
+                                            {t('dictionaryEnabledLabel')}
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={() => onChange(rows.filter((row) => row.id !== entry.id))}
+                                            className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                                        >
+                                            {t('dictionaryRemoveEntry')}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+                <button
+                    type="button"
+                    onClick={() => onChange([...rows, createDraftDictionaryEntry()])}
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                >
+                    {t('dictionaryAddEntry')}
+                </button>
+            </div>
+        </SettingsSection>
+    )
+}
+
 export default function AiSettingsForm({
     botName,
     botMode,
@@ -123,6 +233,7 @@ export default function AiSettingsForm({
     assistantIntakeRule,
     assistantNeverDo,
     assistantOtherInstructions,
+    dictionaryEntries,
     activeTab,
     onActiveTabChange,
     onBotNameChange,
@@ -138,6 +249,7 @@ export default function AiSettingsForm({
     onAssistantIntakeRuleChange,
     onAssistantNeverDoChange,
     onAssistantOtherInstructionsChange,
+    onDictionaryEntriesChange,
     onOpenHowItWorks
 }: AiSettingsFormProps) {
     const t = useTranslations('aiSettings')
@@ -165,7 +277,8 @@ export default function AiSettingsForm({
     const tabs = [
         { id: 'general', label: t('tabs.general') },
         { id: 'behaviorAndLogic', label: t('tabs.behaviorAndLogic') },
-        { id: 'escalation', label: t('tabs.escalation') }
+        { id: 'escalation', label: t('tabs.escalation') },
+        { id: 'dictionary', label: t('tabs.dictionary') }
     ] as const
 
     return (
@@ -416,6 +529,13 @@ export default function AiSettingsForm({
                                     </div>
                                 </SettingsSection>
                             </div>
+                        )}
+
+                        {tabId === 'dictionary' && (
+                            <DictionaryEditorSection
+                                entries={dictionaryEntries}
+                                onChange={onDictionaryEntriesChange}
+                            />
                         )}
                     </>
                 )}

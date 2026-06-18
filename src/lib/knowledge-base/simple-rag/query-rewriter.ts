@@ -212,6 +212,8 @@ function systemPrompt(responseLanguage: MvpResponseLanguage) {
     'Rewrite the latest user question into one clear standalone search query.',
     'Assistant behavior/scope instructions may be provided. Use them only to identify the active organization, assistant identity, in-domain scope, and boundaries.',
     'Do not copy long assistant instructions into the standalone query. Do not treat those instructions as retrieved factual evidence.',
+    'Use the organization dictionary only to understand aliases, abbreviations, spelling variants, and shorthand. It is not factual evidence for the final answer.',
+    'If a dictionary term has multiple meanings, choose from message and history context. If the meaning remains unresolved and materially changes retrieval, ask one clarification.',
     'Use organization context, explicit state, and recent conversation history only to resolve scope and references such as this, it, that plan, that program, or a short correction.',
     'Never ask which institution when organization context is provided. Treat that organization as the active scope.',
     'The latest user correction overrides earlier assistant assumptions.',
@@ -246,6 +248,7 @@ export async function rewriteSimpleRagQuery(input: {
   recentMessages: KnowledgeSearchPlanningTurn[]
   organizationContext?: string | null
   assistantInstructionContext?: string | null
+  dictionaryContext?: string | null
   assistantName?: string | null
   pendingClarification?: RagPendingClarificationState | null
   responseLanguage: MvpResponseLanguage
@@ -271,6 +274,7 @@ export async function rewriteSimpleRagQuery(input: {
           `Latest user message:\n${input.latestUserMessage.trim()}`,
           `Organization context:\n${input.organizationContext?.trim() || 'Not provided'}`,
           `Assistant behavior/scope instructions:\n${input.assistantInstructionContext?.trim().slice(0, 1200) || 'Not provided'}`,
+          `Organization dictionary:\n${input.dictionaryContext?.trim().slice(0, 4000) || 'Not provided'}`,
           `Assistant identity:\n${input.assistantName?.trim() || 'AI assistant'}`,
           `Explicit state:\n${JSON.stringify(input.pendingClarification ?? null)}`,
           `Recent history:\n${JSON.stringify(recentHistory(input.recentMessages))}`,

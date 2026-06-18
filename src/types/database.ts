@@ -62,6 +62,17 @@ export interface OrganizationAiUsage {
     created_at: string
 }
 
+export interface OrganizationAiDictionaryEntry {
+    id: string
+    organization_id: string
+    term: string
+    normalized_term: string
+    meanings: string[]
+    enabled: boolean
+    created_at: string
+    updated_at: string
+}
+
 export type AiLatencyMetricKey = 'lead_extraction' | 'llm_response'
 
 export interface OrganizationAiLatencyEvent {
@@ -685,6 +696,11 @@ export interface Database {
                 Row: OrganizationAiUsage
                 Insert: Omit<OrganizationAiUsage, 'id' | 'created_at'>
                 Update: Partial<Omit<OrganizationAiUsage, 'id' | 'organization_id' | 'created_at'>>
+            }
+            organization_ai_dictionary_entries: {
+                Row: OrganizationAiDictionaryEntry
+                Insert: Omit<OrganizationAiDictionaryEntry, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<OrganizationAiDictionaryEntry, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
             }
             organization_ai_latency_events: {
                 Row: OrganizationAiLatencyEvent

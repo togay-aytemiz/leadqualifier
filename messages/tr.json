@@ -1940,7 +1940,8 @@
     "tabs": {
       "general": "Genel",
       "behaviorAndLogic": "Davranış ve Mantık",
-      "escalation": "Eskalasyon"
+      "escalation": "Eskalasyon",
+      "dictionary": "Sözlük"
     },
     "botModeTitle": "Bot durumu",
     "botModeDescription": "Telegram/WhatsApp/Instagram için geçerlidir. Simülatör etkilenmez.",
@@ -1991,6 +1992,16 @@
     "assistantNeverDoDescription": "Asistanın kaçınması gereken net sınırları ve davranışları yazın.",
     "assistantOtherInstructionsLabel": "Diğer talimatlar",
     "assistantOtherInstructionsDescription": "İşletmenize özel ek çalışma kurallarını burada belirtin.",
+    "dictionaryTitle": "Sözlük",
+    "dictionaryDescription": "Kullanıcıların yazabileceği kısaltma, takma ad ve terimleri tanımlayın. Bu bilgiler yalnızca mesajı anlamaya yardımcı olur; cevap kaynağı yerine geçmez.",
+    "dictionaryTermLabel": "Terim",
+    "dictionaryTermPlaceholder": "Örn. FTR",
+    "dictionaryMeaningsLabel": "Anlamlar",
+    "dictionaryMeaningsPlaceholder": "Örn. Fizyoterapi ve Rehabilitasyon",
+    "dictionaryMeaningsHelp": "Birden fazla anlamı ayrı satırlara yazın. Model bağlama göre en uygun anlamı seçer.",
+    "dictionaryEnabledLabel": "Aktif",
+    "dictionaryRemoveEntry": "Sil",
+    "dictionaryAddEntry": "Yeni sözlük maddesi ekle",
     "howItWorksAction": "Nasıl çalışır?",
     "howItWorksPill": "Rehber",
     "howItWorksTitle": "Yapay zeka asistan talimatları nasıl çalışır?",

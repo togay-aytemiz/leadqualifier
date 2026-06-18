@@ -93,6 +93,7 @@ export async function runSimpleRagPipeline(input: {
   recentMessages: KnowledgeSearchPlanningTurn[]
   organizationContext?: string | null
   assistantInstructionContext?: string | null
+  dictionaryContext?: string | null
   pendingClarification?: RagPendingClarificationState | null
   responseLanguage: MvpResponseLanguage
   settings?: { bot_name?: string | null; prompt?: string | null }
@@ -111,6 +112,7 @@ export async function runSimpleRagPipeline(input: {
     recentMessages: input.recentMessages,
     organizationContext: input.organizationContext,
     assistantInstructionContext: input.assistantInstructionContext,
+    dictionaryContext: input.dictionaryContext,
     assistantName: input.settings?.bot_name,
     pendingClarification: input.pendingClarification,
     responseLanguage: input.responseLanguage,
