@@ -1,5 +1,12 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Implementation Update (2026-06-18):** Public Demo Skill recall now indexes concise fact signals from Skill answers in addition to titles and trigger examples. This lets program Skills surface for natural facet questions such as “ücretli mi?”, “kaç para?”, “kontenjanı nedir?”, or “hangi kampüste?” even when that exact wording is not listed as a trigger. The YİÜ production Skill union remains `70` active Skills and was republished with `1018/1018` verified embedding rows. Public Demo Skill routing now also persists compact `demo_chat_skill_routing` diagnostics for exact match, rewrite, semantic candidate, verifier, and fallback outcomes, and the YİÜ demo display context was moved from `2026` to `2025` to avoid leaking an unprovided year into retrieval rewrites.
+
+- [x] Include concise Skill response fact lines in semantic Skill embeddings.
+- [x] Persist compact Public Demo Skill routing diagnostics for exact/rewrite/candidate/verifier/fallback inspection.
+- [x] Republish and verify YİÜ production Skill embeddings after the response-fact expansion.
+- [x] Change the YİÜ demo display context from 2026 to 2025 while the approved corpus is 2025-based.
+
 > **Implementation Update (2026-06-18):** Qualy AI settings now include an editable organization dictionary for abbreviations, nicknames, typos, and shorthand terms. Dictionary entries can hold multiple possible meanings and are passed to both Public Demo Skill query rewriting and simple non-Skill RAG query rewriting as scope/alias help only, never as answer evidence. This gives tenants a UI-controlled way to teach terms such as `FTR`, `DKT`, `SHMYO`, or `YIU` without adding organization-specific runtime guards. The linked Supabase database now has the dictionary migration and synchronized migration history; the YİÜ demo organization was seeded and verified with `27/27` active entries.
 
 > **Implementation Update (2026-06-18):** The YİÜ starter dictionary now follows the verified brochure's program naming more precisely. `FTR` resolves only to the four-year `Fizyoterapi ve Rehabilitasyon` program, while `FZT` resolves to the two-year `Fizyoterapi` program; high-signal aliases such as `TLT`, `TDS`, `TTP`, `TVİT`, `TST`, `BCT`, `İAY`, `paramedik`, `tıbbi lab`, and `laboratuvar teknikerliği` were added. The live YİÜ dictionary was verified with `38/38` enabled entries. The seed now upserts managed terms instead of deleting the entire tenant dictionary, preserving entries added through the UI.
@@ -29,7 +36,7 @@
 
 - [ ] Stop organization-scope filtering from rejecting chunks belonging to the active organization.
 - [ ] Prevent query rewriting from inventing an academic year when the user did not provide one.
-- [ ] Expand program Skill fee/quota/presence phrase coverage and reject unsupported adjacent-program price/existence claims.
+- [x] Expand program Skill fee/quota/presence phrase coverage and reject unsupported adjacent-program price/existence claims.
 
 > **Implementation Update (2026-06-18):** A generated YİÜ program-fact pack now provides one compact Skill for each of the `26` canonical brochure programs. Each Skill covers program existence, academic unit, campus/address, point type, 2025 fee/quota variants, and available 2024 base-score/rank facts; the active union contains `70` Skills and `687` non-duplicated examples. Existing one-program Skills are updated in place where their identity remains valid, while 18 overlapping fee/quota/group Skills are replaced or disabled. The original PDF table and campus pages were independently reviewed against all `77` option rows. The Tıbbi Tanıtım ve Pazarlama `330.000 TL` row uses the business-confirmed `Ücretli` correction instead of the PDF's erroneous `Burslu` label (`docs/evaluations/yiu-program-fact-skill-codex-review-2026-06-18.md`).
 

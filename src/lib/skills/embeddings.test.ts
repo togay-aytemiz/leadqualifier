@@ -34,4 +34,30 @@ describe('buildSkillEmbeddingTexts', () => {
 
         expect(texts).toEqual(['Acil Talep', 'Acil dönüş yapabilir misiniz?'])
     })
+
+    it('adds concise response fact signals for semantic matching', () => {
+        const texts = buildSkillEmbeddingTexts(
+            'YİÜ Intent - 45 spor_antrenorluk_egitimi',
+            [
+                'Antrenörlük Eğitimi kontenjanı kaç?',
+            ],
+            [
+                'Antrenörlük Eğitimi, Spor Bilimleri Fakültesi bünyesinde bir lisans programıdır. Balgat Yerleşkesinde eğitim verir.',
+                '',
+                'Puan türü: EA. 2025 kontenjan ve ücret bilgileri:',
+                '- Ücretli: 2 kontenjan, 380.000 TL.',
+                '- Burslu: 6 kontenjan.',
+                '',
+                'Kaynak notu: Tanıtım broşürü Spor Bilimleri Fakültesi tablosu.',
+            ].join('\n')
+        )
+
+        expect(texts).toContain(
+            'YİÜ Intent - 45 spor_antrenorluk_egitimi: Ücretli: 2 kontenjan, 380.000 TL.'
+        )
+        expect(texts).toContain(
+            'YİÜ Intent - 45 spor_antrenorluk_egitimi: Puan türü: EA. 2025 kontenjan ve ücret bilgileri:'
+        )
+        expect(texts.some((text) => text.includes('Kaynak notu'))).toBe(false)
+    })
 })

@@ -12,6 +12,10 @@ import {
     buildDemoAssistantInstructionContext,
     resolveDemoOrganizationContext,
 } from '@/lib/demo-chat/organization-context'
+import {
+    appendSkillRoutingOutcome,
+    type DemoChatSkillRoutingDiagnostics,
+} from '@/lib/demo-chat/skill-routing-diagnostics'
 import type { RagPendingClarificationState } from '@/lib/knowledge-base/rag-eval/types'
 
 type SupabaseLike = Parameters<typeof recordAiUsage>[0]['supabase']
@@ -171,6 +175,7 @@ export async function buildOpenAiFileSearchDemoReply(input: {
     conversationId?: string | null
     conversationHistory?: KnowledgeSearchPlanningTurn[]
     pendingClarification?: RagPendingClarificationState | null
+    skillRoutingDiagnostics?: DemoChatSkillRoutingDiagnostics | null
 }) {
     if (!shouldUseOpenAiFileSearch(input.channel)) return null
 
@@ -288,6 +293,14 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                     dictionary_entry_count: dictionaryEntries.length,
                     conversation_history_turn_count: conversationHistoryCount,
                 },
+                ...(input.skillRoutingDiagnostics
+                    ? {
+                        demo_chat_skill_routing: appendSkillRoutingOutcome(
+                            input.skillRoutingDiagnostics,
+                            'rag_fallback'
+                        )
+                    }
+                    : {}),
                 ...(result.diagnostics?.pendingClarification
                     ? { rag_pending_clarification: result.diagnostics.pendingClarification }
                     : {}),

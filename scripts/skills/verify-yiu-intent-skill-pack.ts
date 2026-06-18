@@ -95,7 +95,11 @@ async function main() {
   if (embeddingError) throw new Error(embeddingError.message)
 
   const expectedEmbeddingCount = expected.reduce(
-    (sum, intent) => sum + buildSkillEmbeddingTexts(intent.title, intent.triggerExamples).length,
+    (sum, intent) => sum + buildSkillEmbeddingTexts(
+      intent.title,
+      intent.triggerExamples,
+      intent.responseText
+    ).length,
     0
   )
   const result = {

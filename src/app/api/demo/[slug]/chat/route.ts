@@ -17,6 +17,13 @@ import {
 import { rewriteDemoSkillQuery, type DemoSkillQueryRewriteResult } from '@/lib/demo-chat/skill-query-rewriter'
 import { verifyDemoSkillCandidates } from '@/lib/demo-chat/skill-candidate-verifier'
 import {
+    appendSkillRoutingOutcome,
+    summarizeSkillMatches,
+    summarizeSkillRewrite,
+    summarizeSkillVerification,
+    type DemoChatSkillRoutingDiagnostics,
+} from '@/lib/demo-chat/skill-routing-diagnostics'
+import {
     DEMO_MAINTENANCE_BYPASS_COOKIE,
     shouldServeDemoMaintenance,
 } from '@/lib/demo-chat/maintenance'
@@ -86,6 +93,10 @@ type DemoChatSkillImage = {
 type DemoChatPipelineResult = {
     replyText: string
     skillImage: DemoChatSkillImage | null
+}
+
+type DemoChatSkillRoutingDiagnosticsRef = {
+    current: DemoChatSkillRoutingDiagnostics | null
 }
 
 type DemoChatMessageRow = {
@@ -769,6 +780,15 @@ function readMetadataRecord(metadata: Record<string, unknown> | null, key: strin
         : null
 }
 
+function readSkillRoutingDiagnosticsFromMessageMetadata(
+    metadata: Record<string, unknown> | null | undefined
+): DemoChatSkillRoutingDiagnostics | null {
+    const value = metadata?.demo_chat_skill_routing
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+    const outcome = (value as Record<string, unknown>).outcome
+    return typeof outcome === 'string' ? value as DemoChatSkillRoutingDiagnostics : null
+}
+
 function readSkillImageFromMessageMetadata(metadata: Record<string, unknown> | null): DemoChatSkillImage | null {
     const media = readMetadataRecord(metadata, 'demo_chat_media')
     const imageUrl = readMetadataString(media, 'storage_url')
@@ -828,6 +848,7 @@ async function runDemoChatPipeline(input: {
     inboundMessageId: string
     reprocessExistingInbound?: boolean
     preferredSkillMatch?: SkillMatch
+    replyMetadata?: Record<string, unknown>
 }): Promise<DemoChatPipelineResult> {
     const {
         supabase,
@@ -837,6 +858,7 @@ async function runDemoChatPipeline(input: {
         inboundMessageId,
         reprocessExistingInbound,
         preferredSkillMatch,
+        replyMetadata,
     } = input
     let replyText = ''
     let skillImage: DemoChatSkillImage | null = null
@@ -875,7 +897,8 @@ async function runDemoChatPipeline(input: {
             return {
                 providerMetadata: {
                     demo_chat_reply_to_message_id: inboundMessageId,
-                    demo_chat_reply_kind: isImage ? 'image' : 'text'
+                    demo_chat_reply_kind: isImage ? 'image' : 'text',
+                    ...(replyMetadata ?? {})
                 }
             }
         },
@@ -1124,6 +1147,7 @@ async function ingestDemoChatInboundOnly(input: {
     sessionId: string
     message: string
     inboundMessageId: string
+    inboundMetadata?: Record<string, unknown>
 }) {
     await processInboundAiPipeline({
         supabase: input.supabase,
@@ -1140,6 +1164,7 @@ async function ingestDemoChatInboundOnly(input: {
             demo_chat_channel_id: input.channel.id,
             demo_chat_slug: input.channel.slug,
             demo_chat_session_id: input.sessionId,
+            ...(input.inboundMetadata ?? {}),
         },
         skipAutomation: true,
         sendOutbound: async () => undefined,
@@ -1731,6 +1756,7 @@ async function recoverPendingDemoChatReplyExtractively(input: {
         conversationId,
         conversationHistory,
         pendingClarification: findLatestRagPendingClarificationState(conversationHistory),
+        skillRoutingDiagnostics: readSkillRoutingDiagnosticsFromMessageMetadata(inboundMessage?.metadata),
     })
     if (fileSearchReply) {
         await persistDemoChatTextReply({
@@ -1831,6 +1857,7 @@ async function tryImmediateDemoSkillReply(input: {
     sessionId: string
     message: string
     inboundMessageId: string
+    skillRoutingDiagnostics?: DemoChatSkillRoutingDiagnosticsRef
 }): Promise<DemoChatPipelineResult | null | 'pending'> {
     const exactMatchResult = await matchSkillsWithStatus({
         matcher: () => matchExactSkillTriggers(
@@ -1846,8 +1873,25 @@ async function tryImmediateDemoSkillReply(input: {
     })
 
     const exactMatch = exactMatchResult.matches[0]
+    if (input.skillRoutingDiagnostics) {
+        input.skillRoutingDiagnostics.current = {
+            outcome: exactMatchResult.status === 'matched' ? 'exact_skill' : 'no_exact_match',
+            exact: {
+                status: exactMatchResult.status,
+                matches: summarizeSkillMatches(exactMatchResult.matches)
+            },
+            ...(exactMatchResult.status === 'error'
+                ? { error: exactMatchResult.error instanceof Error ? exactMatchResult.error.message : String(exactMatchResult.error) }
+                : {})
+        }
+    }
     if (exactMatchResult.status === 'matched' && exactMatch) {
-        return runMatchedDemoSkillReply(input, exactMatch, 'exact')
+        return runMatchedDemoSkillReply(
+            input,
+            exactMatch,
+            'exact',
+            input.skillRoutingDiagnostics?.current
+        )
     }
 
     return tryIntentAwareDemoSkillReply(input)
@@ -1862,11 +1906,21 @@ async function runMatchedDemoSkillReply(
         inboundMessageId: string
     },
     preferredSkillMatch: SkillMatch,
-    source: 'exact' | 'verified'
+    source: 'exact' | 'verified',
+    skillRoutingDiagnostics?: DemoChatSkillRoutingDiagnostics | null
 ): Promise<DemoChatPipelineResult | null | 'pending'> {
     const pipelinePromise = runDemoChatPipeline({
         ...input,
         preferredSkillMatch,
+        replyMetadata: skillRoutingDiagnostics
+            ? {
+                demo_chat_reply_source: 'skill_answered',
+                demo_chat_skill_routing: appendSkillRoutingOutcome(
+                    skillRoutingDiagnostics,
+                    source === 'exact' ? 'exact_skill' : 'verified_skill'
+                )
+            }
+            : { demo_chat_reply_source: 'skill_answered' },
     })
     const pipelineResult = await waitForPipelineResult(pipelinePromise, readSyncReplyTimeoutMs())
     if (pipelineResult.status === 'timeout') {
@@ -1908,6 +1962,7 @@ async function tryIntentAwareDemoSkillReply(input: {
     sessionId: string
     message: string
     inboundMessageId: string
+    skillRoutingDiagnostics?: DemoChatSkillRoutingDiagnosticsRef
 }): Promise<DemoChatPipelineResult | null | 'pending'> {
     if (!process.env.OPENAI_API_KEY?.trim()) return null
 
@@ -1950,6 +2005,12 @@ async function tryIntentAwareDemoSkillReply(input: {
             readSkillQueryRewriteTimeoutMs()
         )
         if (rewriteResult.status === 'timeout') {
+            if (input.skillRoutingDiagnostics) {
+                input.skillRoutingDiagnostics.current = appendSkillRoutingOutcome(
+                    input.skillRoutingDiagnostics.current,
+                    'rewrite_timeout'
+                )
+            }
             void rewritePromise.catch((error) => {
                 console.warn('Demo Chat: timed-out skill query rewrite failed later.', {
                     organization_id: input.channel.organizationId,
@@ -1960,6 +2021,12 @@ async function tryIntentAwareDemoSkillReply(input: {
         }
         rewrite = rewriteResult.result
     } catch (error) {
+        if (input.skillRoutingDiagnostics) {
+            input.skillRoutingDiagnostics.current = {
+                ...appendSkillRoutingOutcome(input.skillRoutingDiagnostics.current, 'rewrite_error'),
+                error: error instanceof Error ? error.message : String(error)
+            }
+        }
         console.warn('Demo Chat: skill query rewrite failed; continuing with RAG fallback.', {
             organization_id: input.channel.organizationId,
             error
@@ -1968,15 +2035,39 @@ async function tryIntentAwareDemoSkillReply(input: {
     }
 
     const rewrittenQuery = rewrite?.query.trim()
-    if (!rewrite || !rewrittenQuery) return null
+    if (!rewrite || !rewrittenQuery) {
+        if (input.skillRoutingDiagnostics) {
+            input.skillRoutingDiagnostics.current = appendSkillRoutingOutcome(
+                input.skillRoutingDiagnostics.current,
+                'rewrite_unavailable'
+            )
+        }
+        return null
+    }
+
+    if (input.skillRoutingDiagnostics) {
+        input.skillRoutingDiagnostics.current = {
+            ...(input.skillRoutingDiagnostics.current ?? { outcome: 'no_exact_match' as const }),
+            rewrite: summarizeSkillRewrite(rewrite)
+        }
+    }
 
     const candidateQueries = buildDemoSkillCandidateSearchQueries({
         message: input.message,
         rewrite
     })
-    if (candidateQueries.length === 0) return null
+    if (candidateQueries.length === 0) {
+        if (input.skillRoutingDiagnostics) {
+            input.skillRoutingDiagnostics.current = {
+                ...appendSkillRoutingOutcome(input.skillRoutingDiagnostics.current, 'no_candidate_queries'),
+                rewrite: summarizeSkillRewrite(rewrite),
+                candidateQueries
+            }
+        }
+        return null
+    }
 
-    const candidateGroups = await Promise.all(candidateQueries.map(async (candidateQuery) => {
+    const candidateGroupResults = await Promise.all(candidateQueries.map(async (candidateQuery) => {
         const candidateResult = await matchSkillsWithStatus({
             matcher: () => matchSkills(
                 candidateQuery,
@@ -1991,10 +2082,29 @@ async function tryIntentAwareDemoSkillReply(input: {
                 candidate_query: candidateQuery
             }
         })
-        return candidateResult.matches
+        return {
+            query: candidateQuery,
+            status: candidateResult.status,
+            matches: candidateResult.matches,
+            ...(candidateResult.status === 'error'
+                ? { error: candidateResult.error instanceof Error ? candidateResult.error.message : String(candidateResult.error) }
+                : {})
+        }
     }))
 
-    const candidates = mergeDemoSkillCandidates(candidateGroups)
+    const candidates = mergeDemoSkillCandidates(candidateGroupResults.map((group) => group.matches))
+    if (input.skillRoutingDiagnostics) {
+        input.skillRoutingDiagnostics.current = {
+            ...appendSkillRoutingOutcome(input.skillRoutingDiagnostics.current, 'no_semantic_candidates'),
+            rewrite: summarizeSkillRewrite(rewrite),
+            candidateQueries,
+            semanticCandidateGroups: candidateGroupResults.map((group) => ({
+                query: group.query,
+                matches: summarizeSkillMatches(group.matches)
+            })),
+            mergedCandidates: summarizeSkillMatches(candidates)
+        }
+    }
     if (candidates.length === 0) return null
 
     try {
@@ -2010,6 +2120,14 @@ async function tryIntentAwareDemoSkillReply(input: {
             readSkillCandidateVerifyTimeoutMs()
         )
         if (verificationResult.status === 'timeout') {
+            if (input.skillRoutingDiagnostics) {
+                input.skillRoutingDiagnostics.current = {
+                    ...appendSkillRoutingOutcome(input.skillRoutingDiagnostics.current, 'verification_timeout'),
+                    rewrite: summarizeSkillRewrite(rewrite),
+                    candidateQueries,
+                    mergedCandidates: summarizeSkillMatches(candidates)
+                }
+            }
             void verificationPromise.catch((error) => {
                 console.warn('Demo Chat: timed-out skill candidate verification failed later.', {
                     organization_id: input.channel.organizationId,
@@ -2020,9 +2138,37 @@ async function tryIntentAwareDemoSkillReply(input: {
         }
 
         const verification = verificationResult.result
+        if (input.skillRoutingDiagnostics) {
+            input.skillRoutingDiagnostics.current = {
+                ...appendSkillRoutingOutcome(
+                    input.skillRoutingDiagnostics.current,
+                    verification?.decision === 'skill' && verification.match
+                        ? 'verified_skill'
+                        : 'verification_no_skill'
+                ),
+                rewrite: summarizeSkillRewrite(rewrite),
+                candidateQueries,
+                mergedCandidates: summarizeSkillMatches(candidates),
+                verification: summarizeSkillVerification(verification)
+            }
+        }
         if (verification?.decision !== 'skill' || !verification.match) return null
-        return runMatchedDemoSkillReply(input, verification.match, 'verified')
+        return runMatchedDemoSkillReply(
+            input,
+            verification.match,
+            'verified',
+            input.skillRoutingDiagnostics?.current
+        )
     } catch (error) {
+        if (input.skillRoutingDiagnostics) {
+            input.skillRoutingDiagnostics.current = {
+                ...appendSkillRoutingOutcome(input.skillRoutingDiagnostics.current, 'verification_error'),
+                rewrite: summarizeSkillRewrite(rewrite),
+                candidateQueries,
+                mergedCandidates: summarizeSkillMatches(candidates),
+                error: error instanceof Error ? error.message : String(error)
+            }
+        }
         console.warn('Demo Chat: skill candidate verification failed; continuing with RAG fallback.', {
             organization_id: input.channel.organizationId,
             error
@@ -2076,6 +2222,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
         return NextResponse.json({ error: 'Demo access denied' }, { status: 401 })
     }
     const inboundMessageId = uuidv4()
+    const skillRoutingDiagnostics: DemoChatSkillRoutingDiagnosticsRef = { current: null }
     if (isDemoAssistantIdentityQuestion(message)) {
         const aiSettings = await getOrgAiSettings(channel.organizationId, {
             supabase,
@@ -2130,7 +2277,8 @@ export async function POST(req: NextRequest, context: RouteContext) {
         channel,
         sessionId,
         message,
-        inboundMessageId
+        inboundMessageId,
+        skillRoutingDiagnostics,
     })
     if (immediateSkillReply && immediateSkillReply !== 'pending') {
         return NextResponse.json({
@@ -2146,7 +2294,15 @@ export async function POST(req: NextRequest, context: RouteContext) {
             channel,
             sessionId,
             message,
-            inboundMessageId
+            inboundMessageId,
+            inboundMetadata: skillRoutingDiagnostics.current
+                ? {
+                    demo_chat_skill_routing: appendSkillRoutingOutcome(
+                        skillRoutingDiagnostics.current,
+                        'rag_fallback'
+                    )
+                }
+                : undefined,
         })
     }
 

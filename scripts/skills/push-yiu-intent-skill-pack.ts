@@ -222,7 +222,12 @@ async function main() {
   )
   const staleSkills = ((existingSkills ?? []) as SkillRow[])
     .filter((skill) => skill.enabled && !titles.includes(skill.title))
-  const touchedSkills: Array<{ id: string; title: string; triggerExamples: string[] }> = []
+  const touchedSkills: Array<{
+    id: string
+    title: string
+    triggerExamples: string[]
+    responseText: string
+  }> = []
   let inserted = 0
   let updated = 0
   let unchanged = 0
@@ -248,6 +253,7 @@ async function main() {
         id: existing!.id,
         title: intent.title,
         triggerExamples: intent.triggerExamples,
+        responseText: intent.responseText,
       })
       continue
     }
@@ -270,7 +276,12 @@ async function main() {
         throw new Error(`Failed to update ${intent.title}: ${error?.message ?? 'missing id'}`)
       }
       updated += 1
-      touchedSkills.push({ id: data.id, title: intent.title, triggerExamples: intent.triggerExamples })
+      touchedSkills.push({
+        id: data.id,
+        title: intent.title,
+        triggerExamples: intent.triggerExamples,
+        responseText: intent.responseText,
+      })
       continue
     }
 
@@ -292,7 +303,12 @@ async function main() {
       throw new Error(`Failed to insert ${intent.title}: ${error?.message ?? 'missing id'}`)
     }
     inserted += 1
-    touchedSkills.push({ id: data.id, title: intent.title, triggerExamples: intent.triggerExamples })
+    touchedSkills.push({
+      id: data.id,
+      title: intent.title,
+      triggerExamples: intent.triggerExamples,
+      responseText: intent.responseText,
+    })
   }
 
   const touchedIds = touchedSkills.map((skill) => skill.id)
@@ -306,7 +322,7 @@ async function main() {
   }
 
   const embeddingInputs = touchedSkills.flatMap((skill) =>
-    buildSkillEmbeddingTexts(skill.title, skill.triggerExamples).map((text) => ({
+    buildSkillEmbeddingTexts(skill.title, skill.triggerExamples, skill.responseText).map((text) => ({
       skillId: skill.id,
       triggerText: text,
     }))

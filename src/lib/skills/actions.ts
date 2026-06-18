@@ -265,7 +265,8 @@ export async function createSkill(skill: SkillInsert): Promise<Skill> {
         data.id,
         data.organization_id,
         data.title,
-        skill.trigger_examples
+        skill.trigger_examples,
+        data.response_text
     )
 
     const profileContent = `${data.title}\n${skill.trigger_examples.join('\n')}\n${data.response_text}`
@@ -412,19 +413,21 @@ export async function updateSkill(
     const triggersChanged = Array.isArray(updates.trigger_examples)
         && !areSkillTriggersEqual(existingSkill?.trigger_examples ?? currentTriggers ?? [], updates.trigger_examples)
 
-    // Regenerate embeddings when title or triggers change.
-    if (titleChanged || triggersChanged) {
+    // Regenerate embeddings when the semantic matching surface changes.
+    if (titleChanged || triggersChanged || responseTextChanged) {
         // Delete old embeddings
         await supabase.from('skill_embeddings').delete().eq('skill_id', skillId)
 
         // Generate new embeddings
         const nextTitle = data.title
         const nextTriggers = data.trigger_examples
+        const nextResponseText = data.response_text
         await generateAndStoreEmbeddings(
             skillId,
             data.organization_id,
             nextTitle,
-            nextTriggers
+            nextTriggers,
+            nextResponseText
         )
     }
 
@@ -524,7 +527,7 @@ async function ensureDefaultSystemSkills(
     const { data, error: insertError } = await supabase
         .from('skills')
         .insert(defaultSkills)
-        .select('id, organization_id, title, trigger_examples')
+        .select('id, organization_id, title, trigger_examples, response_text')
 
     if (insertError) {
         console.error('Failed to seed default system skills:', insertError)
@@ -537,7 +540,8 @@ async function ensureDefaultSystemSkills(
                 skill.id,
                 skill.organization_id,
                 skill.title,
-                skill.trigger_examples ?? []
+                skill.trigger_examples ?? [],
+                skill.response_text ?? ''
             )
         )
     )
@@ -550,9 +554,10 @@ async function generateAndStoreEmbeddings(
     skillId: string,
     organizationId: string,
     title: string,
-    triggerExamples: string[]
+    triggerExamples: string[],
+    responseText: string | null | undefined
 ): Promise<void> {
-    const embeddingTexts = buildSkillEmbeddingTexts(title, triggerExamples)
+    const embeddingTexts = buildSkillEmbeddingTexts(title, triggerExamples, responseText)
     if (embeddingTexts.length === 0) return
 
     const supabase = await createClient()
