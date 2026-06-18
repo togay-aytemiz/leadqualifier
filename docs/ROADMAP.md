@@ -5,7 +5,13 @@
 - [x] Add a risk-triggered answer/evidence verifier for non-Skill simple RAG without turning it into a global judge.
 - [x] Allow exactly one verifier-proposed retry query before no-info/clarification.
 - [x] Add retrieval-attempt and verifier diagnostics to the YİÜ route eval report.
-- [ ] Use the enriched eval report on the next random 100 run to separate true corpus gaps from retrieval/query/answer failures.
+- [x] Use the enriched eval report on the next random 100 run to separate true corpus gaps from retrieval/query/answer failures.
+
+> **Evaluation Update (2026-06-18):** A fresh YİÜ Public Demo random 100 run was executed after the risk-triggered RAG verifier. The run completed `99/100` with `1` transport/eval error and route counts of `40` Skill answers, `30` grounded RAG answers, `16` no-info replies, `11` clarifications, and `2` assistant-identity replies. Manual Codex review scored the completed answers `7.10/10` with `54` strong, `26` usable, `12` weak, and `7` bad answers. No-info is now mostly defensible, but four supported facts still false-no-info'd from the approved corpus: Dil ve Konuşma Terapisi quota, Grafik Tasarım quota, university foundation/operation year, and SHMYO program list. The next focused improvement is a generated program-level brochure fact Skill pack so fee/quota/presence/rank questions land on precise program facts before fallback RAG (`docs/evaluations/yiu-routing-random-100-codex-review-2026-06-18T10-29-56-934Z.md`).
+
+- [ ] Generate program-level YİÜ brochure fact Skills from the verified 2025 brochure extraction.
+- [ ] Update Skill push/audit scripts to treat the base intent pack and generated program-fact pack as one active union.
+- [ ] Probe the false no-info and wrong-facet cases before running another random 100.
 
 > **Implementation Update (2026-06-18):** YİÜ simple RAG and Skill coverage were hardened against the latest random-100 failures without adding a new orchestration layer. The query rewriter now treats ordinary payment-policy questions such as credit-card installment availability as searchable policy questions rather than credential collection, while still refusing card/IBAN/TC/password handling. Grounded answers now reject positive “university hospital exists” claims when the evidence only mentions the founding hospital foundation or generic health-center wording. The YİÜ Skill pack was expanded from `61` to `62` active intents with stronger natural phrases for Tıp/Anestezi/MYO quota-fee questions and a separate program-change/yatay-geçiş intent; production Skill embeddings were refreshed to `694` rows. A targeted 7-question local demo probe completed with `5` Skill answers and `2` safe no-info answers, with no false hospital claim and no mistaken payment-safety refusal.
 
