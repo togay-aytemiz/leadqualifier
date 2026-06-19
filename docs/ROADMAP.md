@@ -1,5 +1,12 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Evaluation Update (2026-06-19):** The routing-metadata change was tested with the same production seed and same 100 questions. The run completed `100/100` with zero errors: `35` Skill answers, `32` grounded RAG answers, `22` no-info replies, `7` clarifications, `2` direct answers, `1` identity answer, and `1` refusal. The change fixed the known Ebelik false no-info and removed several broad/wrong single-program matches, but it also introduced a false no-info for `grafik tasarım kaç para` and exposed wrong-facet Skill matches plus unsupported hospital/laboratory/practice RAG inferences. The result is directionally useful but not yet a net quality win (`docs/evaluations/yiu-routing-random-100-same-seed-comparison-2026-06-19T07-55-33-843Z.md`).
+
+- [x] Rerun the same-seed production random 100 after adding Skill routing descriptions and coverage facets.
+- [x] Compare route changes and manually inspect the highest-risk improvements/regressions.
+- [ ] Persist fallback Skill candidate/verifier diagnostics and trace the Grafik Tasarım fee miss.
+- [ ] Tighten RAG evidence validation for hospital, facility, device-practice, and laboratory-existence claims.
+
 > **Implementation Update (2026-06-19):** Source-backed Skills now have internal `routing_description` and `coverage_facets` metadata so semantic matching can understand both what a Skill covers and what it should not cover without leaking source mechanics into customer-facing answers. Skill embeddings now include this routing scope, the Skill verifier receives it as internal matching context, and diagnostics expose compact scope/facet summaries for candidate review. The YİÜ generated/general Skill union was republished to production with `70` active Skills, `26` program fact Skills, and `2615/2615` verified embedding rows after applying migration `20260619072537_add_skill_routing_description.sql`.
 
 - [x] Add internal Skill routing descriptions and coverage facets to the database schema.
@@ -729,7 +736,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-06-19 (Added routing metadata to Skills, republished YİÜ routing-aware embeddings, and prepared the next same-seed rerun.)
+> **Last Updated:** 2026-06-19 (Reran the same-seed YİÜ random 100 and documented routing-metadata improvements and regressions.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
