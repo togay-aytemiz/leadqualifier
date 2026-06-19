@@ -33,6 +33,15 @@ export function auditYiuIntentSkillPack(markdown: string, brochureMarkdown: stri
   const sourceClerkResponses = intents
     .filter((intent) => SOURCE_CLERK_PATTERN.test(intent.responseText))
     .map((intent) => intent.slug)
+  const missingRoutingDescriptions = intents
+    .filter((intent) => intent.routingDescription.trim().length < 80)
+    .map((intent) => intent.slug)
+  const missingCoverageFacets = intents
+    .filter((intent) => intent.coverageFacets.length === 0)
+    .map((intent) => intent.slug)
+  const programScopeLeaks = buildYiuProgramFactIntents(brochureMarkdown)
+    .filter((intent) => !/\bKapsam sadece\b/iu.test(intent.routingDescription))
+    .map((intent) => intent.slug)
   const bySlug = new Map(intents.map((intent) => [intent.slug, intent.responseText]))
   const knownFactMismatches = buildYiuProgramFactIntents(brochureMarkdown)
     .filter((expected) => bySlug.get(expected.slug) !== expected.responseText)
@@ -43,6 +52,9 @@ export function auditYiuIntentSkillPack(markdown: string, brochureMarkdown: stri
     exampleCount: intents.reduce((sum, intent) => sum + intent.triggerExamples.length, 0),
     duplicateTriggers,
     sourceClerkResponses,
+    missingRoutingDescriptions,
+    missingCoverageFacets,
+    programScopeLeaks,
     knownFactMismatches,
   }
 }
@@ -62,6 +74,9 @@ async function main() {
     audit.intentCount < 65 ||
     audit.duplicateTriggers.length > 0 ||
     audit.sourceClerkResponses.length > 0 ||
+    audit.missingRoutingDescriptions.length > 0 ||
+    audit.missingCoverageFacets.length > 0 ||
+    audit.programScopeLeaks.length > 0 ||
     audit.knownFactMismatches.length > 0
   ) {
     process.exitCode = 1

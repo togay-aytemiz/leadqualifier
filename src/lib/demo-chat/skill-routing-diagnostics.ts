@@ -64,6 +64,11 @@ function summarizeSkillMatch(match: SkillMatch) {
         skillId: match.skill_id,
         title: normalizeText(match.title),
         trigger: normalizeText(match.trigger_text),
+        routingDescription: normalizeText(match.routing_description),
+        coverageFacets: (match.coverage_facets ?? [])
+            .map((facet) => normalizeText(facet, 64))
+            .filter(Boolean)
+            .slice(0, 8),
         similarity: match.similarity,
     }
 }

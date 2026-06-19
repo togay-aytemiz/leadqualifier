@@ -69,6 +69,24 @@ function normalizeSkillTriggers(value: string[] | null | undefined) {
     return (value ?? []).map(trigger => trigger.trim()).filter(Boolean)
 }
 
+function normalizeSkillFacets(value: string[] | null | undefined) {
+    return (value ?? []).map(facet => facet.trim()).filter(Boolean)
+}
+
+function areStringArraysEqual(
+    previousValue: string[] | null | undefined,
+    nextValue: string[] | null | undefined
+) {
+    const previous = normalizeSkillFacets(previousValue)
+    const next = normalizeSkillFacets(nextValue)
+
+    if (previous.length !== next.length) {
+        return false
+    }
+
+    return previous.every((value, index) => value === next[index])
+}
+
 function areSkillTriggersEqual(
     previousValue: string[] | null | undefined,
     nextValue: string[] | null | undefined
@@ -108,7 +126,7 @@ export async function matchExactSkillTriggers(
 
     const { data, error } = await supabase
         .from('skills')
-        .select('id, title, response_text, trigger_examples')
+        .select('id, title, response_text, routing_description, coverage_facets, trigger_examples')
         .eq('organization_id', organizationId)
         .eq('enabled', true)
         .limit(100)
@@ -133,6 +151,8 @@ export async function matchExactSkillTriggers(
             skill_id: skill.id,
             title: skill.title,
             response_text: skill.response_text,
+            routing_description: skill.routing_description,
+            coverage_facets: skill.coverage_facets,
             trigger_text: matchedTrigger,
             similarity: 1
         })
@@ -188,7 +208,7 @@ function buildSkillsListQuery(
     if (search && search.trim()) {
         const term = search.trim()
         const searchTerm = `%${term}%`
-        query = query.or(`title.ilike.${searchTerm},response_text.ilike.${searchTerm},trigger_examples.cs.{${term}}`)
+        query = query.or(`title.ilike.${searchTerm},response_text.ilike.${searchTerm},routing_description.ilike.${searchTerm},trigger_examples.cs.{${term}}`)
     }
 
     return query
@@ -266,10 +286,18 @@ export async function createSkill(skill: SkillInsert): Promise<Skill> {
         data.organization_id,
         data.title,
         skill.trigger_examples,
-        data.response_text
+        data.response_text,
+        data.routing_description,
+        data.coverage_facets
     )
 
-    const profileContent = `${data.title}\n${skill.trigger_examples.join('\n')}\n${data.response_text}`
+    const profileContent = [
+        data.title,
+        data.routing_description,
+        ...(data.coverage_facets ?? []),
+        skill.trigger_examples.join('\n'),
+        data.response_text
+    ].filter(Boolean).join('\n')
 
     try {
         await appendServiceCatalogCandidates({
@@ -377,7 +405,7 @@ export async function updateSkill(
     await assertTenantWriteAllowed(supabase)
     const { data: existingSkill, error: existingSkillError } = await supabase
         .from('skills')
-        .select('id, organization_id, title, response_text, trigger_examples, image_storage_path')
+        .select('id, organization_id, title, response_text, routing_description, coverage_facets, trigger_examples, image_storage_path')
         .eq('id', skillId)
         .single()
 
@@ -412,9 +440,13 @@ export async function updateSkill(
         && normalizeSkillText(updates.response_text) !== normalizeSkillText(existingSkill?.response_text)
     const triggersChanged = Array.isArray(updates.trigger_examples)
         && !areSkillTriggersEqual(existingSkill?.trigger_examples ?? currentTriggers ?? [], updates.trigger_examples)
+    const routingDescriptionChanged = typeof updates.routing_description === 'string'
+        && normalizeSkillText(updates.routing_description) !== normalizeSkillText(existingSkill?.routing_description)
+    const coverageFacetsChanged = Array.isArray(updates.coverage_facets)
+        && !areStringArraysEqual(existingSkill?.coverage_facets ?? [], updates.coverage_facets)
 
     // Regenerate embeddings when the semantic matching surface changes.
-    if (titleChanged || triggersChanged || responseTextChanged) {
+    if (titleChanged || triggersChanged || responseTextChanged || routingDescriptionChanged || coverageFacetsChanged) {
         // Delete old embeddings
         await supabase.from('skill_embeddings').delete().eq('skill_id', skillId)
 
@@ -427,13 +459,21 @@ export async function updateSkill(
             data.organization_id,
             nextTitle,
             nextTriggers,
-            nextResponseText
+            nextResponseText,
+            data.routing_description,
+            data.coverage_facets
         )
     }
 
-    const shouldPropose = titleChanged || responseTextChanged || triggersChanged
+    const shouldPropose = titleChanged || responseTextChanged || triggersChanged || routingDescriptionChanged || coverageFacetsChanged
     if (shouldPropose) {
-        const profileContent = `${data.title}\n${data.trigger_examples.join('\n')}\n${data.response_text}`
+        const profileContent = [
+            data.title,
+            data.routing_description,
+            ...(data.coverage_facets ?? []),
+            data.trigger_examples.join('\n'),
+            data.response_text
+        ].filter(Boolean).join('\n')
 
         try {
             await appendServiceCatalogCandidates({
@@ -527,7 +567,7 @@ async function ensureDefaultSystemSkills(
     const { data, error: insertError } = await supabase
         .from('skills')
         .insert(defaultSkills)
-        .select('id, organization_id, title, trigger_examples, response_text')
+        .select('id, organization_id, title, trigger_examples, response_text, routing_description, coverage_facets')
 
     if (insertError) {
         console.error('Failed to seed default system skills:', insertError)
@@ -541,7 +581,9 @@ async function ensureDefaultSystemSkills(
                 skill.organization_id,
                 skill.title,
                 skill.trigger_examples ?? [],
-                skill.response_text ?? ''
+                skill.response_text ?? '',
+                skill.routing_description ?? '',
+                skill.coverage_facets ?? []
             )
         )
     )
@@ -555,9 +597,17 @@ async function generateAndStoreEmbeddings(
     organizationId: string,
     title: string,
     triggerExamples: string[],
-    responseText: string | null | undefined
+    responseText: string | null | undefined,
+    routingDescription?: string | null,
+    coverageFacets?: string[] | null
 ): Promise<void> {
-    const embeddingTexts = buildSkillEmbeddingTexts(title, triggerExamples, responseText)
+    const embeddingTexts = buildSkillEmbeddingTexts(
+        title,
+        triggerExamples,
+        responseText,
+        routingDescription,
+        coverageFacets
+    )
     if (embeddingTexts.length === 0) return
 
     const supabase = await createClient()

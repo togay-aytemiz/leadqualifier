@@ -21,6 +21,8 @@ describe('YIU program fact Skills', () => {
     expect(new Set(intents.map((intent) => intent.slug)).size).toBe(26)
     expect(intents.every((intent) => intent.triggerExamples.length >= 12)).toBe(true)
     expect(intents.every((intent) => intent.responseText.length > 200)).toBe(true)
+    expect(intents.every((intent) => intent.routingDescription.length > 120)).toBe(true)
+    expect(intents.every((intent) => intent.coverageFacets.length >= 10)).toBe(true)
   })
 
   it('expands natural fee, availability, campus, and alias phrases for each program', async () => {
@@ -77,6 +79,20 @@ describe('YIU program fact Skills', () => {
     )
     expect(PROGRAM_REPLACED_BASE_SLUGS).toContain('myo_ucretler')
     expect(PROGRAM_REPLACED_BASE_SLUGS).toContain('ergoterapi_ebelik_ucret_kontenjan')
+  })
+
+  it('marks program-specific routing scope so broad questions do not collapse into one program', async () => {
+    const intents = buildYiuProgramFactIntents(await readFile(brochurePath, 'utf8'))
+    const ftr = intents.find(
+      (intent) => intent.slug === 'fizyoterapi_rehabilitasyon_ucret_kontenjan'
+    )
+
+    expect(ftr?.routingDescription).toContain('Kapsam sadece Fizyoterapi ve Rehabilitasyon')
+    expect(ftr?.routingDescription).toContain('tüm programlar/çoklu program listeleri')
+    expect(ftr?.routingDescription).toContain('staj/klinik uygulama')
+    expect(ftr?.coverageFacets).toEqual(
+      expect.arrayContaining(['program_existence', 'fee', 'quota', 'campus'])
+    )
   })
 
   it('renders a parseable customer-facing pack without source-clerk language', async () => {

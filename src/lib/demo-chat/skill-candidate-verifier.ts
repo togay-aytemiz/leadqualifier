@@ -67,10 +67,13 @@ function systemPrompt() {
     return [
         'Select the best approved Skill for the latest user message.',
         'A Skill is eligible only when the supplied Skill response itself directly answers the requested subject and facet.',
+        'Use routing_description and coverage_facets as internal scope hints for matching; do not treat them as customer-facing answer text.',
         'Prefer a supplied Skill when its reusable intent answer directly covers the requested subject and facet, even if wording is not exact.',
         'Compare meaning, requested fact family, and entity, not just shared words or broad topic similarity.',
         'A matching subject with the wrong facet is NO_SKILL. A matching facet for the wrong program, department, service, or entity is NO_SKILL.',
         'Do not substitute a parent or nearby entity for a more specific requested entity. A university-level answer does not answer a faculty, hospital, campus, department, program, dorm, event, or service question unless that exact entity is covered.',
+        'If the user asks a broad all-program, all-campus, all-price, all-quota, or university-wide question, do not select a single-program Skill unless its routing_description explicitly covers that broad set.',
+        'If routing_description or coverage_facets clearly exclude the requested subject or facet, return NO_SKILL.',
         'If the Skill is only a nearby topic, broad background, or would require extra retrieval to answer the actual question, it is NO_SKILL.',
         'If the user asks a specific detail and the Skill response does not contain that detail or a clear equivalent, it is NO_SKILL.',
         'Do not reject a useful Skill merely because the user omitted the active organization name, year, or a narrower filter such as burs type. The Skill can answer generally when its response covers the family of facts.',
@@ -116,6 +119,14 @@ export async function verifyDemoSkillCandidates(input: {
                         skill_id: candidate.skill_id,
                         title: normalizeText(candidate.title, 220),
                         trigger: normalizeText(candidate.trigger_text, 260),
+                        routing_description: normalizeText(
+                            candidate.routing_description,
+                            MAX_TEXT_CHARS
+                        ),
+                        coverage_facets: (candidate.coverage_facets ?? [])
+                            .map((facet) => normalizeText(facet, 80))
+                            .filter(Boolean)
+                            .slice(0, 14),
                         response_summary: normalizeText(candidate.response_text, MAX_TEXT_CHARS),
                         similarity: candidate.similarity,
                     })),

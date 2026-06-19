@@ -66,7 +66,7 @@ async function main() {
 
   const { data: skills, error: skillsError } = await client
     .from('skills')
-    .select('id, title, trigger_examples, response_text, enabled')
+    .select('id, title, trigger_examples, response_text, routing_description, coverage_facets, enabled')
     .eq('organization_id', channel.organization_id)
     .like('title', `${PREFIX}%`)
   if (skillsError) throw new Error(skillsError.message)
@@ -78,6 +78,12 @@ async function main() {
     const row = activeByTitle.get(intent.title)
     if (!row) return [`missing:${intent.title}`]
     if (row.response_text !== intent.responseText) return [`response:${intent.title}`]
+    if (row.routing_description !== intent.routingDescription) {
+      return [`routing_description:${intent.title}`]
+    }
+    if (JSON.stringify(row.coverage_facets ?? []) !== JSON.stringify(intent.coverageFacets)) {
+      return [`coverage_facets:${intent.title}`]
+    }
     if (JSON.stringify(row.trigger_examples) !== JSON.stringify(intent.triggerExamples)) {
       return [`triggers:${intent.title}`]
     }
@@ -98,7 +104,9 @@ async function main() {
     (sum, intent) => sum + buildSkillEmbeddingTexts(
       intent.title,
       intent.triggerExamples,
-      intent.responseText
+      intent.responseText,
+      intent.routingDescription,
+      intent.coverageFacets
     ).length,
     0
   )

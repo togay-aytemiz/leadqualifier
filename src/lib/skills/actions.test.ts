@@ -212,6 +212,8 @@ describe('matchSkills', () => {
                 skill_id: 'skill-greeting',
                 title: 'Karşılama ve İlk Mesaj',
                 response_text: 'Merhaba, yardımcı olayım. Hangi konuda bilgi almak istersiniz?',
+                routing_description: undefined,
+                coverage_facets: undefined,
                 trigger_text: '/start',
                 similarity: 1
             }

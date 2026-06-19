@@ -14,6 +14,8 @@ export type ParsedIntent = {
   slug: string
   title: string
   triggerExamples: string[]
+  routingDescription: string
+  coverageFacets: string[]
   responseText: string
 }
 
@@ -22,6 +24,8 @@ type SkillRow = {
   title: string
   trigger_examples: string[]
   response_text: string
+  routing_description: string
+  coverage_facets: string[]
   enabled: boolean
   requires_human_handover: boolean
 }
@@ -82,6 +86,52 @@ function extractBlock(section: string, startLabel: string, endLabel: string) {
   return (end >= 0 ? afterStart.slice(0, end) : afterStart).trim()
 }
 
+const FACET_KEYWORDS: Array<[string, RegExp]> = [
+  ['identity', /\b(kimsin|bot|asistan|chatgpt|kimlik|görev)\b/iu],
+  ['program_existence', /\b(var mı|bölüm|program|fakülte|myo|yüksekokul)\b/iu],
+  ['program_overview', /\b(nedir|tanıt|hakkında|nasıl bir)\b/iu],
+  ['academic_unit', /\b(akademik birim|fakülte|yüksekokul|myo|bünyesinde)\b/iu],
+  ['degree_level', /\b(lisans|ön lisans|kaç yıllık|süre)\b/iu],
+  ['fee', /\b(ücret|fiyat|para|tl|ödeme)\b/iu],
+  ['quota', /\b(kontenjan|kaç kişi)\b/iu],
+  ['scholarship', /\b(burs|burslu|indirim|%50|yüzde 50)\b/iu],
+  ['base_score', /\b(taban puan|puanı|puan türü)\b/iu],
+  ['success_rank', /\b(başarı sırası|sıralama|sırası)\b/iu],
+  ['campus', /\b(kampüs|yerleşke|adres|nerede|ulaşım)\b/iu],
+  ['registration', /\b(kayıt|admission|başvuru|tercih)\b/iu],
+  ['document_policy', /\b(yönerge|yönetmelik|mevzuat|belge|dilekçe)\b/iu],
+  ['education_model', /\b(eğitim modeli|müfredat|ders|klinik|uygulama|laboratuvar|kadavra|staj)\b/iu],
+  ['contact', /\b(telefon|e-?posta|mail|iletişim)\b/iu],
+  ['boundary', /\b(kapsam dışı|insan desteği|şikayet|acil|gizlilik)\b/iu],
+]
+
+function buildCoverageFacets(slug: string, triggerExamples: string[], responseText: string) {
+  const haystack = [slug.replace(/_/g, ' '), ...triggerExamples, responseText].join('\n')
+  const facets = FACET_KEYWORDS
+    .filter(([, pattern]) => pattern.test(haystack))
+    .map(([facet]) => facet)
+
+  return [...new Set(facets.length > 0 ? facets : ['general_info'])]
+}
+
+function buildRoutingDescription(input: {
+  slug: string
+  title: string
+  goal: string
+  triggerExamples: string[]
+  responseText: string
+}) {
+  const sampleQuestions = input.triggerExamples.slice(0, 6).join(' | ')
+  const responsePreview = input.responseText.replace(/\s+/g, ' ').trim().slice(0, 520)
+  const goal = input.goal.replace(/\s+/g, ' ').trim()
+  return [
+    `${input.title} Skill kapsamı.`,
+    goal || 'Bu intent, kullanıcı sorusunu hazır YİÜ aday öğrenci cevabına yönlendirmek için kullanılır.',
+    `Tipik sorular: ${sampleQuestions}.`,
+    `Yanıtın kapsadığı bilgi: ${responsePreview}`,
+  ].join(' ').replace(/\s+/g, ' ').trim()
+}
+
 export function parseIntentPack(markdown: string): ParsedIntent[] {
   const sections = markdown.split(/\n---\n/g).filter((section) => /^## \d{2}\. /m.test(section))
 
@@ -96,6 +146,7 @@ export function parseIntentPack(markdown: string): ParsedIntent[] {
     }
     const trimmedSlug = slug.trim()
 
+    const goal = extractBlock(section, 'Amaç:', '\n\nKullanıcı örnekleri:')
     const examplesBlock = extractBlock(section, 'Kullanıcı örnekleri:', '\n\nInstructed cevap:')
     const triggerExamples = examplesBlock
       .split(/\r?\n/g)
@@ -118,6 +169,14 @@ export function parseIntentPack(markdown: string): ParsedIntent[] {
       slug: trimmedSlug,
       title: `${SKILL_TITLE_PREFIX}${order} ${trimmedSlug}`,
       triggerExamples,
+      routingDescription: buildRoutingDescription({
+        slug: trimmedSlug,
+        title: `${SKILL_TITLE_PREFIX}${order} ${trimmedSlug}`,
+        goal,
+        triggerExamples,
+        responseText,
+      }),
+      coverageFacets: buildCoverageFacets(trimmedSlug, triggerExamples, responseText),
       responseText,
     }
   })
@@ -184,6 +243,8 @@ function skillNeedsUpdate(existing: SkillRow | undefined, intent: ParsedIntent) 
   if (!existing) return true
   return (
     existing.response_text !== intent.responseText ||
+    existing.routing_description !== intent.routingDescription ||
+    !arraysEqual(existing.coverage_facets ?? [], intent.coverageFacets) ||
     !arraysEqual(existing.trigger_examples ?? [], intent.triggerExamples) ||
     existing.enabled !== true ||
     existing.requires_human_handover !== false
@@ -237,7 +298,7 @@ async function main() {
   const titles = intents.map((intent) => intent.title)
   const { data: existingSkills, error: existingError } = await supabase
     .from('skills')
-    .select('id, title, trigger_examples, response_text, enabled, requires_human_handover')
+    .select('id, title, trigger_examples, response_text, routing_description, coverage_facets, enabled, requires_human_handover')
     .eq('organization_id', channel.organization_id)
     .like('title', `${SKILL_TITLE_PREFIX}%`)
 
@@ -254,6 +315,8 @@ async function main() {
     title: string
     triggerExamples: string[]
     responseText: string
+    routingDescription: string
+    coverageFacets: string[]
   }> = []
   let inserted = 0
   let updated = 0
@@ -283,6 +346,8 @@ async function main() {
         id: existing!.id,
         title: intent.title,
         triggerExamples: intent.triggerExamples,
+        routingDescription: intent.routingDescription,
+        coverageFacets: intent.coverageFacets,
         responseText: intent.responseText,
       })
       continue
@@ -294,6 +359,8 @@ async function main() {
         .update({
           trigger_examples: intent.triggerExamples,
           response_text: intent.responseText,
+          routing_description: intent.routingDescription,
+          coverage_facets: intent.coverageFacets,
           enabled: true,
           requires_human_handover: false,
           skill_actions: [],
@@ -310,6 +377,8 @@ async function main() {
         id: data.id,
         title: intent.title,
         triggerExamples: intent.triggerExamples,
+        routingDescription: intent.routingDescription,
+        coverageFacets: intent.coverageFacets,
         responseText: intent.responseText,
       })
       continue
@@ -321,6 +390,8 @@ async function main() {
         organization_id: channel.organization_id,
         title: intent.title,
         trigger_examples: intent.triggerExamples,
+        routing_description: intent.routingDescription,
+        coverage_facets: intent.coverageFacets,
         response_text: intent.responseText,
         enabled: true,
         requires_human_handover: false,
@@ -337,6 +408,8 @@ async function main() {
       id: data.id,
       title: intent.title,
       triggerExamples: intent.triggerExamples,
+      routingDescription: intent.routingDescription,
+      coverageFacets: intent.coverageFacets,
       responseText: intent.responseText,
     })
   }
@@ -352,7 +425,13 @@ async function main() {
   }
 
   const embeddingInputs = touchedSkills.flatMap((skill) =>
-    buildSkillEmbeddingTexts(skill.title, skill.triggerExamples, skill.responseText).map(
+    buildSkillEmbeddingTexts(
+      skill.title,
+      skill.triggerExamples,
+      skill.responseText,
+      skill.routingDescription,
+      skill.coverageFacets
+    ).map(
       (text) => ({
         skillId: skill.id,
         triggerText: text,

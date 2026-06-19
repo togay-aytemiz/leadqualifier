@@ -60,4 +60,21 @@ describe('buildSkillEmbeddingTexts', () => {
         )
         expect(texts.some((text) => text.includes('Kaynak notu'))).toBe(false)
     })
+
+    it('adds internal routing description and coverage facet signals', () => {
+        const texts = buildSkillEmbeddingTexts(
+            'YİÜ Intent - 71 ebelik_program_bilgileri',
+            ['Ebelik kontenjanı kaç?'],
+            'Ebelik, Sağlık Bilimleri Fakültesi bünyesinde bir lisans programıdır.',
+            'Ebelik programına özel varlık, ücret, kontenjan, kampüs ve başarı sırası sorularını kapsar; genel üniversite sorularını kapsamaz.',
+            ['program_existence', 'fee', 'quota', 'campus']
+        )
+
+        expect(texts).toContain(
+            'YİÜ Intent - 71 ebelik_program_bilgileri: routing scope: Ebelik programına özel varlık, ücret, kontenjan, kampüs ve başarı sırası sorularını kapsar; genel üniversite sorularını kapsamaz.'
+        )
+        expect(texts).toContain(
+            'YİÜ Intent - 71 ebelik_program_bilgileri: coverage facet: quota'
+        )
+    })
 })

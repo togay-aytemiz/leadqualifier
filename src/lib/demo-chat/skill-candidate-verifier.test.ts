@@ -7,6 +7,8 @@ const candidates = [
         skill_id: 'skill-anatomy',
         title: 'Tıp anatomi laboratuvarı ve kadavra',
         response_text: 'Anatomi laboratuvarında kadavra diseksiyonu yapılır.',
+        routing_description: 'Tıp Fakültesi anatomi laboratuvarı ve kadavra uygulaması sorularını kapsar.',
+        coverage_facets: ['education_model', 'laboratory'],
         trigger_text: 'Kadavra var mı?',
         similarity: 0.88,
     },
@@ -14,6 +16,8 @@ const candidates = [
         skill_id: 'skill-anesthesia',
         title: 'Anestezi programı uygulama olanakları',
         response_text: 'Anestezi programının uygulama olanakları açıklanır.',
+        routing_description: 'Anestezi programına özel laboratuvar ve uygulama olanakları sorularını kapsar; genel MYO sorularını kapsamaz.',
+        coverage_facets: ['program_overview', 'laboratory'],
         trigger_text: 'Anestezi laboratuvarı var mı?',
         similarity: 0.84,
     },
@@ -127,5 +131,43 @@ describe('verifyDemoSkillCandidates', () => {
         })
 
         expect(result).toBeNull()
+    })
+
+    it('sends routing scope metadata to the verifier model without answering', async () => {
+        const createCompletion = vi.fn().mockResolvedValue({
+            choices: [{
+                message: {
+                    content: JSON.stringify({
+                        skill_id: 'skill-anesthesia',
+                        coverage: 'direct',
+                        confidence: 0.94,
+                        reason: 'Scope metadata and response summary cover the requested facet.',
+                    }),
+                },
+            }],
+        })
+
+        await verifyDemoSkillCandidates({
+            latestUserMessage: 'Anestezi laboratuvarı var mı?',
+            standaloneQuery: 'Anestezi programında laboratuvar var mı?',
+            subject: 'Anestezi programı',
+            facet: 'laboratuvar varlığı',
+            candidates,
+            createCompletion,
+        })
+
+        const request = createCompletion.mock.calls[0]?.[0] as {
+            messages?: Array<{ role: string; content: string }>
+        }
+        const systemMessage = request.messages?.find((message) => message.role === 'system')?.content
+        const userPayload = JSON.parse(
+            request.messages?.find((message) => message.role === 'user')?.content ?? '{}'
+        )
+
+        expect(systemMessage).toContain('routing_description')
+        expect(userPayload.candidates[1]).toMatchObject({
+            routing_description: 'Anestezi programına özel laboratuvar ve uygulama olanakları sorularını kapsar; genel MYO sorularını kapsamaz.',
+            coverage_facets: ['program_overview', 'laboratory'],
+        })
     })
 })

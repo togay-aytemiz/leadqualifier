@@ -348,6 +348,8 @@ export interface Skill {
     title: string
     trigger_examples: string[]
     response_text: string
+    routing_description: string
+    coverage_facets: string[]
     skill_actions?: SkillAction[]
     image_storage_path?: string | null
     image_public_url?: string | null
@@ -375,6 +377,8 @@ export interface SkillMatch {
     skill_id: string
     title: string
     response_text: string
+    routing_description?: string | null
+    coverage_facets?: string[] | null
     trigger_text: string
     similarity: number
 }
@@ -614,7 +618,13 @@ export interface Lead {
     updated_at: string
 }
 
-export type SkillInsert = Omit<Skill, 'id' | 'created_at' | 'updated_at'>
+export type SkillInsert = Omit<
+    Skill,
+    'id' | 'created_at' | 'updated_at' | 'routing_description' | 'coverage_facets'
+> & {
+    routing_description?: string
+    coverage_facets?: string[]
+}
 export type SkillUpdate = Partial<Omit<Skill, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
 
 export type ConversationInsert = Omit<Conversation, 'id' | 'created_at' | 'updated_at'>

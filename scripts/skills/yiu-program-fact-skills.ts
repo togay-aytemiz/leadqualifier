@@ -3,6 +3,8 @@ export type YiuProgramFactIntent = {
   slug: string
   title: string
   triggerExamples: string[]
+  routingDescription: string
+  coverageFacets: string[]
   responseText: string
 }
 
@@ -28,6 +30,21 @@ type ProgramDefinition = {
 }
 
 const SKILL_TITLE_PREFIX = 'YİÜ Intent - '
+const PROGRAM_FACT_COVERAGE_FACETS = [
+  'program_existence',
+  'program_overview',
+  'academic_unit',
+  'degree_level',
+  'campus',
+  'address',
+  'point_type',
+  'fee',
+  'quota',
+  'scholarship',
+  'discount',
+  'base_score',
+  'success_rank',
+] as const
 
 export const PROGRAM_REPLACED_BASE_SLUGS = [
   'tip_ucretleri',
@@ -512,6 +529,18 @@ function buildResponse(
   return lines.join('\n')
 }
 
+function buildRoutingDescription(definition: ProgramDefinition, options: ProgramOption[]) {
+  const variants = [...new Set(options.map((option) => option.variant))].join(', ')
+  const aliases = definition.aliases.length ? ` Kullanıcı ${definition.aliases.join(', ')} adlarıyla da sorabilir.` : ''
+
+  return [
+    `${definition.displayName} programına özel Skill.`,
+    `${definition.unit} altındaki ${definition.degree} programının varlığı, ne olduğu, akademik birimi, yerleşkesi/adresi, puan türü, 2025 ücret ve kontenjan seçenekleri (${variants}), 2024 taban puanı ve başarı sırası sorularını kapsar.`,
+    `${aliases}`,
+    `Kapsam sadece ${definition.displayName} programıdır; tüm programlar/çoklu program listeleri, başka programlar, genel üniversite tanıtımı, akreditasyon, staj/klinik uygulama, laboratuvar-cihaz ayrıntısı, iş garantisi, ödeme yöntemi, yatay geçiş, denklik ve mevzuat sorularını kapsamaz.`,
+  ].join(' ').replace(/\s+/g, ' ').trim()
+}
+
 export function buildYiuProgramFactIntents(markdown: string): YiuProgramFactIntent[] {
   const optionsByProgram = parseOptions(markdown)
   const preparationFee =
@@ -528,6 +557,8 @@ export function buildYiuProgramFactIntents(markdown: string): YiuProgramFactInte
       slug: definition.slug,
       title: `${SKILL_TITLE_PREFIX}${definition.order} ${definition.slug}`,
       triggerExamples: buildTriggers(definition),
+      routingDescription: buildRoutingDescription(definition, options),
+      coverageFacets: [...PROGRAM_FACT_COVERAGE_FACETS],
       responseText: buildResponse(
         definition,
         options,
