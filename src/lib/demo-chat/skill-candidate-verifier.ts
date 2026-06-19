@@ -31,7 +31,7 @@ export type DemoSkillCandidateVerificationResult = {
 }
 
 const DEFAULT_MODEL = 'gpt-4.1-mini'
-const MAX_CANDIDATES = 10
+const MAX_CANDIDATES = 20
 const MAX_TEXT_CHARS = 600
 
 function normalizeText(value: unknown, maxLength: number) {

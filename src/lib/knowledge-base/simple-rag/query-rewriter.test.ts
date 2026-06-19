@@ -10,20 +10,20 @@ function completion(payload: Record<string, unknown>) {
 }
 
 describe('rewriteSimpleRagQuery', () => {
-  it('uses history only to resolve the latest referential question', async () => {
+  it('uses history to inherit the facet while the latest message replaces the subject', async () => {
     const createCompletion = vi.fn(async (_args: Record<string, unknown>) =>
       completion({
         status: 'search',
-        standalone_query: 'İngilizce Tıp programının ücreti nedir?',
+        standalone_query: 'Hemşirelik programının ücreti nedir?',
         response_language: 'tr',
       })
     )
 
     const result = await rewriteSimpleRagQuery({
-      latestUserMessage: 'Peki bunun fiyatı ne?',
+      latestUserMessage: 'Ya Hemşirelik peki?',
       recentMessages: [
-        { role: 'user', content: 'İngilizce Tıp programını soruyorum' },
-        { role: 'assistant', content: 'İngilizce Tıp hakkında yardımcı olabilirim.' },
+        { role: 'user', content: 'Tıp kaç para?' },
+        { role: 'assistant', content: 'Tıp programının ücretini paylaşabilirim.' },
       ],
       responseLanguage: 'tr',
       createCompletion,
@@ -31,7 +31,7 @@ describe('rewriteSimpleRagQuery', () => {
 
     expect(result.plan).toEqual({
       status: 'search',
-      standaloneQuery: 'İngilizce Tıp programının ücreti nedir?',
+      standaloneQuery: 'Hemşirelik programının ücreti nedir?',
       responseLanguage: 'tr',
     })
     expect(result.usage).toEqual({ inputTokens: 40, outputTokens: 12, totalTokens: 52 })
@@ -40,8 +40,9 @@ describe('rewriteSimpleRagQuery', () => {
       messages: Array<{ role: string; content: string }>
     }
     expect(request.messages[0]?.content).toContain('Do not answer the question')
-    expect(request.messages[1]?.content).toContain('Peki bunun fiyatı ne?')
-    expect(request.messages[1]?.content).toContain('İngilizce Tıp programını soruyorum')
+    expect(request.messages[0]?.content).toContain('keep the new subject and inherit the active facet')
+    expect(request.messages[1]?.content).toContain('Ya Hemşirelik peki?')
+    expect(request.messages[1]?.content).toContain('Tıp kaç para?')
   })
 
   it('returns one specific clarification when the subject cannot be resolved', async () => {

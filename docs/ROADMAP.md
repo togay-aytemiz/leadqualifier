@@ -1,5 +1,14 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Implementation Update (2026-06-19):** Public Demo non-Skill RAG was simplified to the approved Skill-first flow: recent history and dictionary context produce one standalone query; exact/semantic Skill matching runs first; then one OpenAI vector-store search and one grounded answer generation run when no Skill directly covers the request. The organization/audience chunk filters, broadened retry query, organization-specific program/facility/hospital/operational guards, and second answer-verifier model were removed. Skill candidate recall was widened from `8` to `20`, while valid returned chunk IDs and exact protected-value grounding remain.
+
+- [x] Keep recent history in both Skill and File Search query rewriting, including subject replacement with facet inheritance (`Tıp kaç para?` → `ya Hemşirelik peki?`).
+- [x] Remove post-retrieval organization/audience filters from organization-specific vector stores.
+- [x] Remove RAG retry, second answer verifier, and organization-specific answer guards.
+- [x] Increase semantic Skill candidate recall to `20` before one direct-coverage selector.
+- [x] Retain one-search/one-answer grounding through valid chunk IDs and exact protected values.
+- [ ] Rerun the same production seed after deployment and compare Skill/no-info/answer quality.
+
 > **Evaluation Update (2026-06-19):** The routing-metadata change was tested with the same production seed and same 100 questions. The run completed `100/100` with zero errors: `35` Skill answers, `32` grounded RAG answers, `22` no-info replies, `7` clarifications, `2` direct answers, `1` identity answer, and `1` refusal. The change fixed the known Ebelik false no-info and removed several broad/wrong single-program matches, but it also introduced a false no-info for `grafik tasarım kaç para` and exposed wrong-facet Skill matches plus unsupported hospital/laboratory/practice RAG inferences. The result is directionally useful but not yet a net quality win (`docs/evaluations/yiu-routing-random-100-same-seed-comparison-2026-06-19T07-55-33-843Z.md`).
 
 - [x] Rerun the same-seed production random 100 after adding Skill routing descriptions and coverage facets.
@@ -736,7 +745,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-06-19 (Reran the same-seed YİÜ random 100 and documented routing-metadata improvements and regressions.)
+> **Last Updated:** 2026-06-19 (Simplified Public Demo to history-aware Skill-first matching and one grounded File Search fallback.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.

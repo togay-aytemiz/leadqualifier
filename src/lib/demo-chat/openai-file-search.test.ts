@@ -138,7 +138,7 @@ describe('buildOpenAiFileSearchDemoReply', () => {
         expect(result?.replyText).toContain('Tıp Fakültesi için 2025 broşüründe')
         expect(result?.replyText).toContain('https://example.edu.tr/brochure.pdf')
         expect(result?.metadata.rag_file_search).toMatchObject({
-            pipeline_version: 'simple_standalone_query_v1',
+            pipeline_version: 'simple_skill_first_file_search_v2',
             max_results: 20,
             score_threshold: 0,
         })
@@ -235,7 +235,7 @@ describe('buildOpenAiFileSearchDemoReply', () => {
         expect(result?.metadata).toMatchObject({
             demo_chat_reply_source: 'simple_standalone_query_rag',
             rag_file_search: {
-                pipeline_version: 'simple_standalone_query_v1',
+                pipeline_version: 'simple_skill_first_file_search_v2',
                 failure_reason: 'pipeline_error',
             },
         })

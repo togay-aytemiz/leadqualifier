@@ -600,7 +600,7 @@ describe('demo chat API route', () => {
             'Yüksek İhtisas Üniversitesi kampüsleri nerede?',
             demoChannel.organizationId,
             0.35,
-            8,
+            20,
             expect.anything()
         )
         expect(rewriteDemoSkillQueryMock).toHaveBeenCalledWith(expect.objectContaining({
@@ -707,7 +707,7 @@ describe('demo chat API route', () => {
             'Yüksek İhtisas Üniversitesinde ÇAP yapabiliyor muyum?',
             demoChannel.organizationId,
             0.35,
-            8,
+            20,
             expect.anything()
         )
         expect(verifyDemoSkillCandidatesMock).toHaveBeenCalledWith(expect.objectContaining({
@@ -946,7 +946,7 @@ describe('demo chat API route', () => {
             'Yüksek İhtisas Üniversitesi burs seçenekleri',
             demoChannel.organizationId,
             0.35,
-            8,
+            20,
             fakeSupabase
         )
         expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({

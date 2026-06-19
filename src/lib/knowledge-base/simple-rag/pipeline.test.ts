@@ -77,7 +77,7 @@ describe('runSimpleRagPipeline', () => {
       queryIntent: 'simple_rag_search',
       contextualRetrievalIntent: 'İngilizce Tıp programının ücreti nedir?',
       retryCount: 0,
-      strictVerdict: 'verified_evidence_answer',
+      strictVerdict: 'grounded_evidence_answer',
       simpleRag: {
         resultCount: 1,
         selectedChunkIds: ['C1'],
@@ -163,46 +163,43 @@ describe('runSimpleRagPipeline', () => {
       answerCreateCompletion: vi.fn(),
     })
 
-    expect(result.answer).toBe('Bu bilgiye onaylı kaynaklarda ulaşamadım.')
+    expect(result.answer).toBe('Bu konuda net bir bilgi bulamadım.')
     expect(result.refusal).toBe(false)
-    expect(result.diagnostics?.strictVerdict).toBe('no_verified_evidence')
+    expect(result.diagnostics?.strictVerdict).toBe('no_retrieved_evidence')
   })
 
-  it('retries once when the first retrieval only returns filtered evidence', async () => {
-    const vectorSearch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        data: [
-          {
-            file_id: 'file_wrong',
-            filename: 'news.md',
-            score: 0.93,
-            attributes: null,
-            content: [
-              {
-                type: 'text' as const,
-                text: 'Ankara Yıldırım Beyazıt Üniversitesi Tıp Fakültesi töreni yapıldı.',
-              },
-            ],
-          },
-        ],
+  it('passes the organization store results directly to one answer generation', async () => {
+    const vectorSearch = vi.fn(async () => ({
+      data: [
+        {
+          file_id: 'file_news',
+          filename: 'news.md',
+          score: 0.93,
+          attributes: null,
+          content: [{
+            type: 'text' as const,
+            text: 'Ankara Yıldırım Beyazıt Üniversitesi Tıp Fakültesi töreni yapıldı.',
+          }],
+        },
+        {
+          file_id: 'file_right',
+          filename: 'brochure.md',
+          score: 0.88,
+          attributes: null,
+          content: [{
+            type: 'text' as const,
+            text: 'Yüksek İhtisas Üniversitesi Tıp Fakültesi programı bulunmaktadır.',
+          }],
+        },
+      ],
+    }))
+    const answerCreateCompletion = vi.fn(async () =>
+      completion({
+        status: 'answer',
+        answer: 'Yüksek İhtisas Üniversitesi’nde Tıp Fakültesi programı bulunmaktadır.',
+        used_chunk_ids: ['C2'],
       })
-      .mockResolvedValueOnce({
-        data: [
-          {
-            file_id: 'file_right',
-            filename: 'brochure.md',
-            score: 0.88,
-            attributes: null,
-            content: [
-              {
-                type: 'text' as const,
-                text: 'Yüksek İhtisas Üniversitesi Tıp Fakültesi programı bulunmaktadır.',
-              },
-            ],
-          },
-        ],
-      })
+    )
 
     const result = await runSimpleRagPipeline({
       client: { vectorStores: { search: vectorSearch } },
@@ -219,24 +216,20 @@ describe('runSimpleRagPipeline', () => {
           response_language: 'tr',
         })
       ),
-      answerCreateCompletion: vi.fn(async () =>
-        completion({
-          status: 'answer',
-          answer: 'Yüksek İhtisas Üniversitesi’nde Tıp Fakültesi programı bulunmaktadır.',
-          used_chunk_ids: ['C1'],
-        })
-      ),
+      answerCreateCompletion,
     })
 
-    expect(vectorSearch).toHaveBeenCalledTimes(2)
+    expect(vectorSearch).toHaveBeenCalledOnce()
+    expect(JSON.stringify(answerCreateCompletion.mock.calls[0]?.[0])).toContain(
+      'Ankara Yıldırım Beyazıt Üniversitesi'
+    )
     expect(result.answer).toContain('Yüksek İhtisas Üniversitesi')
     expect(result.diagnostics).toMatchObject({
-      retryCount: 1,
+      retryCount: 0,
       simpleRag: {
-        retryReason: 'all_chunks_filtered',
-        droppedChunkCount: 1,
-        droppedChunkReasons: ['other_organization'],
-        droppedChunkMatches: ['Ankara Yıldırım Beyazıt Üniversitesi'],
+        droppedChunkCount: 0,
+        droppedChunkReasons: [],
+        droppedChunkMatches: [],
         selectedFilenames: ['brochure.md'],
         answerStatus: 'answer',
       },
@@ -314,8 +307,8 @@ describe('runSimpleRagPipeline', () => {
       {
         query: 'Yüksek İhtisas Üniversitesi Bağlıca kampüsü adresi',
         rawResultCount: 2,
-        resultCount: 1,
-        droppedChunkReasons: ['other_organization'],
+        resultCount: 2,
+        droppedChunkReasons: [],
         topResults: [
           {
             id: 'C1',
@@ -324,82 +317,15 @@ describe('runSimpleRagPipeline', () => {
             score: 0.91,
             selected: true,
           },
+          {
+            id: 'C2',
+            filename: 'wrong.md',
+            title: 'wrong.md',
+            score: 0.72,
+            selected: false,
+          },
         ],
       },
     ])
-  })
-
-  it('uses a risk verifier to retry unsupported positive service answers before returning no-info', async () => {
-    const vectorSearch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        data: [
-          {
-            file_id: 'file_foundation',
-            filename: 'student-life.md',
-            score: 0.88,
-            attributes: null,
-            content: [
-              {
-                type: 'text' as const,
-                text: 'Sağlık, Kültür ve Spor Daire Başkanlığı öğrenci etkinlikleri ve sosyal faaliyetleri destekler.',
-              },
-            ],
-          },
-        ],
-      })
-      .mockResolvedValueOnce({ data: [] })
-
-    const answerCreateCompletion = vi.fn(async () =>
-      completion({
-        status: 'answer',
-        answer: 'Evet, kampüste yemekhane bulunmaktadır.',
-        used_chunk_ids: ['C1'],
-      })
-    )
-    const verifierCreateCompletion = vi.fn(async () =>
-      completion({
-        action: 'retry_search',
-        reason: 'unsupported_service_availability:yemekhane',
-        retry_query: 'Yüksek İhtisas Üniversitesi kampüs yemekhane var mı',
-      })
-    )
-
-    const result = await runSimpleRagPipeline({
-      client: { vectorStores: { search: vectorSearch } },
-      vectorStoreId: 'vs_yiu',
-      answerModel: 'gpt-4o-mini',
-      latestUserMessage: 'Kampüste yemekhane var mı?',
-      recentMessages: [],
-      organizationContext: 'Yüksek İhtisas Üniversitesi',
-      responseLanguage: 'tr',
-      rewriteCreateCompletion: vi.fn(async () =>
-        completion({
-          status: 'search',
-          standalone_query: 'Yüksek İhtisas Üniversitesi kampüs yemekhane var mı',
-          response_language: 'tr',
-        })
-      ),
-      answerCreateCompletion,
-      verifierCreateCompletion,
-    } as any)
-
-    expect(vectorSearch).toHaveBeenCalledTimes(2)
-    expect(answerCreateCompletion).toHaveBeenCalledTimes(1)
-    expect(verifierCreateCompletion).toHaveBeenCalledOnce()
-    expect(result.answer).toBe('Bu bilgiye onaylı kaynaklarda ulaşamadım.')
-    expect(result.diagnostics).toMatchObject({
-      retryCount: 1,
-      contextualReason: 'unsupported_service_availability:yemekhane',
-      simpleRag: {
-        retryReason: 'verifier_retry:unsupported_service_availability:yemekhane',
-        answerStatus: 'no_info',
-      },
-      answerVerifier: {
-        used: true,
-        action: 'retry_search',
-        reason: 'unsupported_service_availability:yemekhane',
-      },
-    })
   })
 })
