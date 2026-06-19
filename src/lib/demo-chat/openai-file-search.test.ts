@@ -109,6 +109,7 @@ describe('buildOpenAiFileSearchDemoReply', () => {
             supabase: {},
             channel,
             message: 'tip kaç para',
+            standaloneQuery: 'Yüksek İhtisas Üniversitesi Tıp Fakültesi ücreti nedir?',
             conversationId: 'conv-1',
             conversationHistory: [{ role: 'user', content: 'Tıp Fakültesini soruyorum.' }],
             pendingClarification: {
@@ -120,6 +121,7 @@ describe('buildOpenAiFileSearchDemoReply', () => {
 
         expect(runSimpleRagPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
             latestUserMessage: 'tip kaç para',
+            standaloneQuery: 'Yüksek İhtisas Üniversitesi Tıp Fakültesi ücreti nedir?',
             organizationContext: 'YIU Demo',
             recentMessages: [{ role: 'user', content: 'Tıp Fakültesini soruyorum.' }],
             pendingClarification: expect.objectContaining({

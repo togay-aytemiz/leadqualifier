@@ -1,5 +1,40 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Implementation Update (2026-06-19):** Public Demo Skill routing now keeps terminal verifier diagnostics when falling through to RAG. `ragFallback` is stored as a separate flag instead of overwriting outcomes such as `verification_timeout`, candidate verification uses the same `5000ms` default / `8000ms` cap as Skill rewriting, and compact candidate diagnostics now expose up to `16` coverage facets so fee, quota, base-score, and rank scope remains visible during eval review.
+
+- [x] Preserve terminal Skill verifier outcomes when the route falls through to RAG.
+- [x] Increase Skill candidate verifier timeout budget from `1800ms`/`3000ms` to `5000ms`/`8000ms`.
+- [x] Expose all relevant generated program coverage facets in compact diagnostics.
+
+> **Evaluation Update (2026-06-19):** The same YİÜ 100-question seed was retried from question `34/100` after OpenAI API credits were replenished. The earlier `2026-06-19T11-08-28-727Z` run is invalid as a score run because OpenAI returned `429 insufficient_quota` from around row 34 onward, causing approved-source access fallbacks to inflate no-info counts. The valid first 33 rows plus the 67-row retry produce a practical combined route view of `29` Skill answers, `44` grounded RAG answers, `23` no-info replies, `1` refusal, `1` clarification, `1` direct safety answer, and `1` identity answer. Diagnostics confirmed the top-X recall issue is mostly solved: missed Ebelik/Anestezi candidates appear in `mergedCandidates`, while the remaining issue was verifier timeout/lost terminal diagnostics (`docs/evaluations/yiu-routing-random-100-retry-34-100-codex-review-2026-06-19T11-23-26-085Z.md`).
+
+- [x] Retry the same-seed YİÜ random 100 from question 34 after API credits were replenished.
+- [x] Mark the quota-exhausted run as invalid for scoring and document the valid combined route view.
+- [x] Confirm that correct program Skill candidates are being recalled above the top-X cutoff.
+- [x] Preserve the terminal Skill verifier outcome instead of overwriting timeout/error/no-skill diagnostics with `rag_fallback`.
+- [x] Expand compact diagnostics so quota/base-score/rank coverage facets are visible; generated program Skills already include those facets.
+
+> **Implementation Update (2026-06-19):** Simple Public Demo RAG now keeps the one-query/one-search/one-answer flow but adds a focused risk evidence verifier after high-risk positive answers. Hospital status/existence, accreditation/current recognition, program existence, facilities/resources, clinical practice, internship, payment policy, fees, quotas, scores/rankings, contact, location, transport, housing, and campus-life service claims must be directly supported by the selected chunks. Adjacent evidence now returns no-info or a clarification instead of a positive customer-facing claim.
+
+- [x] Add a focused simple RAG risk-evidence verifier without reintroducing broad router/rewriter orchestration.
+- [x] Block high-risk positive RAG answers when selected chunks only support an adjacent topic.
+- [x] Preserve the simplified normal path for low-risk or directly supported answers.
+
+> **Evaluation Update (2026-06-19):** The same 100-question YİÜ seed was rerun against the current local production build with production Supabase/OpenAI data. An initial `0 Skill` result was rejected after diagnostics showed the test organization at `10000/10000` package usage: verified Skill delivery was stopped by `package_credits_exhausted` while polling recovery still produced RAG answers. After the operator authorized another `10000` package credits and the account was verified at `10000` remaining / `lock_reason=none`, the clean run completed `100/100` with `38` Skill, `44` grounded RAG, `16` no-info, `1` refusal, and `1` identity answer. Manual Codex review scored `7.22/10`; `1/16` no-info replies was clearly false, while the largest quality risk was unsupported positive RAG inference (`docs/evaluations/yiu-routing-random-100-codex-review-2026-06-19T10-01-38-398Z.md`).
+
+- [x] Reject the credit-exhausted `0 Skill` run as an invalid routing-quality measurement.
+- [x] Replenish and verify `10000` evaluation credits for the isolated YİÜ test organization.
+- [x] Complete and manually review the clean same-seed `100/100` run.
+- [ ] Preserve the terminal Skill fallback reason instead of overwriting `verification_timeout` / `rewrite_timeout` with `rag_fallback`.
+- [x] Prevent direct positive RAG claims from adjacent evidence for hospital status/existence, program existence, accreditation, and facilities.
+
+> **Implementation Update (2026-06-19):** Public Demo now preserves one successful history-aware Skill rewrite across the complete fallback path. The standalone query is stored explicitly on the inbound message, pending recovery loads that metadata, and File Search reuses the same query without a second LLM rewrite. The Skill rewrite budget was raised from `1800ms` to `5000ms` with an `8000ms` configuration cap so ordinary production calls are not prematurely discarded.
+
+- [x] Persist a successful Skill standalone query on the inbound demo message.
+- [x] Load inbound routing metadata during pending recovery and pass the query into File Search.
+- [x] Skip duplicate simple-RAG rewriting when a prepared standalone query is available.
+- [x] Raise the production Skill rewrite timeout budget and cover the former 1.8-second cutoff with regression tests.
+
 > **Implementation Update (2026-06-19):** Public Demo non-Skill RAG was simplified to the approved Skill-first flow: recent history and dictionary context produce one standalone query; exact/semantic Skill matching runs first; then one OpenAI vector-store search and one grounded answer generation run when no Skill directly covers the request. The organization/audience chunk filters, broadened retry query, organization-specific program/facility/hospital/operational guards, and second answer-verifier model were removed. Skill candidate recall was widened from `8` to `20`, while valid returned chunk IDs and exact protected-value grounding remain.
 
 - [x] Keep recent history in both Skill and File Search query rewriting, including subject replacement with facet inheritance (`Tıp kaç para?` → `ya Hemşirelik peki?`).
@@ -745,7 +780,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-06-19 (Simplified Public Demo to history-aware Skill-first matching and one grounded File Search fallback.)
+> **Last Updated:** 2026-06-19 (Fixed Public Demo Skill verifier timeout/fallback diagnostics after the YİÜ same-seed retry.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.

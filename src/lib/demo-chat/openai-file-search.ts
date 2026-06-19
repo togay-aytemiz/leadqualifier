@@ -13,7 +13,7 @@ import {
     resolveDemoOrganizationContext,
 } from '@/lib/demo-chat/organization-context'
 import {
-    appendSkillRoutingOutcome,
+    markSkillRoutingRagFallback,
     type DemoChatSkillRoutingDiagnostics,
 } from '@/lib/demo-chat/skill-routing-diagnostics'
 import type { RagPendingClarificationState } from '@/lib/knowledge-base/rag-eval/types'
@@ -158,6 +158,7 @@ export async function buildOpenAiFileSearchDemoReply(input: {
     supabase: SupabaseLike
     channel: DemoChatChannel
     message: string
+    standaloneQuery?: string | null
     conversationId?: string | null
     conversationHistory?: KnowledgeSearchPlanningTurn[]
     pendingClarification?: RagPendingClarificationState | null
@@ -202,6 +203,8 @@ export async function buildOpenAiFileSearchDemoReply(input: {
             answerModel,
             vectorStoreId,
             latestUserMessage: input.message,
+            standaloneQuery: input.standaloneQuery,
+            standaloneQueryUsage: input.skillRoutingDiagnostics?.rewrite?.usage,
             recentMessages: input.conversationHistory ?? [],
             organizationContext: resolveDemoOrganizationContext({
                 channelDisplayName: input.channel.displayName,
@@ -276,9 +279,8 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                 },
                 ...(input.skillRoutingDiagnostics
                     ? {
-                        demo_chat_skill_routing: appendSkillRoutingOutcome(
-                            input.skillRoutingDiagnostics,
-                            'rag_fallback'
+                        demo_chat_skill_routing: markSkillRoutingRagFallback(
+                            input.skillRoutingDiagnostics
                         )
                     }
                     : {}),

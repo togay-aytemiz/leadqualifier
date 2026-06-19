@@ -183,6 +183,24 @@ function enforcePlanBoundary(input: {
   }
 }
 
+export function prepareSimpleRagSearchPlan(input: {
+  standaloneQuery: string
+  latestUserMessage: string
+  organizationContext?: string | null
+  responseLanguage: MvpResponseLanguage
+}): SimpleRagRewritePlan {
+  return enforcePlanBoundary({
+    plan: {
+      status: 'search',
+      standaloneQuery: input.standaloneQuery,
+      responseLanguage: input.responseLanguage,
+    },
+    latestUserMessage: input.latestUserMessage,
+    organizationContext: input.organizationContext,
+    responseLanguage: input.responseLanguage,
+  })
+}
+
 function normalizeUsage(usage: CompletionResult['usage']) {
   const inputTokens = usage?.prompt_tokens ?? 0
   const outputTokens = usage?.completion_tokens ?? 0

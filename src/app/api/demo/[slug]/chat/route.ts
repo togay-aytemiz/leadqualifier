@@ -18,6 +18,7 @@ import { rewriteDemoSkillQuery, type DemoSkillQueryRewriteResult } from '@/lib/d
 import { verifyDemoSkillCandidates } from '@/lib/demo-chat/skill-candidate-verifier'
 import {
     appendSkillRoutingOutcome,
+    markSkillRoutingRagFallback,
     summarizeSkillMatches,
     summarizeSkillRewrite,
     summarizeSkillVerification,
@@ -50,15 +51,15 @@ export const runtime = 'nodejs'
 const MAX_MESSAGE_CHARS = 2000
 const MAX_SESSION_ID_CHARS = 128
 const DEFAULT_SYNC_REPLY_TIMEOUT_MS = 5000
-const DEFAULT_SKILL_QUERY_REWRITE_TIMEOUT_MS = 1800
-const DEFAULT_SKILL_CANDIDATE_VERIFY_TIMEOUT_MS = 1800
+const DEFAULT_SKILL_QUERY_REWRITE_TIMEOUT_MS = 5000
+const DEFAULT_SKILL_CANDIDATE_VERIFY_TIMEOUT_MS = 5000
 const DEFAULT_FAST_RAG_REPLY_TIMEOUT_MS = 10000
 const DEFAULT_FAST_RAG_GENERATE_TIMEOUT_MS = 3500
 const DEFAULT_CONTEXTUAL_FAST_RAG_GENERATE_TIMEOUT_MS = 5500
 const DEFAULT_FAST_RAG_POLISH_TIMEOUT_MS = 1800
 const MAX_SYNC_REPLY_TIMEOUT_MS = 6000
-const MAX_SKILL_QUERY_REWRITE_TIMEOUT_MS = 3000
-const MAX_SKILL_CANDIDATE_VERIFY_TIMEOUT_MS = 3000
+const MAX_SKILL_QUERY_REWRITE_TIMEOUT_MS = 8000
+const MAX_SKILL_CANDIDATE_VERIFY_TIMEOUT_MS = 8000
 const MAX_FAST_RAG_REPLY_TIMEOUT_MS = 12000
 const MAX_FAST_RAG_GENERATE_TIMEOUT_MS = 5000
 const MAX_CONTEXTUAL_FAST_RAG_GENERATE_TIMEOUT_MS = 8000
@@ -789,6 +790,18 @@ function readSkillRoutingDiagnosticsFromMessageMetadata(
     return typeof outcome === 'string' ? value as DemoChatSkillRoutingDiagnostics : null
 }
 
+function readStandaloneQueryFromMessageMetadata(
+    metadata: Record<string, unknown> | null | undefined
+) {
+    const directQuery = readMetadataString(metadata ?? null, 'demo_chat_standalone_query')
+    if (directQuery) return directQuery.slice(0, 300).trim()
+
+    const routing = readMetadataRecord(metadata ?? null, 'demo_chat_skill_routing')
+    const rewrite = readMetadataRecord(routing, 'rewrite')
+    if (readMetadataString(rewrite, 'decision') === 'unresolved') return null
+    return readMetadataString(rewrite, 'query')?.slice(0, 300).trim() || null
+}
+
 function readSkillImageFromMessageMetadata(metadata: Record<string, unknown> | null): DemoChatSkillImage | null {
     const media = readMetadataRecord(metadata, 'demo_chat_media')
     const imageUrl = readMetadataString(media, 'storage_url')
@@ -1083,7 +1096,7 @@ async function findPendingDemoChatInboundMessage(input: {
 
     const { data: message, error: messageError } = await input.supabase
         .from('messages')
-        .select('id, content')
+        .select('metadata, id, content')
         .eq('conversation_id', conversationRow.id)
         .eq('sender_type', 'contact')
         .eq('metadata->>demo_chat_message_id', input.messageId)
@@ -1753,6 +1766,7 @@ async function recoverPendingDemoChatReplyExtractively(input: {
         supabase: input.supabase,
         channel: input.channel,
         message,
+        standaloneQuery: readStandaloneQueryFromMessageMetadata(inboundMessage?.metadata),
         conversationId,
         conversationHistory,
         pendingClarification: findLatestRagPendingClarificationState(conversationHistory),
@@ -2289,6 +2303,9 @@ export async function POST(req: NextRequest, context: RouteContext) {
     }
 
     if (immediateSkillReply !== 'pending') {
+        const standaloneQuery = skillRoutingDiagnostics.current?.rewrite?.decision !== 'unresolved'
+            ? skillRoutingDiagnostics.current?.rewrite?.query
+            : null
         await ingestDemoChatInboundOnly({
             supabase,
             channel,
@@ -2297,9 +2314,11 @@ export async function POST(req: NextRequest, context: RouteContext) {
             inboundMessageId,
             inboundMetadata: skillRoutingDiagnostics.current
                 ? {
-                    demo_chat_skill_routing: appendSkillRoutingOutcome(
-                        skillRoutingDiagnostics.current,
-                        'rag_fallback'
+                    ...(standaloneQuery
+                        ? { demo_chat_standalone_query: standaloneQuery }
+                        : {}),
+                    demo_chat_skill_routing: markSkillRoutingRagFallback(
+                        skillRoutingDiagnostics.current
                     )
                 }
                 : undefined,

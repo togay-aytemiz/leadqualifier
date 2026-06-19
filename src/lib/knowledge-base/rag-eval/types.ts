@@ -152,6 +152,7 @@ export type RagProviderResult = {
     strictVerdict?: string
     simpleRag?: {
       standaloneQuery?: string
+      standaloneQuerySource?: 'skill_routing' | 'simple_rag_rewrite'
       retryQuery?: string
       retryReason?: string
       retryScoreThreshold?: number

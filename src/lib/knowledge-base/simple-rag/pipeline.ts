@@ -11,6 +11,12 @@ import {
   type SimpleRagAnswerCreateCompletion,
 } from './answer-generator'
 import {
+  verifySimpleRagAnswerEvidence,
+  type SimpleRagEvidenceVerifierCreateCompletion,
+  type SimpleRagEvidenceVerifierResult,
+} from './evidence-verifier'
+import {
+  prepareSimpleRagSearchPlan,
   rewriteSimpleRagQuery,
   type SimpleRagCreateCompletion,
 } from './query-rewriter'
@@ -70,6 +76,8 @@ export async function runSimpleRagPipeline(input: {
   answerModel: string
   rewriteModel?: string
   latestUserMessage: string
+  standaloneQuery?: string | null
+  standaloneQueryUsage?: Usage | null
   recentMessages: KnowledgeSearchPlanningTurn[]
   organizationContext?: string | null
   assistantInstructionContext?: string | null
@@ -82,20 +90,41 @@ export async function runSimpleRagPipeline(input: {
   scoreThreshold?: number
   rewriteCreateCompletion?: SimpleRagCreateCompletion
   answerCreateCompletion?: SimpleRagAnswerCreateCompletion
+  evidenceVerifierModel?: string
+  evidenceVerifierCreateCompletion?: SimpleRagEvidenceVerifierCreateCompletion
 }): Promise<RagProviderResult> {
   const startedAt = Date.now()
-  const rewrite = await rewriteSimpleRagQuery({
-    latestUserMessage: input.latestUserMessage,
-    recentMessages: input.recentMessages,
-    organizationContext: input.organizationContext,
-    assistantInstructionContext: input.assistantInstructionContext,
-    dictionaryContext: input.dictionaryContext,
-    assistantName: input.settings?.bot_name,
-    pendingClarification: input.pendingClarification,
-    responseLanguage: input.responseLanguage,
-    model: input.rewriteModel,
-    createCompletion: input.rewriteCreateCompletion,
-  })
+  const preparedStandaloneQuery = input.standaloneQuery?.replace(/\s+/g, ' ').trim() || null
+  const preparedUsage = {
+    inputTokens: input.standaloneQueryUsage?.inputTokens ?? 0,
+    outputTokens: input.standaloneQueryUsage?.outputTokens ?? 0,
+    totalTokens: input.standaloneQueryUsage?.totalTokens
+      ?? (input.standaloneQueryUsage?.inputTokens ?? 0)
+      + (input.standaloneQueryUsage?.outputTokens ?? 0),
+  }
+  const rewrite = preparedStandaloneQuery
+    ? {
+        plan: prepareSimpleRagSearchPlan({
+          standaloneQuery: preparedStandaloneQuery,
+          latestUserMessage: input.latestUserMessage,
+          organizationContext: input.organizationContext,
+          responseLanguage: input.responseLanguage,
+        }),
+        usage: preparedUsage,
+        model: input.rewriteModel?.trim() || 'prepared_standalone_query',
+      }
+    : await rewriteSimpleRagQuery({
+        latestUserMessage: input.latestUserMessage,
+        recentMessages: input.recentMessages,
+        organizationContext: input.organizationContext,
+        assistantInstructionContext: input.assistantInstructionContext,
+        dictionaryContext: input.dictionaryContext,
+        assistantName: input.settings?.bot_name,
+        pendingClarification: input.pendingClarification,
+        responseLanguage: input.responseLanguage,
+        model: input.rewriteModel,
+        createCompletion: input.rewriteCreateCompletion,
+      })
 
   const stateUsed = stateWasUsed(input.pendingClarification)
 
@@ -184,8 +213,13 @@ export async function runSimpleRagPipeline(input: {
   const retrievalMs = Date.now() - retrievalStartedAt
   const chunks = retrieval.chunks
 
+  const standaloneQuerySource = preparedStandaloneQuery
+    ? 'skill_routing' as const
+    : 'simple_rag_rewrite' as const
+
   const simpleDiagnostics = (selectedChunkIds: string[] = []) => ({
     standaloneQuery,
+    standaloneQuerySource,
     stateUsed,
     rawResultCount: chunks.length,
     resultCount: chunks.length,
@@ -324,17 +358,100 @@ export async function runSimpleRagPipeline(input: {
     }
   }
 
+  const verifierStartedAt = Date.now()
+  const evidenceVerifier = await verifySimpleRagAnswerEvidence({
+    latestUserMessage: input.latestUserMessage,
+    standaloneQuery,
+    answer: generated.answer,
+    chunks: generated.selectedChunks,
+    responseLanguage: rewrite.plan.responseLanguage,
+    model: input.evidenceVerifierModel ?? input.answerModel,
+    createCompletion: input.evidenceVerifierCreateCompletion,
+  })
+  const verificationMs = Date.now() - verifierStartedAt
+  const usageWithVerifier = addUsage(usage, evidenceVerifier.usage)
+  const answerVerifierDiagnostics = toAnswerVerifierDiagnostics(evidenceVerifier)
+
+  if (evidenceVerifier.status === 'clarify') {
+    return {
+      provider: 'openai_file_search_validated',
+      answer: evidenceVerifier.clarificationQuestion,
+      citations: [],
+      refusal: false,
+      timingsMs: {
+        total: Date.now() - startedAt,
+        retrieval: retrievalMs,
+        generation: generationMs,
+        validation: verificationMs,
+      },
+      usage: usageWithVerifier,
+      diagnostics: {
+        ...baseDiagnostics,
+        clarification: evidenceVerifier.clarificationQuestion,
+        pendingClarification: {
+          originalQuestion: input.latestUserMessage,
+          clarificationQuestion: evidenceVerifier.clarificationQuestion,
+          missingSlots: [evidenceVerifier.missingSlot],
+          retrievalIntent: standaloneQuery,
+        },
+        strictVerdict: 'risk_evidence_clarify',
+        contextualReason: evidenceVerifier.reason,
+        answerVerifier: answerVerifierDiagnostics,
+        simpleRag: {
+          ...simpleDiagnostics(generated.usedChunkIds),
+          selectedChunkIds: generated.usedChunkIds,
+          selectedFilenames: generated.selectedChunks.map((chunk) => chunk.filename),
+          answerStatus: 'clarify',
+        },
+      },
+    }
+  }
+
+  if (evidenceVerifier.status === 'no_info') {
+    return {
+      provider: 'openai_file_search_validated',
+      answer: noInformationAnswer(rewrite.plan.responseLanguage),
+      citations: [],
+      refusal: false,
+      timingsMs: {
+        total: Date.now() - startedAt,
+        retrieval: retrievalMs,
+        generation: generationMs,
+        validation: verificationMs,
+      },
+      usage: usageWithVerifier,
+      diagnostics: {
+        ...baseDiagnostics,
+        contextualReason: evidenceVerifier.reason,
+        strictVerdict: 'risk_evidence_no_info',
+        answerVerifier: answerVerifierDiagnostics,
+        simpleRag: {
+          ...simpleDiagnostics(generated.usedChunkIds),
+          selectedChunkIds: generated.usedChunkIds,
+          selectedFilenames: generated.selectedChunks.map((chunk) => chunk.filename),
+          answerStatus: 'no_info',
+        },
+      },
+    }
+  }
+
   const citations = selectedCitations(generated.selectedChunks)
   return {
     provider: 'openai_file_search_validated',
     answer: generated.answer,
     citations,
     refusal: false,
-    timingsMs: { total: Date.now() - startedAt, retrieval: retrievalMs, generation: generationMs },
-    usage,
+    timingsMs: {
+      total: Date.now() - startedAt,
+      retrieval: retrievalMs,
+      generation: generationMs,
+      validation: verificationMs,
+    },
+    usage: usageWithVerifier,
     diagnostics: {
       ...baseDiagnostics,
       strictVerdict: 'grounded_evidence_answer',
+      answerVerifier: answerVerifierDiagnostics,
       simpleRag: {
         ...simpleDiagnostics(generated.usedChunkIds),
         selectedChunkIds: generated.usedChunkIds,
@@ -342,5 +459,14 @@ export async function runSimpleRagPipeline(input: {
         answerStatus: 'answer',
       },
     },
+  }
+}
+
+function toAnswerVerifierDiagnostics(verifier: SimpleRagEvidenceVerifierResult) {
+  return {
+    used: verifier.status !== 'skipped',
+    action: verifier.status,
+    reason: verifier.reason,
+    model: verifier.model,
   }
 }

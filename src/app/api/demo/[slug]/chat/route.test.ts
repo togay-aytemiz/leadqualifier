@@ -620,6 +620,204 @@ describe('demo chat API route', () => {
         expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
     })
 
+    it('allows a normal 2.5-second skill rewrite to finish before falling back to RAG', async () => {
+        vi.useFakeTimers()
+        vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+        matchExactSkillTriggersMock.mockResolvedValueOnce([])
+        rewriteDemoSkillQueryMock.mockImplementationOnce(() => new Promise((resolve) => {
+            setTimeout(() => resolve({
+                query: 'Yüksek İhtisas Üniversitesi Anestezi kontenjanı nedir?',
+                subject: 'Anestezi',
+                facet: 'kontenjan',
+                needsClarification: false,
+                usedHistory: false,
+                decision: 'standalone',
+                reason: 'Standalone quota question.',
+                model: 'gpt-4.1-mini',
+                usage: { inputTokens: 80, outputTokens: 20, totalTokens: 100 },
+            }), 2500)
+        }))
+        matchSkillsMock.mockResolvedValueOnce([])
+
+        const responsePromise = POST(createRequest({
+            sessionId: 'session-1',
+            message: 'Anestezi kontenjanı nedir?',
+        }), createContext())
+
+        await vi.waitFor(() => expect(rewriteDemoSkillQueryMock).toHaveBeenCalledOnce())
+        await vi.advanceTimersByTimeAsync(2500)
+        const res = await responsePromise
+
+        expect(res.status).toBe(202)
+        expect(matchSkillsMock).toHaveBeenCalledWith(
+            'Yüksek İhtisas Üniversitesi Anestezi kontenjanı nedir?',
+            demoChannel.organizationId,
+            0.35,
+            20,
+            expect.anything()
+        )
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            skipAutomation: true,
+            inboundMessageMetadata: expect.objectContaining({
+                demo_chat_standalone_query:
+                    'Yüksek İhtisas Üniversitesi Anestezi kontenjanı nedir?',
+            }),
+        }))
+    })
+
+    it('allows a normal 2.5-second skill candidate verification to choose the recalled Skill', async () => {
+        vi.useFakeTimers()
+        vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+        matchExactSkillTriggersMock.mockResolvedValueOnce([])
+        const ebelikMatch = {
+            skill_id: 'skill-ebelik',
+            title: 'YİÜ Intent - 71 ebelik_program_bilgileri',
+            response_text: 'Ebelik programının 2025 kontenjan bilgisi paylaşılır.',
+            trigger_text: 'Ebelik kontenjanı kaç?',
+            similarity: 0.936,
+            routing_description:
+                'Ebelik programına özel Skill. 2025 ücret ve kontenjan seçenekleri.',
+            coverage_facets: [
+                'program_existence',
+                'program_overview',
+                'academic_unit',
+                'degree_level',
+                'campus',
+                'address',
+                'point_type',
+                'fee',
+                'quota',
+            ],
+        }
+        rewriteDemoSkillQueryMock.mockResolvedValueOnce({
+            query: 'Ebelik programının kontenjan sayısı nedir?',
+            subject: 'Ebelik',
+            facet: 'kontenjan',
+            needsClarification: false,
+            usedHistory: false,
+            decision: 'standalone',
+            reason: 'Standalone quota question.',
+            model: 'gpt-4.1-mini',
+            usage: { inputTokens: 80, outputTokens: 20, totalTokens: 100 },
+        })
+        matchSkillsMock.mockResolvedValueOnce([ebelikMatch])
+        verifyDemoSkillCandidatesMock.mockImplementationOnce(() => new Promise((resolve) => {
+            setTimeout(() => resolve({
+                decision: 'skill',
+                match: ebelikMatch,
+                confidence: 0.94,
+                coverage: 'direct',
+                reason: 'The recalled Ebelik Skill directly answers the quota facet.',
+                model: 'gpt-4.1-mini',
+                usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 },
+            }), 2500)
+        }))
+        processInboundAiPipelineMock.mockImplementationOnce(async (input) => {
+            await input.sendOutbound('Ebelik programının 2025 kontenjan bilgisi paylaşılır.')
+        })
+
+        const responsePromise = POST(createRequest({
+            sessionId: 'session-1',
+            message: 'Ebelik kontenjanı nedir?',
+        }), createContext())
+
+        await vi.waitFor(() => expect(verifyDemoSkillCandidatesMock).toHaveBeenCalledOnce())
+        await vi.advanceTimersByTimeAsync(2500)
+        const res = await responsePromise
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: 'Ebelik programının 2025 kontenjan bilgisi paylaşılır.',
+            skillImage: null,
+        })
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            preferredSkillMatch: ebelikMatch,
+        }))
+        expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalled()
+        expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
+    })
+
+    it('preserves verification timeout diagnostics when falling back to RAG', async () => {
+        vi.useFakeTimers()
+        vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+        matchExactSkillTriggersMock.mockResolvedValueOnce([])
+        const ebelikMatch = {
+            skill_id: 'skill-ebelik',
+            title: 'YİÜ Intent - 71 ebelik_program_bilgileri',
+            response_text: 'Ebelik programının 2025 kontenjan bilgisi paylaşılır.',
+            trigger_text: 'Ebelik kontenjanı kaç?',
+            similarity: 0.936,
+            routing_description:
+                'Ebelik programına özel Skill. 2025 ücret ve kontenjan seçenekleri.',
+            coverage_facets: [
+                'program_existence',
+                'program_overview',
+                'academic_unit',
+                'degree_level',
+                'campus',
+                'address',
+                'point_type',
+                'fee',
+                'quota',
+            ],
+        }
+        rewriteDemoSkillQueryMock.mockResolvedValueOnce({
+            query: 'Ebelik programının kontenjan sayısı nedir?',
+            subject: 'Ebelik',
+            facet: 'kontenjan',
+            needsClarification: false,
+            usedHistory: false,
+            decision: 'standalone',
+            reason: 'Standalone quota question.',
+            model: 'gpt-4.1-mini',
+            usage: { inputTokens: 80, outputTokens: 20, totalTokens: 100 },
+        })
+        matchSkillsMock.mockResolvedValueOnce([ebelikMatch])
+        verifyDemoSkillCandidatesMock.mockImplementationOnce(() => new Promise((resolve) => {
+            setTimeout(() => resolve({
+                decision: 'skill',
+                match: ebelikMatch,
+                confidence: 0.94,
+                coverage: 'direct',
+                reason: 'The recalled Ebelik Skill directly answers the quota facet.',
+                model: 'gpt-4.1-mini',
+                usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 },
+            }), 6000)
+        }))
+
+        const responsePromise = POST(createRequest({
+            sessionId: 'session-1',
+            message: 'Ebelik kontenjanı nedir?',
+        }), createContext())
+
+        await vi.waitFor(() => expect(verifyDemoSkillCandidatesMock).toHaveBeenCalledOnce())
+        await vi.advanceTimersByTimeAsync(5000)
+        const res = await responsePromise
+
+        expect(res.status).toBe(202)
+        await expect(res.json()).resolves.toEqual({
+            pending: true,
+            messageId: expect.any(String),
+        })
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            skipAutomation: true,
+            inboundMessageMetadata: expect.objectContaining({
+                demo_chat_standalone_query: 'Ebelik programının kontenjan sayısı nedir?',
+                demo_chat_skill_routing: expect.objectContaining({
+                    outcome: 'verification_timeout',
+                    ragFallback: true,
+                    mergedCandidates: expect.arrayContaining([
+                        expect.objectContaining({
+                            title: 'YİÜ Intent - 71 ebelik_program_bilgileri',
+                            coverageFacets: expect.arrayContaining(['fee', 'quota']),
+                        }),
+                    ]),
+                }),
+            }),
+        }))
+    })
+
     it('lets the verifier choose from a broader semantic skill candidate pool', async () => {
         vi.stubEnv('OPENAI_API_KEY', 'sk-test')
         matchExactSkillTriggersMock.mockResolvedValueOnce([])
@@ -820,6 +1018,9 @@ describe('demo chat API route', () => {
         expect(processInboundAiPipelineMock).toHaveBeenCalledTimes(1)
         expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
             skipAutomation: true,
+            inboundMessageMetadata: expect.objectContaining({
+                demo_chat_standalone_query: 'Staj yerini üniversite mi ayarlıyor?',
+            }),
         }))
         expect(processInboundAiPipelineMock).not.toHaveBeenCalledWith(expect.objectContaining({
             preferredSkillMatch: housingMatch,
@@ -1282,7 +1483,7 @@ describe('demo chat API route', () => {
         const conversations = [createConversationChain(), createConversationChain(), createConversationChain()]
         const messagesTable = {
             select: vi.fn((columns: string) => (
-                columns.includes('metadata') ? completedMessagesChain : inboundMessagesChain
+                columns.includes('id, content') ? inboundMessagesChain : completedMessagesChain
             )),
         }
         const fromMock = vi.fn((table: string) => {
@@ -1346,6 +1547,10 @@ describe('demo chat API route', () => {
                 data: {
                     id: 'contact-message-1',
                     content: 'Tıp Fakültesi ücreti ne kadar?',
+                    metadata: {
+                        demo_chat_standalone_query:
+                            'Yüksek İhtisas Üniversitesi Tıp Fakültesi ücreti nedir?',
+                    },
                 },
                 error: null,
             })),
@@ -1419,6 +1624,7 @@ describe('demo chat API route', () => {
         expect(buildOpenAiFileSearchDemoReplyMock).toHaveBeenCalledWith(expect.objectContaining({
             channel: demoChannel,
             message: 'Tıp Fakültesi ücreti ne kadar?',
+            standaloneQuery: 'Yüksek İhtisas Üniversitesi Tıp Fakültesi ücreti nedir?',
             conversationId: 'conversation-1',
         }))
         expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalled()
@@ -1685,7 +1891,7 @@ describe('demo chat API route', () => {
         }
         const messagesTable = {
             select: vi.fn((columns: string) => {
-                if (columns === 'id, content') return inboundMessagesChain
+                if (columns.includes('id, content')) return inboundMessagesChain
                 if (columns.includes('content, metadata')) return completedMessagesChain
                 if (columns === 'id') return duplicateReplyChain
                 return completedMessagesChain
@@ -1940,7 +2146,7 @@ describe('demo chat API route', () => {
         const conversations = [conversationChain, conversationChain, conversationChain, conversationChain]
         const messagesTable = {
             select: vi.fn((columns: string) => {
-                if (columns === 'id, content') return inboundMessagesChain
+                if (columns.includes('id, content')) return inboundMessagesChain
                 if (columns === 'content, sender_type, metadata') return historyMessagesChain
                 if (columns.includes('content, metadata')) return completedMessagesChain
                 if (columns === 'id') return duplicateReplyChain
@@ -2100,7 +2306,7 @@ describe('demo chat API route', () => {
         const conversations = [conversationChain, conversationChain, conversationChain, conversationChain]
         const messagesTable = {
             select: vi.fn((columns: string) => {
-                if (columns === 'id, content') return inboundMessagesChain
+                if (columns.includes('id, content')) return inboundMessagesChain
                 if (columns === 'content, sender_type, metadata') return historyMessagesChain
                 if (columns.includes('content, metadata')) return completedMessagesChain
                 if (columns === 'id') return duplicateReplyChain
@@ -2223,7 +2429,7 @@ describe('demo chat API route', () => {
 
         const messagesTable = {
             select: vi.fn((columns: string) => {
-                if (columns === 'id, content') return inboundMessagesChain
+                if (columns.includes('id, content')) return inboundMessagesChain
                 if (columns === 'content, sender_type, metadata') return historyMessagesChain
                 if (columns.includes('content, metadata')) return emptyCompletedMessagesChain
                 return emptyCompletedMessagesChain
@@ -2352,7 +2558,7 @@ describe('demo chat API route', () => {
         const conversations = [conversationChain, conversationChain, conversationChain, conversationChain]
         const messagesTable = {
             select: vi.fn((columns: string) => {
-                if (columns === 'id, content') return inboundMessagesChain
+                if (columns.includes('id, content')) return inboundMessagesChain
                 if (columns === 'content, sender_type, metadata') return historyMessagesChain
                 if (columns.includes('content, metadata')) return completedMessagesChain
                 if (columns === 'id') return duplicateReplyChain
@@ -2491,7 +2697,7 @@ describe('demo chat API route', () => {
         const conversations = [conversationChain, conversationChain, conversationChain, conversationChain]
         const messagesTable = {
             select: vi.fn((columns: string) => {
-                if (columns === 'id, content') return inboundMessagesChain
+                if (columns.includes('id, content')) return inboundMessagesChain
                 if (columns === 'content, sender_type, metadata') return historyMessagesChain
                 if (columns.includes('content, metadata')) return completedMessagesChain
                 if (columns === 'id') return duplicateReplyChain
@@ -3811,7 +4017,7 @@ describe('demo chat API route', () => {
         const conversations = [createConversationChain(), createConversationChain(), createConversationChain()]
         const messagesTable = {
             select: vi.fn((columns: string) => (
-                columns.includes('metadata') ? completedMessagesChain : inboundMessagesChain
+                columns.includes('id, content') ? inboundMessagesChain : completedMessagesChain
             )),
         }
         const fromMock = vi.fn((table: string) => {
@@ -3887,7 +4093,7 @@ describe('demo chat API route', () => {
         const conversations = [createConversationChain(), createConversationChain()]
         const messagesTable = {
             select: vi.fn((columns: string) => (
-                columns.includes('metadata') ? completedMessagesChain : inboundMessagesChain
+                columns.includes('id, content') ? inboundMessagesChain : completedMessagesChain
             )),
         }
         const fromMock = vi.fn((table: string) => {

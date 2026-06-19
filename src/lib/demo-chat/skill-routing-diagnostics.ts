@@ -4,6 +4,7 @@ import type { SkillMatch } from '@/types/database'
 
 const MAX_TEXT_CHARS = 240
 const MAX_MATCHES = 8
+const MAX_COVERAGE_FACETS = 16
 
 export type DemoChatSkillRoutingOutcome =
     | 'exact_skill'
@@ -21,6 +22,7 @@ export type DemoChatSkillRoutingOutcome =
 
 export type DemoChatSkillRoutingDiagnostics = {
     outcome: DemoChatSkillRoutingOutcome
+    ragFallback?: true
     exact?: {
         status: string
         matches: ReturnType<typeof summarizeSkillMatches>
@@ -60,15 +62,18 @@ function normalizeText(value: string | null | undefined, maxChars = MAX_TEXT_CHA
 }
 
 function summarizeSkillMatch(match: SkillMatch) {
+    const routingDescription = normalizeText(match.routing_description)
+    const coverageFacets = (match.coverage_facets ?? [])
+        .map((facet) => normalizeText(facet, 64))
+        .filter(Boolean)
+        .slice(0, MAX_COVERAGE_FACETS)
+
     return {
         skillId: match.skill_id,
         title: normalizeText(match.title),
         trigger: normalizeText(match.trigger_text),
-        routingDescription: normalizeText(match.routing_description),
-        coverageFacets: (match.coverage_facets ?? [])
-            .map((facet) => normalizeText(facet, 64))
-            .filter(Boolean)
-            .slice(0, 8),
+        ...(routingDescription ? { routingDescription } : {}),
+        ...(coverageFacets.length > 0 ? { coverageFacets } : {}),
         similarity: match.similarity,
     }
 }
@@ -117,4 +122,12 @@ export function appendSkillRoutingOutcome(
     outcome: DemoChatSkillRoutingOutcome
 ) {
     return diagnostics ? { ...diagnostics, outcome } : { outcome }
+}
+
+export function markSkillRoutingRagFallback(
+    diagnostics: DemoChatSkillRoutingDiagnostics | null | undefined
+) {
+    return diagnostics
+        ? { ...diagnostics, ragFallback: true as const }
+        : { outcome: 'rag_fallback' as const, ragFallback: true as const }
 }

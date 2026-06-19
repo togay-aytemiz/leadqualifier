@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
     appendSkillRoutingOutcome,
+    markSkillRoutingRagFallback,
     summarizeSkillMatches,
     summarizeSkillRewrite,
     summarizeSkillVerification,
@@ -65,8 +66,62 @@ describe('skill routing diagnostics', () => {
         })
     })
 
-    it('can mark an existing diagnostic object as a fallback', () => {
-        expect(appendSkillRoutingOutcome({ outcome: 'no_semantic_candidates' }, 'rag_fallback'))
-            .toEqual({ outcome: 'rag_fallback' })
+    it('marks RAG fallback without losing the terminal skill-routing outcome', () => {
+        expect(markSkillRoutingRagFallback({
+            outcome: 'verification_timeout',
+            mergedCandidates: [
+                {
+                    skillId: 'skill-ebelik',
+                    title: 'YİÜ Intent - 71 ebelik_program_bilgileri',
+                    trigger: 'Ebelik kontenjanı kaç?',
+                    similarity: 0.93,
+                },
+            ],
+        })).toEqual({
+            outcome: 'verification_timeout',
+            ragFallback: true,
+            mergedCandidates: [
+                {
+                    skillId: 'skill-ebelik',
+                    title: 'YİÜ Intent - 71 ebelik_program_bilgileri',
+                    trigger: 'Ebelik kontenjanı kaç?',
+                    similarity: 0.93,
+                },
+            ],
+        })
+    })
+
+    it('keeps all relevant coverage facets visible in compact candidate diagnostics', () => {
+        const summary = summarizeSkillMatches([
+            {
+                skill_id: 'skill-1',
+                title: 'YİÜ Intent - 71 ebelik_program_bilgileri',
+                trigger_text: 'Ebelik kontenjanı kaç?',
+                response_text: 'long answer that should not be copied into metadata',
+                similarity: 0.93,
+                coverage_facets: [
+                    'program_existence',
+                    'program_overview',
+                    'academic_unit',
+                    'degree_level',
+                    'campus',
+                    'address',
+                    'point_type',
+                    'fee',
+                    'quota',
+                    'scholarship',
+                    'discount',
+                    'base_score',
+                    'success_rank',
+                ],
+            },
+        ])
+
+        expect(summary[0]?.coverageFacets).toEqual(expect.arrayContaining([
+            'fee',
+            'quota',
+            'base_score',
+            'success_rank',
+        ]))
     })
 })

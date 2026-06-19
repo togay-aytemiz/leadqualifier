@@ -13,9 +13,174 @@ function completion(payload: Record<string, unknown>, totalTokens = 20) {
   }
 }
 
+function zeroUsageCompletion(payload: Record<string, unknown>) {
+  return {
+    choices: [{ message: { content: JSON.stringify(payload) } }],
+    usage: {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+    },
+  }
+}
+
+function verifierPassCompletion(reason = 'Selected chunks directly support the answer.') {
+  return vi.fn(async () => zeroUsageCompletion({ verdict: 'pass', reason }))
+}
+
 const settings = { bot_name: 'Qualy', prompt: 'Kısa ve net cevap ver.' }
 
 describe('runSimpleRagPipeline', () => {
+  it('blocks high-risk positive RAG claims when selected chunks do not directly support the requested facet', async () => {
+    const rewriteCreateCompletion = vi.fn(async () =>
+      completion({
+        status: 'search',
+        standalone_query: 'Yüksek İhtisas Üniversitesi afiliye hastane özel mi devlet mi?',
+        response_language: 'tr',
+      }, 30)
+    )
+    const vectorSearch = vi.fn(async () => ({
+      data: [
+        {
+          file_id: 'file_foundation',
+          filename: 'foundation.md',
+          score: 0.95,
+          attributes: null,
+          content: [{
+            type: 'text' as const,
+            text:
+              'Yüksek İhtisas Üniversitesi, Türkiye Yüksek İhtisas Hastanesi Vakfı tarafından kurulmuştur.',
+          }],
+        },
+      ],
+    }))
+    const answerCreateCompletion = vi.fn(async () =>
+      completion({
+        status: 'answer',
+        answer: 'Afiliye hastane özel hastane statüsündedir.',
+        used_chunk_ids: ['C1'],
+      }, 40)
+    )
+    const evidenceVerifierCreateCompletion = vi.fn(async () =>
+      completion({
+        verdict: 'no_info',
+        reason:
+          'Selected evidence mentions the founding hospital foundation but does not directly state the affiliated hospital status.',
+      }, 20)
+    )
+
+    const result = await runSimpleRagPipeline({
+      client: { vectorStores: { search: vectorSearch } },
+      vectorStoreId: 'vs_yiu',
+      answerModel: 'gpt-4o-mini',
+      rewriteModel: 'gpt-4.1-mini',
+      latestUserMessage: 'Afiliye hastane özel mi devlet hastanesi mi?',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      rewriteCreateCompletion,
+      answerCreateCompletion,
+      evidenceVerifierCreateCompletion,
+    })
+
+    expect(evidenceVerifierCreateCompletion).toHaveBeenCalledOnce()
+    expect(result.answer).toBe('Bu konuda net bir bilgi bulamadım.')
+    expect(result.citations).toEqual([])
+    expect(result.refusal).toBe(false)
+    expect(result.usage.totalTokens).toBe(90)
+    expect(result.diagnostics).toMatchObject({
+      strictVerdict: 'risk_evidence_no_info',
+      contextualReason:
+        'Selected evidence mentions the founding hospital foundation but does not directly state the affiliated hospital status.',
+      answerVerifier: {
+        used: true,
+        action: 'no_info',
+        reason:
+          'Selected evidence mentions the founding hospital foundation but does not directly state the affiliated hospital status.',
+      },
+      simpleRag: {
+        selectedChunkIds: ['C1'],
+        selectedFilenames: ['foundation.md'],
+        answerStatus: 'no_info',
+      },
+    })
+  })
+
+  it('reuses a prepared standalone query without a second rewrite', async () => {
+    const rewriteCreateCompletion = vi.fn()
+    const vectorSearch = vi.fn(async () => ({
+      data: [
+        {
+          file_id: 'file_1',
+          filename: 'anesthesia.md',
+          score: 0.96,
+          attributes: null,
+          content: [{ type: 'text' as const, text: 'Anestezi programının kontenjanı 10 kişidir.' }],
+        },
+      ],
+    }))
+    const answerCreateCompletion = vi.fn(async () =>
+      completion({
+        status: 'answer',
+        answer: 'Anestezi programının kontenjanı 10 kişidir.',
+        used_chunk_ids: ['C1'],
+      }, 40)
+    )
+
+    const result = await runSimpleRagPipeline({
+      client: { vectorStores: { search: vectorSearch } },
+      vectorStoreId: 'vs_yiu',
+      answerModel: 'gpt-4o-mini',
+      rewriteModel: 'gpt-4.1-mini',
+      latestUserMessage: 'Anestezi kontenjanı nedir?',
+      standaloneQuery: 'Yüksek İhtisas Üniversitesi Anestezi kontenjanı nedir?',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      rewriteCreateCompletion,
+      answerCreateCompletion,
+      evidenceVerifierCreateCompletion: verifierPassCompletion(),
+    })
+
+    expect(rewriteCreateCompletion).not.toHaveBeenCalled()
+    expect(vectorSearch).toHaveBeenCalledOnce()
+    expect(vectorSearch).toHaveBeenCalledWith('vs_yiu', expect.objectContaining({
+      query: 'Yüksek İhtisas Üniversitesi Anestezi kontenjanı nedir?',
+      rewrite_query: false,
+    }))
+    expect(answerCreateCompletion).toHaveBeenCalledOnce()
+    expect(result.usage.totalTokens).toBe(40)
+    expect(result.diagnostics).toMatchObject({
+      contextualRetrievalIntent: 'Yüksek İhtisas Üniversitesi Anestezi kontenjanı nedir?',
+      simpleRag: {
+        standaloneQuery: 'Yüksek İhtisas Üniversitesi Anestezi kontenjanı nedir?',
+      },
+    })
+  })
+
+  it('keeps deterministic credential refusal when a prepared query skips rewriting', async () => {
+    const rewriteCreateCompletion = vi.fn()
+    const vectorSearch = vi.fn()
+    const answerCreateCompletion = vi.fn()
+
+    const result = await runSimpleRagPipeline({
+      client: { vectorStores: { search: vectorSearch } },
+      vectorStoreId: 'vs_yiu',
+      answerModel: 'gpt-4o-mini',
+      latestUserMessage: 'Kredi kartı bilgilerimi buraya yazsam ödeme alır mısın?',
+      standaloneQuery: 'Yüksek İhtisas Üniversitesi kredi kartı ile ödeme',
+      recentMessages: [],
+      responseLanguage: 'tr',
+      rewriteCreateCompletion,
+      answerCreateCompletion,
+      evidenceVerifierCreateCompletion: verifierPassCompletion(),
+    })
+
+    expect(result.refusal).toBe(true)
+    expect(result.answer).toContain('paylaşmayın')
+    expect(rewriteCreateCompletion).not.toHaveBeenCalled()
+    expect(vectorSearch).not.toHaveBeenCalled()
+    expect(answerCreateCompletion).not.toHaveBeenCalled()
+  })
+
   it('rewrites once, searches once, and answers once', async () => {
     const rewriteCreateCompletion = vi.fn(async (_args: Record<string, unknown>) =>
       completion({
@@ -57,6 +222,7 @@ describe('runSimpleRagPipeline', () => {
       },
       rewriteCreateCompletion,
       answerCreateCompletion,
+      evidenceVerifierCreateCompletion: verifierPassCompletion(),
     })
 
     expect(rewriteCreateCompletion).toHaveBeenCalledOnce()
@@ -217,6 +383,7 @@ describe('runSimpleRagPipeline', () => {
         })
       ),
       answerCreateCompletion,
+      evidenceVerifierCreateCompletion: verifierPassCompletion(),
     })
 
     expect(vectorSearch).toHaveBeenCalledOnce()
@@ -301,6 +468,7 @@ describe('runSimpleRagPipeline', () => {
           used_chunk_ids: ['C1'],
         })
       ),
+      evidenceVerifierCreateCompletion: verifierPassCompletion(),
     })
 
     expect((result.diagnostics?.simpleRag as any).retrievalAttempts).toEqual([
