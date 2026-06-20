@@ -8,9 +8,18 @@ import {
     createDemoMaintenanceBypassCookieValue
 } from '@/lib/demo-chat/maintenance'
 import { parseCustomerEvaluationRows } from '@/lib/knowledge-base/rag-eval/customer-question-score-report'
+import {
+    classifyClarificationFlow,
+    routeFromFileSearchAnswerStatus,
+    routeFromFileSearchFailureReason,
+    validateClarificationCases,
+    type ClarificationCase,
+    type ClarificationFlowStatus
+} from './yiu-clarification-cases'
+import { excludeRowsByPoolId, readExcludedPoolIds } from './yiu-eval-selection'
 
 type Args = {
-    mode: 'routing' | 'followup' | 'both'
+    mode: 'routing' | 'followup' | 'clarification' | 'both'
     routingCount: number
     routingStartIndex: number
     followupCount: number
@@ -18,6 +27,8 @@ type Args = {
     baseUrl: string
     slug: string
     questionDoc: string
+    excludeRoutingArtifact: string | null
+    clarificationFixture: string
     outDir: string
     docsDir: string
     dryRun: boolean
@@ -72,6 +83,7 @@ type RouteKind =
     | 'rag_clarify'
     | 'rag_refuse'
     | 'rag_no_info'
+    | 'rag_pipeline_error'
     | 'assistant_identity'
     | 'fallback_answered'
     | 'scope_help'
@@ -129,6 +141,23 @@ type FollowupResult = {
         | 'error'
 }
 
+type ClarificationTurn = {
+    answer: string
+    messageId: string | null
+    durationMs: number
+    httpStatuses: number[]
+    trace: DemoTrace
+    error: string | null
+}
+
+type ClarificationResult = ClarificationCase & {
+    index: number
+    sessionId: string
+    first: ClarificationTurn
+    second: ClarificationTurn | null
+    status: ClarificationFlowStatus
+}
+
 type SupabaseQueryError = {
     message: string
 }
@@ -157,6 +186,7 @@ type SupabaseClientLike = {
 const DEFAULT_BASE_URL = 'http://localhost:3000'
 const DEFAULT_SLUG = 'yiu-tanitim-gunleri-2026'
 const DEFAULT_QUESTION_DOC = 'docs/evaluations/yiu-demo-customer-questions-2026-06-05.md'
+const DEFAULT_CLARIFICATION_FIXTURE = 'scripts/knowledge/fixtures/yiu-prospective-student-clarification-cases.json'
 const DEFAULT_OUT_DIR = 'tmp/crawl-output'
 const DEFAULT_DOCS_DIR = 'docs/evaluations'
 const DEFAULT_FETCH_TIMEOUT_MS = 45000
@@ -180,6 +210,8 @@ function parseArgs(argv: string[]): Args {
         baseUrl: process.env.PUBLIC_DEMO_BASE_URL?.trim() || DEFAULT_BASE_URL,
         slug: process.env.PUBLIC_DEMO_SLUG?.trim() || DEFAULT_SLUG,
         questionDoc: DEFAULT_QUESTION_DOC,
+        excludeRoutingArtifact: null,
+        clarificationFixture: DEFAULT_CLARIFICATION_FIXTURE,
         outDir: DEFAULT_OUT_DIR,
         docsDir: DEFAULT_DOCS_DIR,
         dryRun: false
@@ -199,7 +231,7 @@ function parseArgs(argv: string[]): Args {
         index += 1
 
         if (key === 'mode') {
-            if (!['routing', 'followup', 'both'].includes(value)) throw new Error(`Invalid --mode ${value}`)
+            if (!['routing', 'followup', 'clarification', 'both'].includes(value)) throw new Error(`Invalid --mode ${value}`)
             args.mode = value as Args['mode']
         } else if (key === 'routing-count') {
             args.routingCount = Number(value)
@@ -215,6 +247,10 @@ function parseArgs(argv: string[]): Args {
             args.slug = value
         } else if (key === 'question-doc') {
             args.questionDoc = value
+        } else if (key === 'exclude-routing-artifact') {
+            args.excludeRoutingArtifact = value
+        } else if (key === 'clarification-fixture') {
+            args.clarificationFixture = value
         } else if (key === 'out-dir') {
             args.outDir = value
         } else if (key === 'docs-dir') {
@@ -509,7 +545,11 @@ function classifyRoute(answer: string, metadata: Record<string, unknown> | null)
     const ragFileSearch = readMetadataRecord(metadata, 'rag_file_search')
     if (metadata.is_rag === true || ragFileSearch || metadata.demo_chat_reply_source === 'simple_standalone_query_rag') {
         const failureReason = readMetadataString(ragFileSearch, 'failure_reason')
-        if (failureReason || isNoInfoAnswer(answer)) return 'rag_no_info'
+        const failureRoute = routeFromFileSearchFailureReason(failureReason)
+        if (failureRoute) return failureRoute
+        if (isNoInfoAnswer(answer)) return 'rag_no_info'
+        const terminalRoute = routeFromFileSearchAnswerStatus(ragFileSearch?.answer_status)
+        if (terminalRoute) return terminalRoute
         const diagnostics = readNestedRecord(ragFileSearch, 'diagnostics')
         const simpleRag = readNestedRecord(diagnostics, 'simpleRag')
         const answerStatus = readRecordString(simpleRag, 'answerStatus')
@@ -695,10 +735,13 @@ function traceVerifier(trace: DemoTrace) {
 
 function summarizeRouting(results: RoutingResult[]) {
     const completed = results.filter((result) => !result.error)
+    const pipelineErrors = completed.filter((result) => result.trace.route === 'rag_pipeline_error').length
     const latencies = completed.map((result) => result.durationMs)
     return {
         completed: completed.length,
+        validResponses: completed.length - pipelineErrors,
         errors: results.length - completed.length,
+        pipelineErrors,
         routeCounts: routeCounts(results.filter((result) => !result.error)),
         averageLatencyMs: latencies.length ? Math.round(latencies.reduce((sum, value) => sum + value, 0) / latencies.length) : 0,
         p50LatencyMs: percentile(latencies, 50),
@@ -712,6 +755,22 @@ function summarizeFollowups(results: FollowupResult[]) {
         statusCounts.set(result.status, (statusCounts.get(result.status) ?? 0) + 1)
     }
     return Object.fromEntries([...statusCounts.entries()].sort(([left], [right]) => left.localeCompare(right)))
+}
+
+function summarizeClarifications(results: ClarificationResult[]) {
+    const statusCounts = new Map<ClarificationFlowStatus, number>()
+    for (const result of results) {
+        statusCounts.set(result.status, (statusCounts.get(result.status) ?? 0) + 1)
+    }
+    const completedTurns = results.flatMap((result) => [result.first, result.second].filter((turn): turn is ClarificationTurn => Boolean(turn && !turn.error)))
+    const latencies = completedTurns.map((turn) => turn.durationMs)
+    return {
+        statusCounts: Object.fromEntries([...statusCounts.entries()].sort(([left], [right]) => left.localeCompare(right))),
+        firstRouteCounts: routeCounts(results.filter((result) => !result.first.error).map((result) => result.first)),
+        secondRouteCounts: routeCounts(results.flatMap((result) => result.second && !result.second.error ? [result.second] : [])),
+        averageTurnLatencyMs: latencies.length ? Math.round(latencies.reduce((sum, value) => sum + value, 0) / latencies.length) : 0,
+        p90TurnLatencyMs: percentile(latencies, 90)
+    }
 }
 
 function renderRoutingMarkdown(input: {
@@ -733,7 +792,9 @@ function renderRoutingMarkdown(input: {
         `Question pool: 508`,
         `Selected: ${input.selected.length}`,
         `Completed: ${summary.completed}`,
+        `Valid responses: ${summary.validResponses}`,
         `Errors: ${summary.errors}`,
+        `RAG pipeline errors: ${summary.pipelineErrors}`,
         `Average latency: ${millisToSeconds(summary.averageLatencyMs)}`,
         `p50 latency: ${millisToSeconds(summary.p50LatencyMs)}`,
         `p90 latency: ${millisToSeconds(summary.p90LatencyMs)}`,
@@ -789,6 +850,40 @@ function renderFollowupMarkdown(input: {
     return `${lines.join('\n')}\n`
 }
 
+function renderClarificationMarkdown(input: {
+    runId: string
+    baseUrl: string
+    slug: string
+    cases: ClarificationCase[]
+    results: ClarificationResult[]
+}) {
+    const summary = summarizeClarifications(input.results)
+    const lines = [
+        '# YİÜ Realistic Prospective-student Clarification Eval',
+        '',
+        `Run: ${input.runId}`,
+        `Base URL: ${input.baseUrl}`,
+        `Demo slug: ${input.slug}`,
+        `Cases: ${input.cases.length}`,
+        `Average turn latency: ${millisToSeconds(summary.averageTurnLatencyMs)}`,
+        `p90 turn latency: ${millisToSeconds(summary.p90TurnLatencyMs)}`,
+        '',
+        '## Status Counts',
+        '',
+        '| Status | Count |',
+        '|---|---:|',
+        ...Object.entries(summary.statusCounts).map(([status, count]) => `| ${status} | ${count} |`),
+        '',
+        '## Raw Conversations',
+        '',
+        '| # | Case | First message | Expected subject | Expected facet | First route | First answer | Short reply | Second route | Skill | Second answer | Status | Error |',
+        '|---:|---|---|---|---|---|---|---|---|---|---|---|---|',
+        ...input.results.map((result) => `| ${result.index} | ${result.id} | ${markdownCell(result.firstMessage)} | ${markdownCell(result.expectedSubject)} | ${markdownCell(result.expectedFacet)} | ${result.first.trace.route} | ${markdownCell(result.first.answer)} | ${markdownCell(result.shortReply)} | ${result.second?.trace.route ?? '-'} | ${markdownCell(result.second?.trace.matchedSkillTitle ?? '-')} | ${markdownCell(result.second?.answer ?? '')} | ${result.status} | ${markdownCell(result.first.error ?? result.second?.error ?? '')} |`),
+        ''
+    ]
+    return `${lines.join('\n')}\n`
+}
+
 async function askAndTrace(input: {
     supabase: SupabaseClientLike
     channel: DemoChannel
@@ -825,6 +920,7 @@ async function askAndTrace(input: {
 
 async function runRoutingEval(input: {
     rows: QuestionRow[]
+    excludedPoolIds: ReadonlySet<number>
     supabase: SupabaseClientLike
     channel: DemoChannel
     token: string
@@ -883,7 +979,12 @@ async function runRoutingEval(input: {
         }
     }
 
-    return { selected, results }
+    return {
+        selected,
+        results,
+        candidateRowCount: input.rows.length,
+        excludedPoolIds: [...input.excludedPoolIds].sort((left, right) => left - right)
+    }
 }
 
 function followupStatus(first: DemoTrace, second: DemoTrace | null, secondError: string | null): FollowupResult['status'] {
@@ -1002,11 +1103,96 @@ async function runFollowupEval(input: {
     return { selected, results }
 }
 
+async function runClarificationEval(input: {
+    cases: ClarificationCase[]
+    supabase: SupabaseClientLike
+    channel: DemoChannel
+    token: string
+    args: Args
+    runId: string
+}) {
+    const results: ClarificationResult[] = []
+
+    for (let index = 0; index < input.cases.length; index += 1) {
+        const clarificationCase = input.cases[index]!
+        const sessionId = `codex-yiu-clarification-${input.runId}-${index + 1}`
+        console.log(`CLARIFICATION ${index + 1}/${input.cases.length} ${clarificationCase.id}: ${clarificationCase.firstMessage}`)
+
+        let first: ClarificationTurn
+        try {
+            first = await askAndTrace({
+                supabase: input.supabase,
+                channel: input.channel,
+                baseUrl: input.args.baseUrl,
+                slug: input.args.slug,
+                token: input.token,
+                sessionId,
+                message: clarificationCase.firstMessage
+            })
+        } catch (error) {
+            first = {
+                answer: '',
+                messageId: null,
+                durationMs: 0,
+                httpStatuses: [],
+                trace: emptyTrace(null, ''),
+                error: error instanceof Error ? error.message : String(error)
+            }
+        }
+
+        if (first.error || first.trace.route !== 'rag_clarify') {
+            const status = classifyClarificationFlow({
+                firstRoute: first.trace.route,
+                firstError: first.error,
+                secondRoute: null,
+                secondError: null
+            })
+            results.push({ ...clarificationCase, index: index + 1, sessionId, first, second: null, status })
+            console.log(`  -> ${status} (${first.trace.route})`)
+            continue
+        }
+
+        let second: ClarificationTurn
+        try {
+            second = await askAndTrace({
+                supabase: input.supabase,
+                channel: input.channel,
+                baseUrl: input.args.baseUrl,
+                slug: input.args.slug,
+                token: input.token,
+                sessionId,
+                message: clarificationCase.shortReply
+            })
+        } catch (error) {
+            second = {
+                answer: '',
+                messageId: null,
+                durationMs: 0,
+                httpStatuses: [],
+                trace: emptyTrace(first.trace.conversationId, ''),
+                error: error instanceof Error ? error.message : String(error)
+            }
+        }
+
+        const status = classifyClarificationFlow({
+            firstRoute: first.trace.route,
+            firstError: first.error,
+            secondRoute: second.trace.route,
+            secondError: second.error
+        })
+        results.push({ ...clarificationCase, index: index + 1, sessionId, first, second, status })
+        console.log(`  -> ${status} (${first.trace.route} → ${second.trace.route})`)
+    }
+
+    return { cases: input.cases, results }
+}
+
 async function writeArtifacts(input: {
     args: Args
     runId: string
     routing?: Awaited<ReturnType<typeof runRoutingEval>>
     followup?: Awaited<ReturnType<typeof runFollowupEval>>
+    clarification?: Awaited<ReturnType<typeof runClarificationEval>>
 }) {
     await mkdir(input.args.outDir, { recursive: true })
     await mkdir(input.args.docsDir, { recursive: true })
@@ -1019,6 +1205,12 @@ async function writeArtifacts(input: {
             baseUrl: input.args.baseUrl,
             slug: input.args.slug,
             seed: input.args.seed,
+            exclusionArtifact: input.args.excludeRoutingArtifact,
+            candidateRowCount: input.routing.candidateRowCount,
+            excludedPoolIds: input.routing.excludedPoolIds,
+            selectedOverlap: input.routing.selected
+                .map((row) => row.no)
+                .filter((poolId) => input.routing?.excludedPoolIds.includes(poolId)),
             selected: input.routing.selected,
             summary: summarizeRouting(input.routing.results),
             results: input.routing.results
@@ -1058,6 +1250,29 @@ async function writeArtifacts(input: {
         console.log(`FOLLOWUP_JSON ${jsonPath}`)
         console.log(`FOLLOWUP_MD ${mdPath}`)
     }
+
+    if (input.clarification) {
+        const jsonPath = path.join(input.args.outDir, `yiu-clarification-real-student-${input.clarification.cases.length}-${input.runId}.json`)
+        const mdPath = path.join(input.args.docsDir, `yiu-clarification-real-student-${input.clarification.cases.length}-${input.runId}.md`)
+        await writeFile(jsonPath, JSON.stringify({
+            runId: input.runId,
+            baseUrl: input.args.baseUrl,
+            slug: input.args.slug,
+            fixture: input.args.clarificationFixture,
+            cases: input.clarification.cases,
+            summary: summarizeClarifications(input.clarification.results),
+            results: input.clarification.results
+        }, null, 2), 'utf8')
+        await writeFile(mdPath, renderClarificationMarkdown({
+            runId: input.runId,
+            baseUrl: input.args.baseUrl,
+            slug: input.args.slug,
+            cases: input.clarification.cases,
+            results: input.clarification.results
+        }), 'utf8')
+        console.log(`CLARIFICATION_JSON ${jsonPath}`)
+        console.log(`CLARIFICATION_MD ${mdPath}`)
+    }
 }
 
 async function main() {
@@ -1071,15 +1286,32 @@ async function main() {
         originalScore: row.originalScore
     }))
 
-    const routingSelected = sampleRows(rows, args.routingCount, `${args.seed}:routing`)
+    const excludedPoolIds = args.excludeRoutingArtifact
+        ? readExcludedPoolIds(JSON.parse(await readFile(path.resolve(args.excludeRoutingArtifact), 'utf8')))
+        : new Set<number>()
+    const routingRows = excludeRowsByPoolId(rows, excludedPoolIds)
+    if (routingRows.length < args.routingCount) {
+        throw new Error(`Only ${routingRows.length} routing rows remain after exclusions; requested ${args.routingCount}`)
+    }
+    const clarificationCases = validateClarificationCases(
+        JSON.parse(await readFile(path.resolve(args.clarificationFixture), 'utf8'))
+    )
+
+    const routingSelected = sampleRows(routingRows, args.routingCount, `${args.seed}:routing`)
         .slice(args.routingStartIndex - 1)
     const followupSelected = sampleRows(rows, args.followupCount, `${args.seed}:followup`)
 
     if (args.dryRun) {
         console.log(JSON.stringify({
             rowCount: rows.length,
+            routingCandidateCount: routingRows.length,
+            excludedRoutingCount: excludedPoolIds.size,
+            selectedRoutingOverlap: routingSelected
+                .map((row) => row.no)
+                .filter((poolId) => excludedPoolIds.has(poolId)),
             routingSelected: routingSelected.map((row) => ({ no: row.no, question: row.question })),
-            followupSelected: followupSelected.map((row) => ({ no: row.no, question: row.question }))
+            followupSelected: followupSelected.map((row) => ({ no: row.no, question: row.question })),
+            clarificationCases
         }, null, 2))
         return
     }
@@ -1102,10 +1334,12 @@ async function main() {
     const runId = new Date().toISOString().replace(/[:.]/g, '-')
     let routing: Awaited<ReturnType<typeof runRoutingEval>> | undefined
     let followup: Awaited<ReturnType<typeof runFollowupEval>> | undefined
+    let clarification: Awaited<ReturnType<typeof runClarificationEval>> | undefined
 
     if (args.mode === 'routing' || args.mode === 'both') {
         routing = await runRoutingEval({
-            rows,
+            rows: routingRows,
+            excludedPoolIds,
             supabase: supabase as unknown as SupabaseClientLike,
             channel,
             token,
@@ -1125,13 +1359,28 @@ async function main() {
         })
     }
 
-    await writeArtifacts({ args, runId, routing, followup })
+
+    if (args.mode === 'clarification') {
+        clarification = await runClarificationEval({
+            cases: clarificationCases,
+            supabase: supabase as unknown as SupabaseClientLike,
+            channel,
+            token,
+            args,
+            runId
+        })
+    }
+
+    await writeArtifacts({ args, runId, routing, followup, clarification })
 
     if (routing) {
         console.log('ROUTING_SUMMARY', JSON.stringify(summarizeRouting(routing.results)))
     }
     if (followup) {
         console.log('FOLLOWUP_SUMMARY', JSON.stringify(summarizeFollowups(followup.results)))
+    }
+    if (clarification) {
+        console.log('CLARIFICATION_SUMMARY', JSON.stringify(summarizeClarifications(clarification.results)))
     }
 }
 

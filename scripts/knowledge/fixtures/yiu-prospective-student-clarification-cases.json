@@ -1,0 +1,162 @@
+[
+  {
+    "id": "program-fee",
+    "firstMessage": "ücreti ne kadar acaba",
+    "shortReply": "anestezi",
+    "expectedSubject": "Anestezi",
+    "expectedFacet": "ücret",
+    "rationale": "Aday hangi programın ücretini sorduğunu belirtmedi."
+  },
+  {
+    "id": "program-score",
+    "firstMessage": "puanı kaçla kapatmış",
+    "shortReply": "burslu İngilizce tıp",
+    "expectedSubject": "İngilizce Tıp burslu",
+    "expectedFacet": "taban puan",
+    "rationale": "Program ve burs türü belirtilmeden taban puan cevaplanamaz."
+  },
+  {
+    "id": "program-ranking",
+    "firstMessage": "başarı sırası kaç peki",
+    "shortReply": "anestezi burslu",
+    "expectedSubject": "Anestezi burslu",
+    "expectedFacet": "başarı sırası",
+    "rationale": "Program ve ücret türü belirtilmeden başarı sırası cevaplanamaz."
+  },
+  {
+    "id": "program-duration",
+    "firstMessage": "kaç yıl sürüyor",
+    "shortReply": "fizyoterapi ve rehabilitasyon",
+    "expectedSubject": "Fizyoterapi ve Rehabilitasyon",
+    "expectedFacet": "eğitim süresi",
+    "rationale": "Aday program adını belirtmedi."
+  },
+  {
+    "id": "program-campus",
+    "firstMessage": "hangi kampüste okuyacağım",
+    "shortReply": "hemşirelik",
+    "expectedSubject": "Hemşirelik",
+    "expectedFacet": "kampüs",
+    "rationale": "Kampüs bilgisi program bağlamına ihtiyaç duyuyor."
+  },
+  {
+    "id": "program-internship",
+    "firstMessage": "staj işi nasıl oluyor",
+    "shortReply": "ergoterapi",
+    "expectedSubject": "Ergoterapi",
+    "expectedFacet": "staj ve uygulama",
+    "rationale": "Staj koşulları için program adı eksik."
+  },
+  {
+    "id": "program-quota",
+    "firstMessage": "kontenjan kaç kişi",
+    "shortReply": "dil ve konuşma terapisi burslu",
+    "expectedSubject": "Dil ve Konuşma Terapisi burslu",
+    "expectedFacet": "kontenjan",
+    "rationale": "Program ve burs türü belirtilmeden kontenjan seçilemez."
+  },
+  {
+    "id": "program-prep",
+    "firstMessage": "hazırlık okumam gerekiyor mu",
+    "shortReply": "İngilizce tıp",
+    "expectedSubject": "İngilizce Tıp",
+    "expectedFacet": "hazırlık",
+    "rationale": "Hazırlık gereksinimi programın eğitim diline bağlı."
+  },
+  {
+    "id": "program-accreditation",
+    "firstMessage": "akreditasyonu var mı",
+    "shortReply": "tıp fakültesi",
+    "expectedSubject": "Tıp Fakültesi",
+    "expectedFacet": "akreditasyon",
+    "rationale": "Hangi akademik birimin sorulduğu belirtilmedi."
+  },
+  {
+    "id": "program-lab",
+    "firstMessage": "laboratuvar imkanı nasıl",
+    "shortReply": "tıbbi laboratuvar teknikleri",
+    "expectedSubject": "Tıbbi Laboratuvar Teknikleri",
+    "expectedFacet": "laboratuvar ve uygulama olanakları",
+    "rationale": "Laboratuvar olanakları program bağlamına ihtiyaç duyuyor."
+  },
+  {
+    "id": "program-practice-start",
+    "firstMessage": "uygulamalar ne zaman başlıyor",
+    "shortReply": "ebelik",
+    "expectedSubject": "Ebelik",
+    "expectedFacet": "uygulama başlangıcı",
+    "rationale": "Uygulama takvimi program belirtilmeden cevaplanamaz."
+  },
+  {
+    "id": "program-attendance",
+    "firstMessage": "devamsızlık sınırı kaç",
+    "shortReply": "hemşirelik uygulaması",
+    "expectedSubject": "Hemşirelik uygulaması",
+    "expectedFacet": "devam zorunluluğu",
+    "rationale": "Ders veya uygulama bağlamı belirtilmedi."
+  },
+  {
+    "id": "program-payment",
+    "firstMessage": "ödemeyi nasıl yapıyoruz",
+    "shortReply": "anestezi ücretli",
+    "expectedSubject": "Anestezi ücretli",
+    "expectedFacet": "ödeme seçenekleri",
+    "rationale": "Program ve ücret türü ödeme bağlamını belirliyor."
+  },
+  {
+    "id": "discount-type",
+    "firstMessage": "indirim oranı ne kadar",
+    "shortReply": "birinci tercih indirimi",
+    "expectedSubject": "Birinci tercih indirimi",
+    "expectedFacet": "indirim oranı",
+    "rationale": "Aday hangi indirim türünü sorduğunu belirtmedi."
+  },
+  {
+    "id": "registration-type",
+    "firstMessage": "kayıt için ne yapmam lazım",
+    "shortReply": "YKS ile yeni kayıt",
+    "expectedSubject": "YKS yeni kayıt",
+    "expectedFacet": "kayıt süreci",
+    "rationale": "Kayıt türü belirtilmeden doğru prosedür seçilemez."
+  },
+  {
+    "id": "registration-documents",
+    "firstMessage": "hangi belgeleri getireceğim",
+    "shortReply": "uluslararası öğrenci kaydı",
+    "expectedSubject": "Uluslararası öğrenci kaydı",
+    "expectedFacet": "kayıt belgeleri",
+    "rationale": "Gerekli belgeler başvuru türüne göre değişiyor."
+  },
+  {
+    "id": "dorm-type",
+    "firstMessage": "hangi yurda başvurabilirim",
+    "shortReply": "kız öğrenci",
+    "expectedSubject": "Kız öğrenci yurdu",
+    "expectedFacet": "yurt seçeneği",
+    "rationale": "Uygun yurt seçeneği için adayın ihtiyacı eksik."
+  },
+  {
+    "id": "career-outcome",
+    "firstMessage": "bitirince ne iş yapıyorum",
+    "shortReply": "grafik tasarım",
+    "expectedSubject": "Grafik Tasarım",
+    "expectedFacet": "kariyer olanakları",
+    "rationale": "Kariyer çıktısı program belirtilmeden cevaplanamaz."
+  },
+  {
+    "id": "transfer-type",
+    "firstMessage": "geçiş yapabilir miyim",
+    "shortReply": "yatay geçiş",
+    "expectedSubject": "Yatay geçiş",
+    "expectedFacet": "geçiş koşulları",
+    "rationale": "Aday geçiş türünü belirtmedi."
+  },
+  {
+    "id": "programs-by-score-type",
+    "firstMessage": "hangi bölümleri tercih edebilirim",
+    "shortReply": "TYT puanıyla",
+    "expectedSubject": "TYT programları",
+    "expectedFacet": "program seçenekleri",
+    "rationale": "Program listesi için puan türü veya ilgi alanı eksik."
+  }
+]
