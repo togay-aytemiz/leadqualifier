@@ -4,12 +4,12 @@ const {
     getOrgAiDictionaryEntriesMock,
     getOrgAiSettingsMock,
     recordAiUsageMock,
-    runSimpleRagPipelineMock,
+    runOneStepFileSearchMock,
 } = vi.hoisted(() => ({
     getOrgAiDictionaryEntriesMock: vi.fn(),
     getOrgAiSettingsMock: vi.fn(),
     recordAiUsageMock: vi.fn(),
-    runSimpleRagPipelineMock: vi.fn(),
+    runOneStepFileSearchMock: vi.fn(),
 }))
 
 vi.mock('openai', () => ({
@@ -30,8 +30,8 @@ vi.mock('@/lib/ai/usage', () => ({
     recordAiUsage: recordAiUsageMock,
 }))
 
-vi.mock('@/lib/knowledge-base/simple-rag/pipeline', () => ({
-    runSimpleRagPipeline: runSimpleRagPipelineMock,
+vi.mock('@/lib/knowledge-base/simple-rag/one-step-file-search', () => ({
+    runOneStepFileSearch: runOneStepFileSearchMock,
 }))
 
 import { buildOpenAiFileSearchDemoReply } from './openai-file-search'
@@ -56,7 +56,7 @@ describe('buildOpenAiFileSearchDemoReply', () => {
         vi.clearAllMocks()
     })
 
-    it('routes the demo directly through the simple standalone-query pipeline', async () => {
+    it('routes the demo through one GPT-5.5 Responses File Search call', async () => {
         vi.stubEnv('OPENAI_API_KEY', 'sk-test')
         getOrgAiDictionaryEntriesMock.mockResolvedValue([
             {
@@ -74,8 +74,9 @@ describe('buildOpenAiFileSearchDemoReply', () => {
             bot_name: 'Qualy',
             prompt: 'Bol emoji kullan, Gen-Z gibi konuş.',
         })
-        runSimpleRagPipelineMock.mockResolvedValue({
-            provider: 'openai_file_search_validated',
+        runOneStepFileSearchMock.mockResolvedValue({
+            provider: 'openai_file_search',
+            status: 'answer',
             answer:
                 'Tıp Fakültesi için 2025 broşüründe Ücretli fiyat 720.000 TL, %50 indirimli fiyat 360.000 TL olarak listelenir. Burslu kontenjan satırında fiyat alanı "-" olarak gösterilir.\nhttps://example.edu.tr/brochure.pdf',
             citations: [
@@ -88,19 +89,12 @@ describe('buildOpenAiFileSearchDemoReply', () => {
                 },
             ],
             refusal: false,
-            timingsMs: { total: 10, retrieval: 0, generation: 0, validation: 0 },
-            usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120, toolCalls: 0 },
+            timingsMs: { total: 10 },
+            usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120, toolCalls: 1 },
             diagnostics: {
-                strictVerdict: 'catalog_program_fee_fact',
-                simpleRag: {
-                    standaloneQuery: 'Tıp Fakültesi ücreti nedir?',
-                    stateUsed: true,
-                    resultCount: 1,
-                    topScores: [0.95],
-                    selectedChunkIds: ['C1'],
-                    selectedFilenames: ['fees.md'],
-                    answerStatus: 'answer',
-                }
+                queries: ['Tıp Fakültesi ücreti nedir?'],
+                resultCount: 1,
+                topScores: [0.95],
             },
         })
         recordAiUsageMock.mockResolvedValue(undefined)
@@ -119,30 +113,23 @@ describe('buildOpenAiFileSearchDemoReply', () => {
             },
         })
 
-        expect(runSimpleRagPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+        expect(runOneStepFileSearchMock).toHaveBeenCalledWith(expect.objectContaining({
             latestUserMessage: 'tip kaç para',
             standaloneQuery: 'Yüksek İhtisas Üniversitesi Tıp Fakültesi ücreti nedir?',
             organizationContext: 'YIU Demo',
             recentMessages: [{ role: 'user', content: 'Tıp Fakültesini soruyorum.' }],
-            pendingClarification: expect.objectContaining({
-                originalQuestion: 'Tıp ücreti nedir?',
-            }),
             responseLanguage: 'tr',
-            answerModel: 'gpt-4.1-mini',
+            model: 'gpt-5.5',
             maxResults: 20,
-            scoreThreshold: 0,
-            settings: {
-                bot_name: 'Qualy',
-                prompt: 'Bol emoji kullan, Gen-Z gibi konuş.',
-            },
+            assistantInstructionContext: expect.stringContaining('Bol emoji kullan'),
             dictionaryContext: 'ftr => Fizyoterapi ve Rehabilitasyon | Fizyoterapi ön lisans',
         }))
         expect(result?.replyText).toContain('Tıp Fakültesi için 2025 broşüründe')
         expect(result?.replyText).toContain('https://example.edu.tr/brochure.pdf')
         expect(result?.metadata.rag_file_search).toMatchObject({
-            pipeline_version: 'simple_skill_first_file_search_v2',
+            pipeline_version: 'one_step_responses_file_search_v1',
+            answer_model: 'gpt-5.5',
             max_results: 20,
-            score_threshold: 0,
         })
         expect(result?.metadata.rag_file_search).not.toHaveProperty('final_polish')
     })
@@ -153,8 +140,9 @@ describe('buildOpenAiFileSearchDemoReply', () => {
             bot_name: 'Qualy',
             prompt: 'Kısa ve net Türkçe konuş.',
         })
-        runSimpleRagPipelineMock.mockResolvedValue({
-            provider: 'openai_file_search_validated',
+        runOneStepFileSearchMock.mockResolvedValue({
+            provider: 'openai_file_search',
+            status: 'answer',
             answer: 'English Medicine tuition is 720,000 TL; discounted tuition is 360,000 TL.',
             citations: [],
             refusal: false,
@@ -179,7 +167,7 @@ describe('buildOpenAiFileSearchDemoReply', () => {
         expect(getOrgAiSettingsMock).toHaveBeenCalledWith('org-1', expect.objectContaining({
             locale: 'tr',
         }))
-        expect(runSimpleRagPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+        expect(runOneStepFileSearchMock).toHaveBeenCalledWith(expect.objectContaining({
             latestUserMessage: 'ingilizcesi?',
             responseLanguage: 'tr',
             recentMessages: expect.arrayContaining([
@@ -195,8 +183,9 @@ describe('buildOpenAiFileSearchDemoReply', () => {
             bot_name: 'YİÜ Tanıtım Asistanı',
             prompt: 'Yüksek İhtisas Üniversitesi Tanıtım Günleri aday öğrenci asistanı gibi konuş.',
         })
-        runSimpleRagPipelineMock.mockResolvedValue({
-            provider: 'openai_file_search_validated',
+        runOneStepFileSearchMock.mockResolvedValue({
+            provider: 'openai_file_search',
+            status: 'answer',
             answer: 'Yüksek İhtisas Üniversitesi fakülteleri listelenmiştir.',
             citations: [],
             refusal: false,
@@ -211,7 +200,7 @@ describe('buildOpenAiFileSearchDemoReply', () => {
             message: 'hangi fakülteler var?',
         })
 
-        expect(runSimpleRagPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+        expect(runOneStepFileSearchMock).toHaveBeenCalledWith(expect.objectContaining({
             organizationContext: 'Yüksek İhtisas Üniversitesi / YIU Demo',
         }))
     })
@@ -222,7 +211,7 @@ describe('buildOpenAiFileSearchDemoReply', () => {
             bot_name: 'Qualy',
             prompt: 'Kısa ve net cevap ver.',
         })
-        runSimpleRagPipelineMock.mockRejectedValueOnce(new Error('vector search unavailable'))
+        runOneStepFileSearchMock.mockRejectedValueOnce(new Error('File Search unavailable'))
 
         const result = await buildOpenAiFileSearchDemoReply({
             supabase: {},
@@ -237,9 +226,37 @@ describe('buildOpenAiFileSearchDemoReply', () => {
         expect(result?.metadata).toMatchObject({
             demo_chat_reply_source: 'simple_standalone_query_rag',
             rag_file_search: {
-                pipeline_version: 'simple_skill_first_file_search_v2',
+                pipeline_version: 'one_step_responses_file_search_v1',
                 failure_reason: 'pipeline_error',
             },
+        })
+    })
+
+    it('maps one-step no_info to the localized no-information reply', async () => {
+        vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+        getOrgAiSettingsMock.mockResolvedValue({ bot_name: 'Qualy', prompt: 'Kısa konuş.' })
+        runOneStepFileSearchMock.mockResolvedValue({
+            provider: 'openai_file_search',
+            status: 'no_info',
+            answer: '',
+            citations: [],
+            refusal: false,
+            timingsMs: { total: 10 },
+            usage: { inputTokens: 50, outputTokens: 8, totalTokens: 58, toolCalls: 1 },
+            diagnostics: { queries: ['Psikoloji bölümü'], resultCount: 3, topScores: [0.7] },
+        })
+
+        const result = await buildOpenAiFileSearchDemoReply({
+            supabase: {},
+            channel,
+            message: 'Psikoloji bölümü var mı?',
+        })
+
+        expect(result?.replyText).toBe('Bu konuda net bir bilgi bulamadım.')
+        expect(result?.metadata.rag_file_search).toMatchObject({
+            pipeline_version: 'one_step_responses_file_search_v1',
+            answer_status: 'no_info',
+            refusal: false,
         })
     })
 })

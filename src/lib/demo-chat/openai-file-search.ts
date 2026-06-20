@@ -5,7 +5,7 @@ import { getOrgAiSettings } from '@/lib/ai/settings'
 import { getOrgAiDictionaryEntries } from '@/lib/ai/dictionary'
 import { formatAiDictionaryContext } from '@/lib/ai/dictionary-core'
 import { recordAiUsage } from '@/lib/ai/usage'
-import { runSimpleRagPipeline } from '@/lib/knowledge-base/simple-rag/pipeline'
+import { runOneStepFileSearch } from '@/lib/knowledge-base/simple-rag/one-step-file-search'
 import type { KnowledgeSearchPlanningTurn } from '@/lib/knowledge-base/query-planner'
 import type { DemoChatChannel } from '@/lib/demo-chat/channel'
 import {
@@ -33,10 +33,8 @@ export type OpenAiFileSearchDemoReply = {
 }
 
 const DEFAULT_FILE_SEARCH_DEMO_SLUGS = ['yiu-tanitim-gunleri-2026']
-const DEFAULT_REWRITE_MODEL = 'gpt-4.1-mini'
-const DEFAULT_ANSWER_MODEL = 'gpt-4.1-mini'
+const DEFAULT_ANSWER_MODEL = 'gpt-5.5'
 const DEFAULT_MAX_RESULTS = 20
-const DEFAULT_SCORE_THRESHOLD = 0
 
 function readEnabledSlugs() {
     const raw = process.env.DEMO_CHAT_FILE_SEARCH_SLUGS?.trim()
@@ -58,12 +56,6 @@ function readVectorStoreId() {
         || sourceManifest.vectorStoreId
 }
 
-function readRewriteModel() {
-    return process.env.DEMO_CHAT_FILE_SEARCH_REWRITE_MODEL?.trim()
-        || process.env.DEMO_CHAT_FILE_SEARCH_RETRIEVAL_MODEL?.trim()
-        || DEFAULT_REWRITE_MODEL
-}
-
 function readAnswerModel() {
     return process.env.DEMO_CHAT_FILE_SEARCH_ANSWER_MODEL?.trim()
         || DEFAULT_ANSWER_MODEL
@@ -73,16 +65,6 @@ function readMaxResults() {
     const parsed = Number(process.env.DEMO_CHAT_FILE_SEARCH_MAX_RESULTS)
     if (!Number.isFinite(parsed)) return DEFAULT_MAX_RESULTS
     return Math.max(1, Math.min(50, Math.round(parsed)))
-}
-
-function readScoreThreshold() {
-    const parsed = Number(process.env.DEMO_CHAT_FILE_SEARCH_SCORE_THRESHOLD)
-    if (!Number.isFinite(parsed)) return DEFAULT_SCORE_THRESHOLD
-    return Math.max(0, Math.min(1, parsed))
-}
-
-function usageModelName(...models: string[]) {
-    return Array.from(new Set(models.filter(Boolean))).join('+')
 }
 
 function mapCitationMetadata(citations: Array<{
@@ -122,10 +104,8 @@ function buildSimpleRagUnavailableReply(input: {
     conversationHistoryCount: number
 }): OpenAiFileSearchDemoReply {
     const vectorStoreId = readVectorStoreId()
-    const rewriteModel = readRewriteModel()
     const answerModel = readAnswerModel()
     const maxResults = readMaxResults()
-    const scoreThreshold = readScoreThreshold()
 
     return {
         replyText: input.responseLanguage === 'tr'
@@ -135,14 +115,12 @@ function buildSimpleRagUnavailableReply(input: {
             is_rag: true,
             rag_extractive: false,
             demo_chat_reply_source: 'simple_standalone_query_rag',
-            rag_provider: 'openai_file_search_validated',
+            rag_provider: 'openai_file_search',
             rag_file_search: {
                 vector_store_id: vectorStoreId,
-                rewrite_model: rewriteModel,
                 answer_model: answerModel,
-                pipeline_version: 'simple_skill_first_file_search_v2',
+                pipeline_version: 'one_step_responses_file_search_v1',
                 max_results: maxResults,
-                score_threshold: scoreThreshold,
                 refusal: false,
                 failure_reason: input.failureReason,
                 conversation_history_turn_count: input.conversationHistoryCount,
@@ -191,36 +169,35 @@ export async function buildOpenAiFileSearchDemoReply(input: {
             }),
         ])
         const dictionaryContext = formatAiDictionaryContext(dictionaryEntries)
-        const rewriteModel = readRewriteModel()
         const answerModel = readAnswerModel()
         const vectorStoreId = readVectorStoreId()
         const maxResults = readMaxResults()
-        const scoreThreshold = readScoreThreshold()
         const openai = new OpenAI({ apiKey })
-        const result = await runSimpleRagPipeline({
+        const organizationContext = resolveDemoOrganizationContext({
+            channelDisplayName: input.channel.displayName,
+            settings,
+        })
+        const result = await runOneStepFileSearch({
             client: openai,
-            rewriteModel,
-            answerModel,
+            model: answerModel,
             vectorStoreId,
             latestUserMessage: input.message,
             standaloneQuery: input.standaloneQuery,
-            standaloneQueryUsage: input.skillRoutingDiagnostics?.rewrite?.usage,
             recentMessages: input.conversationHistory ?? [],
-            organizationContext: resolveDemoOrganizationContext({
-                channelDisplayName: input.channel.displayName,
-                settings,
-            }),
+            organizationContext,
             assistantInstructionContext: buildDemoAssistantInstructionContext(settings),
             dictionaryContext,
             pendingClarification: input.pendingClarification,
             responseLanguage,
             citationSourcesByFilename: sourceManifest.sourcesByFilename,
             maxResults,
-            scoreThreshold,
-            settings,
         })
-        const answer = result.answer.trim()
-        if (!answer) {
+        const answer = result.status === 'no_info'
+            ? responseLanguage === 'tr'
+                ? 'Bu konuda net bir bilgi bulamadım.'
+                : 'I could not find clear information about this.'
+            : result.answer.trim()
+        if (!answer && result.status !== 'no_info') {
             return buildSimpleRagUnavailableReply({
                 responseLanguage,
                 failureReason: 'empty_answer',
@@ -233,13 +210,13 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                 await recordAiUsage({
                     organizationId: input.channel.organizationId,
                     category: 'rag',
-                    model: usageModelName(rewriteModel, answerModel),
+                    model: answerModel,
                     inputTokens: result.usage.inputTokens,
                     outputTokens: result.usage.outputTokens,
                     totalTokens: result.usage.totalTokens,
                     metadata: {
-                        source: 'demo_chat_simple_rag',
-                        response_kind: 'rag_simple_standalone_query',
+                        source: 'demo_chat_one_step_file_search',
+                        response_kind: 'rag_one_step_file_search',
                         demo_chat_channel_id: input.channel.id,
                         ...(input.conversationId ? { conversation_id: input.conversationId } : {}),
                         vector_store_id: vectorStoreId,
@@ -265,11 +242,10 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                 rag_provider: result.provider,
                 rag_file_search: {
                     vector_store_id: vectorStoreId,
-                    rewrite_model: rewriteModel,
                     answer_model: answerModel,
-                    pipeline_version: 'simple_skill_first_file_search_v2',
+                    pipeline_version: 'one_step_responses_file_search_v1',
                     max_results: maxResults,
-                    score_threshold: scoreThreshold,
+                    answer_status: result.status,
                     refusal: result.refusal,
                     timings_ms: result.timingsMs,
                     diagnostics: result.diagnostics,
@@ -284,16 +260,13 @@ export async function buildOpenAiFileSearchDemoReply(input: {
                         )
                     }
                     : {}),
-                ...(result.diagnostics?.pendingClarification
-                    ? { rag_pending_clarification: result.diagnostics.pendingClarification }
-                    : {}),
                 source_titles: citations.map((citation) => citation.title).filter(Boolean),
                 source_urls: citations.map((citation) => citation.url).filter(Boolean),
                 sources: citations,
             },
         } satisfies OpenAiFileSearchDemoReply
     } catch (error) {
-        console.error('Demo Chat: simple RAG reply failed; returning approved-source no-info', error)
+        console.error('Demo Chat: one-step File Search reply failed; returning temporary unavailable response', error)
         return buildSimpleRagUnavailableReply({
             responseLanguage,
             failureReason: 'pipeline_error',

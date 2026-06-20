@@ -8,6 +8,10 @@
 
 ### Changed
 
+- Documented the exact same-seed 100-question comparison for one-step GPT-5.5 File Search. Manual review accepted all `35/35` Skill routes and confirmed material safety gains on Psychology existence, meal pricing, affiliated-hospital scope, Tıbbi Görüntüleme fee substitution, and hospital-project status; release remains blocked by two adjacent-evidence positives, one reproducible reasoning-output budget failure, three selector timeouts, and p90 increasing from `15.26s` to `28.95s` (`docs/evaluations/yiu-one-step-file-search-same-seed-100-review-2026-06-20.md`).
+
+- Changed Public Demo fallback RAG from custom vector search plus separate GPT-4.1-mini answer/verifier calls to one GPT-5.5 Responses API call with hosted File Search, forced tool use, included search-result diagnostics, and strict `answer | no_info | refuse` output. The balanced 20-case live gate retained `10/10` supported recall and produced zero manually reviewed unsafe positives without a new threshold or second verifier (`src/lib/knowledge-base/simple-rag/one-step-file-search.ts`, `src/lib/demo-chat/openai-file-search.ts`, `docs/evaluations/yiu-one-step-file-search-focused-review-2026-06-20.md`).
+
 - Changed Public Demo semantic Skill retrieval from top embedding rows to top unique Skills. The linked `match_skills` RPC now keeps each Skill's best embedding before `match_count`; the same live broad-rank probe improved from `20` rows / `14` unique Skills to `20/20` unique Skills (`supabase/migrations/20260620053214_match_skills_unique_candidates.sql`, related migration test).
 - Changed the single Skill selector from `gpt-4.1-mini` Chat Completions JSON mode to `gpt-5.5` with `reasoning.effort=none` on the Responses API and strict Structured Outputs. Frozen-payload evaluation found `4/30` false Skills for the former model versus `30/30` exact decisions for both GPT-5.5 none and low; none won on p90 latency (`3.88s` versus `4.28s`) (`src/lib/demo-chat/skill-candidate-verifier.ts`, `docs/evaluations/yiu-skill-selector-model-ab-2026-06-20T06-31-51-160Z.md`).
 - Changed Skill semantic indexing to use positive recall signals only: title, positive trigger examples, coverage facets, and concise approved-response facts. `routing_description` remains available to the single LLM selector but its exclusions no longer enter embeddings (`src/lib/skills/embeddings.ts`, `src/lib/skills/embeddings.test.ts`).
@@ -43,6 +47,8 @@
 
 ### Fixed
 
+- Fixed one-step GPT-5.5 File Search exhausting the full `800` output-token budget on medium reasoning before emitting strict JSON for broad questions. The budget is now `2000`; the configuration test followed red/green TDD, the production build passed, and the formerly failing success-ranking turn returned valid structured answers in two consecutive live reruns (`src/lib/knowledge-base/simple-rag/one-step-file-search.ts`, `src/lib/knowledge-base/simple-rag/one-step-file-search.test.ts`, `docs/evaluations/yiu-one-step-file-search-same-seed-100-review-2026-06-20.md`).
+
 - Fixed repeated embeddings from one Skill consuming the semantic candidate budget before application-side deduplication, which previously yielded only `14` distinct Skills from a requested top `20` on a broad YİÜ ranking query.
 - Fixed Skill fallback diagnostics being overwritten as `rag_fallback` after verifier timeout/error/no-skill outcomes. RAG fallback is now marked separately with `ragFallback: true`, so eval reports can still show whether the terminal Skill selector state was `verification_timeout`, `verification_error`, or `verification_no_skill` (`src/lib/demo-chat/skill-routing-diagnostics.ts`, `src/app/api/demo/[slug]/chat/route.ts`, `src/lib/demo-chat/openai-file-search.ts`).
 - Fixed high-risk Public Demo RAG answers accepting adjacent evidence for hospital status/existence, accreditation, program existence, facility/resource, clinical practice, fee/quota/ranking, payment, contact, location, transport, housing, and campus-life claims. Risky unsupported positive answers now become no-info or a clarification instead of a confident claim (`src/lib/knowledge-base/simple-rag/evidence-verifier.ts`, `src/lib/knowledge-base/simple-rag/pipeline.test.ts`).
@@ -50,6 +56,8 @@
 - Fixed organization-specific File Search results being discarded by a second heuristic layer that could misclassify the active university's own fee chunks as `other_organization` or `audience_mismatch`.
 
 ### Added
+
+- Added a reproducible 20-case YİÜ one-step File Search gate covering ten directly supported questions plus ten bounded/unsupported adjacent-evidence cases, including deterministic status scoring, forbidden-positive checks, latency/token reporting, and retained File Search results for audit (`scripts/knowledge/yiu-one-step-file-search-focused-eval.ts`, `scripts/knowledge/fixtures/yiu-one-step-file-search-focused-cases.json`).
 
 - Added a same-seed 100-question HTTP rerun and manual route review for the unique-candidate GPT-5.5 selector. The run completed `100/100` with zero errors and `34/34` acceptable Skill routes, while isolating the next blocker to adjacent-evidence RAG positives and recording two safe selector-timeout fallbacks (`docs/evaluations/yiu-routing-random-100-2026-06-20T07-32-22-180Z.md`, `docs/evaluations/yiu-routing-random-100-gpt55-unique-candidates-review-2026-06-20.md`).
 

@@ -1,0 +1,22 @@
+[
+  { "caseId": "supported-attendance", "poolId": 413, "group": "supported", "question": "Derslere devam zorunlu mu?", "expectedStatus": "answer" },
+  { "caseId": "supported-martyr-veteran-scholarship", "poolId": 117, "group": "supported", "question": "Şehit ve gazi yakınlarına burs var mı?", "expectedStatus": "answer" },
+  { "caseId": "supported-missing-registration-document", "poolId": 394, "group": "supported", "question": "Eksik belgeyle kayıt yapılır mı?", "expectedStatus": "answer" },
+  { "caseId": "supported-registration-payment", "poolId": 88, "group": "supported", "question": "Kayıt sırasında ne kadar ödeme yapmam gerekiyor?", "expectedStatus": "answer" },
+  { "caseId": "supported-candidate-contact", "poolId": 387, "group": "supported", "question": "Aday öğrenci birimine nasıl ulaşırım?", "expectedStatus": "answer" },
+  { "caseId": "supported-bedside-training", "poolId": 207, "group": "supported", "question": "Öğrenciler hasta başı eğitim yapabiliyor mu?", "expectedStatus": "answer" },
+  { "caseId": "supported-internship-insurance", "poolId": 369, "group": "supported", "question": "Stajda sigorta yapılıyor mu?", "expectedStatus": "answer" },
+  { "caseId": "supported-skills-lab", "poolId": 304, "group": "supported", "question": "Beceri laboratuvarı var mı?", "expectedStatus": "answer" },
+  { "caseId": "supported-state-hospital-internship", "poolId": 365, "group": "supported", "question": "Devlet hastanesinde staj yapabilir miyim?", "expectedStatus": "answer" },
+  { "caseId": "supported-founder", "poolId": 5, "group": "supported", "question": "Üniversitenin kurucu vakfı kimdir?", "expectedStatus": "answer" },
+  { "caseId": "unsupported-psychology-program", "poolId": 49, "group": "unsupported", "question": "Psikoloji bölümü var mı?", "expectedStatus": "no_info" },
+  { "caseId": "unsupported-meal-price", "poolId": 435, "group": "bounded", "question": "yemek paralı mı", "expectedStatus": "answer", "forbiddenAnswerPatterns": ["yemek(?:ler)? (?:paralı|ücretli)(?:dır|dir)?"] },
+  { "caseId": "unsupported-romantic-outcome", "poolId": 459, "group": "bounded", "question": "Üniversitenizde sevgili bulabilir miyim?", "expectedStatus": "answer", "forbiddenAnswerPatterns": ["sevgili (?:bulabilirsiniz|bulursunuz)"] },
+  { "caseId": "unsupported-affiliate-city", "poolId": 182, "group": "bounded", "question": "Afiliye hastaneniz hangi şehirde?", "expectedStatus": "answer", "forbiddenAnswerPatterns": ["afiliye hastane(?:niz)? Ankara(?:'da|’da|dadır)"] },
+  { "caseId": "unsupported-affiliate-emergency", "poolId": 201, "group": "bounded", "question": "Afiliye hastanede acil servis var mı?", "expectedStatus": "answer", "forbiddenAnswerPatterns": ["^Evet[.!]"] },
+  { "caseId": "unsupported-hospital-project", "poolId": 228, "group": "bounded", "question": "Hastane projeniz var mı?", "expectedStatus": "answer", "forbiddenAnswerPatterns": ["^Evet[.!]"] },
+  { "caseId": "unsupported-state-dorm", "poolId": 262, "group": "bounded", "question": "Yakınlarda devlet yurdu var mı?", "expectedStatus": "answer", "forbiddenAnswerPatterns": ["devlet.{0,30}yurt.{0,30}(?:yok|bulunmamaktadır)"] },
+  { "caseId": "unsupported-alumni-discount", "poolId": 116, "group": "bounded", "question": "Annem mezun, bana indirim var mı?", "expectedStatus": "answer", "forbiddenAnswerPatterns": ["(?:mezun yakını|mezun çocuğu).{0,40}indirim (?:yok|uygulanmaz)"] },
+  { "caseId": "unsupported-crypto-payment", "poolId": 479, "group": "bounded", "question": "Ücreti kriptoyla ödeyebilir miyim?", "expectedStatus": "answer", "forbiddenAnswerPatterns": ["kripto.{0,30}(?:kabul edilir|ödenebilir|kullanılabilir)"] },
+  { "caseId": "unsupported-vat", "poolId": 84, "group": "unsupported", "question": "Ücretlere KDV dahil mi?", "expectedStatus": "no_info" }
+]

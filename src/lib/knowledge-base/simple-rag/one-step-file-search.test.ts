@@ -51,8 +51,9 @@ describe('runOneStepFileSearch', () => {
       model: 'gpt-5.5',
       include: ['file_search_call.results'],
       tool_choice: { type: 'file_search' },
-      reasoning: { effort: 'none' },
+      reasoning: { effort: 'medium' },
       store: false,
+      max_output_tokens: 2000,
       tools: [{
         type: 'file_search',
         vector_store_ids: ['vs_yiu'],
@@ -66,7 +67,7 @@ describe('runOneStepFileSearch', () => {
           strict: true,
         }),
       },
-      instructions: expect.stringContaining('exact requested subject and facet'),
+      instructions: expect.stringMatching(/exact requested subject and facet[\s\S]*regulation or definition[\s\S]*not interchangeable/i),
       input: expect.stringContaining('Yüksek İhtisas Üniversitesi kampüs adresi'),
     }))
     expect(result).toMatchObject({
