@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { resolveRagPendingClarificationFollowup } from './pending-clarification-state'
+import {
+  findLatestRagPendingClarificationState,
+  resolveRagPendingClarificationFollowup,
+} from './pending-clarification-state'
 import type { RagPendingClarificationState } from './types'
 
 const programListPending: RagPendingClarificationState = {
@@ -440,5 +443,26 @@ describe('resolveRagPendingClarificationFollowup', () => {
     })
     expect(result?.question).toContain('kaç para')
     expect(result?.question).toContain('Dil ve Konuşma Terapisi')
+  })
+})
+
+describe('findLatestRagPendingClarificationState', () => {
+  it('does not reactivate an older pending clarification after a later assistant answer', () => {
+    const result = findLatestRagPendingClarificationState([
+      { role: 'user', content: 'Ücreti ne kadar?' },
+      {
+        role: 'assistant',
+        content: 'Hangi programın ücretini öğrenmek istiyorsunuz?',
+        metadata: { rag_pending_clarification: tableMetricPending },
+      },
+      { role: 'user', content: 'Hemşirelik' },
+      {
+        role: 'assistant',
+        content: 'Hemşirelik programının ücret bilgileri şöyledir.',
+        metadata: { demo_chat_reply_source: 'skill_answered' },
+      },
+    ])
+
+    expect(result).toBeNull()
   })
 })

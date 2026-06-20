@@ -13,6 +13,7 @@ export type DemoChatSkillRoutingOutcome =
     | 'rewrite_unavailable'
     | 'rewrite_timeout'
     | 'rewrite_error'
+    | 'clarification_requested'
     | 'no_candidate_queries'
     | 'no_semantic_candidates'
     | 'verification_no_skill'
@@ -32,6 +33,8 @@ export type DemoChatSkillRoutingDiagnostics = {
         subject: string | null
         facet: string | null
         needsClarification: boolean
+        clarificationQuestion?: string
+        missingSlots?: string[]
         usedHistory: boolean
         decision: string
         reason: string
@@ -92,6 +95,12 @@ export function summarizeSkillRewrite(
         subject: normalizeText(rewrite.subject) || null,
         facet: normalizeText(rewrite.facet) || null,
         needsClarification: rewrite.needsClarification,
+        ...(rewrite.clarificationQuestion
+            ? { clarificationQuestion: normalizeText(rewrite.clarificationQuestion) }
+            : {}),
+        ...(rewrite.missingSlots && rewrite.missingSlots.length > 0
+            ? { missingSlots: rewrite.missingSlots.map((slot) => normalizeText(slot, 80)).filter(Boolean) }
+            : {}),
         usedHistory: rewrite.usedHistory,
         decision: rewrite.decision,
         reason: normalizeText(rewrite.reason),

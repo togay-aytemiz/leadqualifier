@@ -159,6 +159,45 @@ describe('rewriteDemoSkillQuery', () => {
         expect(result?.usedHistory).toBe(true)
     })
 
+    it('returns the clarification question and missing slots for an underspecified request', async () => {
+        const createCompletion = vi.fn().mockResolvedValue({
+            choices: [{
+                message: {
+                    content: JSON.stringify({
+                        query: 'Yüksek İhtisas Üniversitesi ücret bilgisi',
+                        subject: '',
+                        facet: 'ücret',
+                        needs_clarification: true,
+                        clarification_question: 'Hangi programın ücretini öğrenmek istiyorsunuz?',
+                        missing_slots: ['subject'],
+                        used_history: false,
+                        decision: 'unresolved',
+                        reason: 'The requested program is missing.',
+                    }),
+                },
+            }],
+        })
+
+        const result = await rewriteDemoSkillQuery({
+            latestUserMessage: 'ücreti ne kadar?',
+            responseLanguage: 'tr',
+            recentMessages: [],
+            createCompletion,
+        })
+
+        expect(result).toMatchObject({
+            needsClarification: true,
+            clarificationQuestion: 'Hangi programın ücretini öğrenmek istiyorsunuz?',
+            missingSlots: ['subject'],
+        })
+
+        const request = createCompletion.mock.calls[0]?.[0] as {
+            messages: Array<{ role: string; content: string }>
+        }
+        expect(request.messages[0]?.content).toContain('clarification_question')
+        expect(request.messages[0]?.content).toContain('missing_slots')
+    })
+
     it('preserves standalone questions without requiring history use', async () => {
         const createCompletion = vi.fn().mockResolvedValue({
             choices: [{

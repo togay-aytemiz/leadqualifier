@@ -38,7 +38,10 @@ import { matchExactSkillTriggers, matchSkills } from '@/lib/skills/actions'
 import { matchSkillsWithStatus } from '@/lib/skills/match-safe'
 import type { KnowledgeSearchPlanningTurn } from '@/lib/knowledge-base/query-planner'
 import { buildRagContext, type RagChunk } from '@/lib/knowledge-base/rag'
-import { findLatestRagPendingClarificationState } from '@/lib/knowledge-base/rag-eval/pending-clarification-state'
+import {
+    buildRagPendingClarificationState,
+    findLatestRagPendingClarificationState,
+} from '@/lib/knowledge-base/rag-eval/pending-clarification-state'
 import { repairLinkOnlyRagAnswer } from '@/lib/knowledge-base/rag-answer-repair'
 import { microPolishDeterministicRagAnswer } from '@/lib/knowledge-base/rag-answer-micro-polish'
 import { polishGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-polish'
@@ -377,6 +380,28 @@ function buildDemoSkillCandidateSearchQueries(input: {
         seen.add(key)
         return true
     })
+}
+
+function buildDemoSkillClarificationQuestion(input: {
+    rewrite: DemoSkillQueryRewriteResult
+    responseLanguage: MvpResponseLanguage
+}) {
+    const modelQuestion = input.rewrite.clarificationQuestion?.trim()
+    if (modelQuestion) return modelQuestion
+
+    const missingSlots = new Set(input.rewrite.missingSlots ?? [])
+    const subjectIsMissing = !input.rewrite.subject.trim() || missingSlots.has('subject')
+    const facetIsMissing = !input.rewrite.facet.trim() || missingSlots.has('facet')
+
+    if (input.responseLanguage === 'tr') {
+        if (subjectIsMissing) return 'Hangi program, bölüm veya hizmet için soruyorsunuz?'
+        if (facetIsMissing) return 'Bu konu hakkında hangi ayrıntıyı öğrenmek istiyorsunuz?'
+        return 'Sorunuzu yanıtlayabilmem için hangi ayrıntıyı netleştirebilirsiniz?'
+    }
+
+    if (subjectIsMissing) return 'Which program, department, or service are you asking about?'
+    if (facetIsMissing) return 'Which detail would you like to know about this subject?'
+    return 'Which detail can you clarify so I can answer your question?'
 }
 
 function mergeDemoSkillCandidates(groups: SkillMatch[][]) {
@@ -1729,6 +1754,46 @@ async function persistDemoChatScopeHelpReply(input: {
     }
 }
 
+async function persistDemoSkillClarificationReply(input: {
+    supabase: DemoChatServiceClient
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    sessionId: string
+    message: string
+    messageId: string
+    replyText: string
+    pendingClarification: NonNullable<ReturnType<typeof buildRagPendingClarificationState>>
+    diagnostics: DemoChatSkillRoutingDiagnostics
+}) {
+    try {
+        await ingestDemoChatInboundOnly({
+            supabase: input.supabase,
+            channel: input.channel,
+            sessionId: input.sessionId,
+            message: input.message,
+            inboundMessageId: input.messageId,
+            inboundMetadata: {
+                demo_chat_skill_routing: input.diagnostics,
+            },
+        })
+
+        await persistDemoChatTextReply({
+            supabase: input.supabase,
+            channel: input.channel,
+            sessionId: input.sessionId,
+            messageId: input.messageId,
+            replyText: input.replyText,
+            metadata: {
+                is_rag: true,
+                demo_chat_reply_source: 'skill_query_clarification',
+                rag_pending_clarification: input.pendingClarification,
+                demo_chat_skill_routing: input.diagnostics,
+            },
+        })
+    } catch (error) {
+        console.error('Demo Chat: skill clarification persistence failed; continuing reply flow', error)
+    }
+}
+
 async function recoverPendingDemoChatReplyExtractively(input: {
     supabase: DemoChatServiceClient
     channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
@@ -1873,42 +1938,58 @@ async function tryImmediateDemoSkillReply(input: {
     inboundMessageId: string
     skillRoutingDiagnostics?: DemoChatSkillRoutingDiagnosticsRef
 }): Promise<DemoChatPipelineResult | null | 'pending'> {
-    const exactMatchResult = await matchSkillsWithStatus({
-        matcher: () => matchExactSkillTriggers(
-            input.message,
-            input.channel.organizationId,
-            1,
-            input.supabase
-        ),
-        context: {
-            organization_id: input.channel.organizationId,
-            source: 'demo_chat_post_exact'
-        }
-    })
+    const conversationHistory = await readDemoSkillRewriteHistory(input)
+    const pendingClarification = findLatestRagPendingClarificationState(conversationHistory)
 
-    const exactMatch = exactMatchResult.matches[0]
-    if (input.skillRoutingDiagnostics) {
+    if (!pendingClarification) {
+        const exactMatchResult = await matchSkillsWithStatus({
+            matcher: () => matchExactSkillTriggers(
+                input.message,
+                input.channel.organizationId,
+                1,
+                input.supabase
+            ),
+            context: {
+                organization_id: input.channel.organizationId,
+                source: 'demo_chat_post_exact'
+            }
+        })
+
+        const exactMatch = exactMatchResult.matches[0]
+        if (input.skillRoutingDiagnostics) {
+            input.skillRoutingDiagnostics.current = {
+                outcome: exactMatchResult.status === 'matched' ? 'exact_skill' : 'no_exact_match',
+                exact: {
+                    status: exactMatchResult.status,
+                    matches: summarizeSkillMatches(exactMatchResult.matches)
+                },
+                ...(exactMatchResult.status === 'error'
+                    ? { error: exactMatchResult.error instanceof Error ? exactMatchResult.error.message : String(exactMatchResult.error) }
+                    : {})
+            }
+        }
+        if (exactMatchResult.status === 'matched' && exactMatch) {
+            return runMatchedDemoSkillReply(
+                input,
+                exactMatch,
+                'exact',
+                input.skillRoutingDiagnostics?.current
+            )
+        }
+    } else if (input.skillRoutingDiagnostics) {
         input.skillRoutingDiagnostics.current = {
-            outcome: exactMatchResult.status === 'matched' ? 'exact_skill' : 'no_exact_match',
+            outcome: 'no_exact_match',
             exact: {
-                status: exactMatchResult.status,
-                matches: summarizeSkillMatches(exactMatchResult.matches)
+                status: 'skipped_pending_clarification',
+                matches: [],
             },
-            ...(exactMatchResult.status === 'error'
-                ? { error: exactMatchResult.error instanceof Error ? exactMatchResult.error.message : String(exactMatchResult.error) }
-                : {})
         }
     }
-    if (exactMatchResult.status === 'matched' && exactMatch) {
-        return runMatchedDemoSkillReply(
-            input,
-            exactMatch,
-            'exact',
-            input.skillRoutingDiagnostics?.current
-        )
-    }
 
-    return tryIntentAwareDemoSkillReply(input)
+    return tryIntentAwareDemoSkillReply({
+        ...input,
+        conversationHistory,
+    })
 }
 
 async function runMatchedDemoSkillReply(
@@ -1977,10 +2058,12 @@ async function tryIntentAwareDemoSkillReply(input: {
     message: string
     inboundMessageId: string
     skillRoutingDiagnostics?: DemoChatSkillRoutingDiagnosticsRef
+    conversationHistory?: KnowledgeSearchPlanningTurn[]
 }): Promise<DemoChatPipelineResult | null | 'pending'> {
     if (!process.env.OPENAI_API_KEY?.trim()) return null
 
-    const conversationHistory = await readDemoSkillRewriteHistory(input)
+    const conversationHistory = input.conversationHistory
+        ?? await readDemoSkillRewriteHistory(input)
     const responseLanguage = resolveMvpResponseLanguage(input.message)
     let assistantSettings: Awaited<ReturnType<typeof getOrgAiSettings>> | null = null
     try {
@@ -2063,6 +2146,49 @@ async function tryIntentAwareDemoSkillReply(input: {
         input.skillRoutingDiagnostics.current = {
             ...(input.skillRoutingDiagnostics.current ?? { outcome: 'no_exact_match' as const }),
             rewrite: summarizeSkillRewrite(rewrite)
+        }
+    }
+
+    if (rewrite.needsClarification) {
+        const clarificationQuestion = buildDemoSkillClarificationQuestion({
+            rewrite,
+            responseLanguage,
+        })
+        const pendingClarification = buildRagPendingClarificationState({
+            originalQuestion: input.message,
+            clarificationQuestion,
+            missingSlots: rewrite.missingSlots,
+            requestedFacet: rewrite.facet || undefined,
+            retrievalIntent: rewrittenQuery,
+        })
+
+        if (!pendingClarification) return null
+
+        const diagnostics = {
+            ...appendSkillRoutingOutcome(
+                input.skillRoutingDiagnostics?.current,
+                'clarification_requested'
+            ),
+            rewrite: summarizeSkillRewrite(rewrite),
+        }
+        if (input.skillRoutingDiagnostics) {
+            input.skillRoutingDiagnostics.current = diagnostics
+        }
+
+        await persistDemoSkillClarificationReply({
+            supabase: input.supabase,
+            channel: input.channel,
+            sessionId: input.sessionId,
+            message: input.message,
+            messageId: input.inboundMessageId,
+            replyText: clarificationQuestion,
+            pendingClarification,
+            diagnostics,
+        })
+
+        return {
+            replyText: clarificationQuestion,
+            skillImage: null,
         }
     }
 

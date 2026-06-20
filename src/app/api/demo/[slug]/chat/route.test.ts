@@ -243,6 +243,7 @@ function createHistorySupabaseMock(historyRows: Array<{
     sender_type: string
     metadata: Record<string, unknown> | null
 }>) {
+    const messageInsertMock = vi.fn(async () => ({ error: null }))
     const conversationUpdateChain = {
         eq: vi.fn(async () => ({ error: null })),
     }
@@ -273,7 +274,7 @@ function createHistorySupabaseMock(historyRows: Array<{
                     data: null,
                     error: null,
                 })),
-                insert: vi.fn(async () => ({ error: null })),
+                insert: messageInsertMock,
             }
             return chain
         }
@@ -281,7 +282,7 @@ function createHistorySupabaseMock(historyRows: Array<{
         throw new Error(`Unexpected table ${table}`)
     })
 
-    return { from: fromMock }
+    return { from: fromMock, messageInsertMock }
 }
 
 describe('demo chat API route', () => {
@@ -917,56 +918,147 @@ describe('demo chat API route', () => {
         }))
     })
 
-    it('still searches skills when the rewriter over-clarifies an actionable fact question', async () => {
+    it('returns a router clarification before semantic matching or File Search', async () => {
         vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+        const fakeSupabase = createHistorySupabaseMock([])
+        createClientMock.mockReturnValueOnce(fakeSupabase)
         matchExactSkillTriggersMock.mockResolvedValueOnce([])
-        const quotaMatch = {
-            skill_id: 'skill-ergo-quota',
-            title: 'YİÜ Intent - Ergoterapi kontenjan',
-            response_text: 'Ergoterapi kontenjan bilgisi paylaşılır.',
-            trigger_text: 'Ergoterapi kontenjanı nedir?',
-            similarity: 0.57,
-        }
         rewriteDemoSkillQueryMock.mockResolvedValueOnce({
-            query: 'Ergoterapi kontenjanı nedir?',
-            subject: 'Ergoterapi',
-            facet: 'kontenjan',
+            query: 'Yüksek İhtisas Üniversitesi ücret bilgisi',
+            subject: '',
+            facet: 'ücret',
             needsClarification: true,
+            clarificationQuestion: 'Hangi programın ücretini öğrenmek istiyorsunuz?',
+            missingSlots: ['subject'],
             usedHistory: false,
-            decision: 'standalone',
-            reason: 'Model asked for year, but the fact request is actionable.',
+            decision: 'unresolved',
+            reason: 'The requested program is missing.',
             model: 'gpt-4.1-mini',
             usage: { inputTokens: 80, outputTokens: 20, totalTokens: 100 },
-        })
-        matchSkillsMock.mockResolvedValueOnce([quotaMatch])
-        verifyDemoSkillCandidatesMock.mockResolvedValueOnce({
-            decision: 'skill',
-            match: quotaMatch,
-            confidence: 0.9,
-            reason: 'The candidate answers Ergoterapi quota.',
-            model: 'gpt-4.1-mini',
-            usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 },
-        })
-        processInboundAiPipelineMock.mockImplementationOnce(async (input) => {
-            await input.sendOutbound('Ergoterapi kontenjan bilgisi paylaşılır.')
         })
 
         const res = await POST(createRequest({
             sessionId: 'session-1',
-            message: 'Ergoterapi kontenjanı nedir?',
+            message: 'Ücreti ne kadar?',
         }), createContext())
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({
             pending: false,
-            response: 'Ergoterapi kontenjan bilgisi paylaşılır.',
+            response: 'Hangi programın ücretini öğrenmek istiyorsunuz?',
             skillImage: null,
         })
-        expect(matchSkillsMock).toHaveBeenCalled()
-        expect(verifyDemoSkillCandidatesMock).toHaveBeenCalledWith(expect.objectContaining({
-            candidates: [quotaMatch],
-            facet: 'kontenjan',
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            skipAutomation: true,
+            inboundMessageMetadata: expect.objectContaining({
+                demo_chat_skill_routing: expect.objectContaining({
+                    outcome: 'clarification_requested',
+                }),
+            }),
         }))
+        expect(fakeSupabase.messageInsertMock).toHaveBeenCalledWith(expect.objectContaining({
+            sender_type: 'bot',
+            content: 'Hangi programın ücretini öğrenmek istiyorsunuz?',
+            metadata: expect.objectContaining({
+                demo_chat_reply_source: 'skill_query_clarification',
+                rag_pending_clarification: expect.objectContaining({
+                    originalQuestion: 'Ücreti ne kadar?',
+                    clarificationQuestion: 'Hangi programın ücretini öğrenmek istiyorsunuz?',
+                    missingSlots: ['subject'],
+                    requestedFacet: 'ücret',
+                }),
+            }),
+        }))
+        expect(matchSkillsMock).not.toHaveBeenCalled()
+        expect(verifyDemoSkillCandidatesMock).not.toHaveBeenCalled()
+        expect(buildOpenAiFileSearchDemoReplyMock).not.toHaveBeenCalled()
+    })
+
+    it('skips raw exact matching while a router clarification is pending', async () => {
+        vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+        const fakeSupabase = createHistorySupabaseMock([
+            {
+                content: 'Hangi programın ücretini öğrenmek istiyorsunuz?',
+                sender_type: 'bot',
+                metadata: {
+                    demo_chat_reply_to_message_id: 'previous-message',
+                    rag_pending_clarification: {
+                        originalQuestion: 'Ücreti ne kadar?',
+                        clarificationQuestion: 'Hangi programın ücretini öğrenmek istiyorsunuz?',
+                        missingSlots: ['subject'],
+                        requestedFacet: 'ücret',
+                        retrievalIntent: 'Yüksek İhtisas Üniversitesi ücret bilgisi',
+                    },
+                },
+            },
+            {
+                content: 'Ücreti ne kadar?',
+                sender_type: 'contact',
+                metadata: { demo_chat_message_id: 'previous-message' },
+            },
+        ])
+        createClientMock.mockReturnValueOnce(fakeSupabase)
+        const feeMatch = {
+            skill_id: 'skill-anestezi-fee',
+            title: 'Anestezi ücret bilgisi',
+            response_text: 'Anestezi ücret bilgileri.',
+            trigger_text: 'Anestezi ücreti ne kadar?',
+            similarity: 0.92,
+        }
+        rewriteDemoSkillQueryMock.mockResolvedValueOnce({
+            query: 'Anestezi programının ücreti ne kadar?',
+            subject: 'Anestezi',
+            facet: 'ücret',
+            needsClarification: false,
+            usedHistory: true,
+            decision: 'accepted_previous_offer',
+            reason: 'The user supplied the missing program.',
+            model: 'gpt-4.1-mini',
+            usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 },
+        })
+        matchSkillsMock.mockResolvedValueOnce([feeMatch])
+        verifyDemoSkillCandidatesMock.mockResolvedValueOnce({
+            decision: 'skill',
+            match: feeMatch,
+            confidence: 0.98,
+            coverage: 'direct',
+            reason: 'The candidate answers the requested program fee.',
+            model: 'gpt-5.5',
+            usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 },
+        })
+        processInboundAiPipelineMock.mockImplementationOnce(async (input) => {
+            await input.sendOutbound('Anestezi ücret bilgileri.')
+        })
+
+        const res = await POST(createRequest({
+            sessionId: 'session-1',
+            message: 'Anestezi',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: 'Anestezi ücret bilgileri.',
+            skillImage: null,
+        })
+        expect(matchExactSkillTriggersMock).not.toHaveBeenCalled()
+        expect(rewriteDemoSkillQueryMock).toHaveBeenCalledWith(expect.objectContaining({
+            latestUserMessage: 'Anestezi',
+            recentMessages: expect.arrayContaining([
+                expect.objectContaining({ role: 'user', content: 'Ücreti ne kadar?' }),
+                expect.objectContaining({
+                    role: 'assistant',
+                    content: 'Hangi programın ücretini öğrenmek istiyorsunuz?',
+                }),
+            ]),
+        }))
+        expect(matchSkillsMock).toHaveBeenCalledWith(
+            'Anestezi programının ücreti ne kadar?',
+            demoChannel.organizationId,
+            0.35,
+            20,
+            fakeSupabase
+        )
     })
 
     it('continues to RAG when the verifier says a nearby skill does not directly cover the question', async () => {

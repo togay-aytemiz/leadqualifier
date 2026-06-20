@@ -23,6 +23,8 @@ export type DemoSkillQueryRewriteResult = {
     subject: string
     facet: string
     needsClarification: boolean
+    clarificationQuestion?: string
+    missingSlots?: string[]
     usedHistory: boolean
     decision: DemoSkillQueryRewriteDecision
     reason: string
@@ -41,6 +43,8 @@ export type DemoSkillQueryCreateCompletion = (
 const DEFAULT_MODEL = 'gpt-4.1-mini'
 const MAX_QUERY_CHARS = 300
 const MAX_REASON_CHARS = 240
+const MAX_CLARIFICATION_QUESTION_CHARS = 240
+const MAX_MISSING_SLOTS = 4
 
 function normalizeText(value: unknown, maxLength: number) {
     return typeof value === 'string'
@@ -56,6 +60,15 @@ function normalizeUsage(usage: CompletionResult['usage']) {
         outputTokens,
         totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
     }
+}
+
+function normalizeStringArray(value: unknown, maxItems: number) {
+    if (!Array.isArray(value)) return []
+    return [...new Set(
+        value
+            .map((item) => normalizeText(item, 80))
+            .filter(Boolean)
+    )].slice(0, maxItems)
 }
 
 function recentHistory(turns: KnowledgeSearchPlanningTurn[]) {
@@ -90,6 +103,14 @@ function parseRewritePayload(
         subject: normalizeText(record.subject, 180),
         facet: normalizeText(record.facet, 180),
         needsClarification: Boolean(record.needs_clarification ?? record.needsClarification),
+        clarificationQuestion: normalizeText(
+            record.clarification_question ?? record.clarificationQuestion,
+            MAX_CLARIFICATION_QUESTION_CHARS
+        ) || undefined,
+        missingSlots: normalizeStringArray(
+            record.missing_slots ?? record.missingSlots,
+            MAX_MISSING_SLOTS
+        ),
         usedHistory: Boolean(record.used_history ?? record.usedHistory),
         decision,
         reason: normalizeText(record.reason, MAX_REASON_CHARS) || 'No reason provided.',
@@ -125,6 +146,8 @@ function systemPrompt(responseLanguage: MvpResponseLanguage) {
         'Extract the main subject or entity and the requested facet, such as existence, fee, quota, location, duration, curriculum, laboratory, internship, career, or policy.',
         'If organization context identifies the active institution, use it to resolve broad institution questions such as campuses, address, programs, fees, scholarships, registration, or contact.',
         'Set needs_clarification true only when the missing subject or facet prevents a useful Skill search.',
+        'When needs_clarification is true, return one short clarification_question in the user language and list only the minimum missing semantic slots in missing_slots (for example subject or facet).',
+        'When needs_clarification is false, return an empty clarification_question and an empty missing_slots array.',
         'Do not set needs_clarification true merely because the user used informal wording, omitted the active institution name, omitted the year, or asked a broad institution-level question.',
         'If the latest message contains a concrete subject plus a fact facet, keep needs_clarification false even when a narrower filter could be useful; Skill matching can still choose the best reusable answer.',
         'If the latest message cannot be resolved from history, return the original latest message with decision "unresolved".',
@@ -132,7 +155,7 @@ function systemPrompt(responseLanguage: MvpResponseLanguage) {
         'Prefer the user language. Use Turkish for Turkish conversations.',
         `Default response language: ${responseLanguage}.`,
         'Return JSON only:',
-        '{"query":"...","subject":"...","facet":"...","needs_clarification":true|false,"used_history":true|false,"decision":"accepted_previous_offer|standalone|unresolved","reason":"short reason"}',
+        '{"query":"...","subject":"...","facet":"...","needs_clarification":true|false,"clarification_question":"...","missing_slots":["subject|facet"],"used_history":true|false,"decision":"accepted_previous_offer|standalone|unresolved","reason":"short reason"}',
     ].join('\n')
 }
 

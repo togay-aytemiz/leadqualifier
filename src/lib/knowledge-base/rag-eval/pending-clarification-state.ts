@@ -166,6 +166,9 @@ export function findLatestRagPendingClarificationState(
       const pending = normalizeRagPendingClarificationState(candidate)
       if (pending) return pending
     }
+
+    // A later assistant answer closes any older clarification request.
+    return null
   }
 
   return null

@@ -8,6 +8,9 @@
 
 ### Changed
 
+- Changed Public Demo ambiguity handling so the existing query rewriter's `needsClarification` decision returns one short clarification immediately, persists the missing slots, and avoids semantic retrieval, the GPT-5.5 selector, and File Search. A slot-only next turn skips raw exact matching and is combined with the original requested facet through conversation history; no new router, threshold, verifier, migration, or File Search status was added (`src/lib/demo-chat/skill-query-rewriter.ts`, `src/app/api/demo/[slug]/chat/route.ts`).
+- Documented the same-seed OpenAI cost change from approximately `$4.49` to `$9.96` per 100 questions. The 2.22x increase is driven primarily by moving the million-token RAG context from GPT-4.1-mini to GPT-5.5, not the 3.7% token-count increase; evaluation policy now requires a 20-case smoke before full 100-question runs (`docs/evaluations/yiu-openai-cost-comparison-2026-06-20.md`).
+
 - Added a deterministic disjoint YİÜ evaluation gate: the CLI can exclude every `poolId` from a prior artifact before seeded sampling, records candidate/exclusion/overlap metadata, and now classifies File Search `failure_reason` outcomes as `rag_pipeline_error` instead of factual `rag_no_info`. The first zero-overlap 100 run was correctly marked invalid after live logs confirmed OpenAI `429 insufficient_quota`; its 20 Skill replies and one identity reply were manually reviewed separately (`scripts/knowledge/qa-yiu-routing-and-followup-eval.ts`, `scripts/knowledge/yiu-eval-selection.ts`, `docs/evaluations/yiu-disjoint-100-and-clarification-codex-review-2026-06-20.md`).
 
 - Added a 20-case realistic prospective-student clarification suite with under-specified first messages and short slot-only replies. The live harness sends the second turn only when the bot actually emits `rag_clarify`, preserving same-session pending-state behavior and keeping first-turn misses/errors visible. The quota-exhausted first run is invalid; review also identified that the active one-step File Search schema has no `clarify` status and the query rewriter's `needsClarification` decision is not routed to a clarification response (`scripts/knowledge/fixtures/yiu-prospective-student-clarification-cases.json`, `scripts/knowledge/yiu-clarification-cases.ts`).
@@ -50,6 +53,8 @@
 - Changed the simple RAG query rewriter to refuse IBAN, credit card, TC identity, password, and payment-detail handling requests before retrieval, even when the planner attempts a search (`src/lib/knowledge-base/simple-rag/query-rewriter.ts`, `src/lib/knowledge-base/simple-rag/query-rewriter.test.ts`).
 
 ### Fixed
+
+- Fixed resolved clarification metadata being rediscovered from older assistant turns after a later Skill/File Search answer. Only the latest assistant turn can now keep pending clarification active, preventing future unrelated turns from permanently skipping exact matching (`src/lib/knowledge-base/rag-eval/pending-clarification-state.ts`).
 
 - Fixed one-step GPT-5.5 File Search exhausting the full `800` output-token budget on medium reasoning before emitting strict JSON for broad questions. The budget is now `2000`; the configuration test followed red/green TDD, the production build passed, and the formerly failing success-ranking turn returned valid structured answers in two consecutive live reruns (`src/lib/knowledge-base/simple-rag/one-step-file-search.ts`, `src/lib/knowledge-base/simple-rag/one-step-file-search.test.ts`, `docs/evaluations/yiu-one-step-file-search-same-seed-100-review-2026-06-20.md`).
 
