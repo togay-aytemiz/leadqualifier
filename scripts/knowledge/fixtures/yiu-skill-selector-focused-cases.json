@@ -1,0 +1,116 @@
+[
+  {
+    "caseId": "focused-1",
+    "latestUserMessage": "Hastane değişebilir mi?",
+    "standaloneQuery": "Hastane değişikliği yapılabilir mi?",
+    "subject": "Hastane",
+    "facet": "değişiklik politikası",
+    "candidateQueries": ["Hastane değişikliği yapılabilir mi?"],
+    "expectedSkillId": null,
+    "expectedSkillTitle": null
+  },
+  {
+    "caseId": "focused-2",
+    "latestUserMessage": "Başarı sıralamaları nedir?",
+    "standaloneQuery": "Yüksek İhtisas Üniversitesi programlarının başarı sıralamaları nedir?",
+    "subject": "Yüksek İhtisas Üniversitesi programları",
+    "facet": "başarı sıralamaları",
+    "candidateQueries": [
+      "Yüksek İhtisas Üniversitesi programlarının başarı sıralamaları nedir?",
+      "Başarı sıralamaları nedir?"
+    ],
+    "expectedSkillId": null,
+    "expectedSkillTitle": null
+  },
+  {
+    "caseId": "focused-3",
+    "latestUserMessage": "Kayıtta pazarlık yapılıyor mu?",
+    "standaloneQuery": "Kayıtta pazarlık yapılıyor mu?",
+    "subject": "kayıt işlemi",
+    "facet": "pazarlık durumu",
+    "candidateQueries": ["Kayıtta pazarlık yapılıyor mu?"],
+    "expectedSkillId": null,
+    "expectedSkillTitle": null
+  },
+  {
+    "caseId": "focused-4",
+    "latestUserMessage": "Afiliye hastane özel mi devlet hastanesi mi?",
+    "standaloneQuery": "Yüksek İhtisas Üniversitesi'nin afiliye hastanesi özel mi yoksa devlet hastanesi mi?",
+    "subject": "Yüksek İhtisas Üniversitesi afiliye hastane",
+    "facet": "özellik (özel/devlet)",
+    "candidateQueries": [
+      "Yüksek İhtisas Üniversitesi'nin afiliye hastanesi özel mi yoksa devlet hastanesi mi?"
+    ],
+    "expectedSkillId": null,
+    "expectedSkillTitle": null
+  },
+  {
+    "caseId": "focused-5",
+    "latestUserMessage": "Devlet hastanesinde staj yapabilir miyim?",
+    "standaloneQuery": "Devlet hastanesinde staj yapabilir miyim?",
+    "subject": "staj yapma imkanı",
+    "facet": "yer",
+    "candidateQueries": ["Devlet hastanesinde staj yapabilir miyim?"],
+    "expectedSkillId": null,
+    "expectedSkillTitle": null
+  },
+  {
+    "caseId": "focused-6",
+    "latestUserMessage": "Hastane projeniz var mı?",
+    "standaloneQuery": "Yüksek İhtisas Üniversitesi'nin hastane projesi var mı?",
+    "subject": "hastane projesi",
+    "facet": "varlık durumu",
+    "candidateQueries": [
+      "Yüksek İhtisas Üniversitesi'nin hastane projesi var mı?",
+      "Hastane projeniz var mı?"
+    ],
+    "expectedSkillId": null,
+    "expectedSkillTitle": null
+  },
+  {
+    "caseId": "focused-7",
+    "latestUserMessage": "Anestezi programının ücreti nedir?",
+    "standaloneQuery": "Anestezi programının ücreti nedir?",
+    "subject": "Anestezi programı",
+    "facet": "ücret",
+    "candidateQueries": ["Anestezi programının ücreti nedir?"],
+    "expectedSkillId": "720c2468-54a2-4d83-9491-570fd1ba6c5c",
+    "expectedSkillTitle": "YİÜ Intent - 37 anestezi_ucret_kontenjan"
+  },
+  {
+    "caseId": "focused-8",
+    "latestUserMessage": "Üniversitenizde sevgili bulabilir miyim?",
+    "standaloneQuery": "Yüksek İhtisas Üniversitesi'nde öğrenci sosyal hayatı ve arkadaşlık imkanları nelerdir?",
+    "subject": "Yüksek İhtisas Üniversitesi",
+    "facet": "sosyal hayat ve arkadaşlık imkanları",
+    "candidateQueries": [
+      "Yüksek İhtisas Üniversitesi'nde öğrenci sosyal hayatı ve arkadaşlık imkanları nelerdir?",
+      "Üniversitenizde sevgili bulabilir miyim?"
+    ],
+    "expectedSkillId": null,
+    "expectedSkillTitle": null
+  },
+  {
+    "caseId": "focused-9",
+    "latestUserMessage": "Laboratuvarlar yeni mi?",
+    "standaloneQuery": "Laboratuvarların yeni olup olmadığı",
+    "subject": "Laboratuvarlar",
+    "facet": "durum/yeni olma",
+    "candidateQueries": ["Laboratuvarların yeni olup olmadığı"],
+    "expectedSkillId": null,
+    "expectedSkillTitle": null
+  },
+  {
+    "caseId": "focused-10",
+    "latestUserMessage": "Ebelik kontenjanı nedir?",
+    "standaloneQuery": "Ebelik programının kontenjanı nedir?",
+    "subject": "Ebelik",
+    "facet": "kontenjan",
+    "candidateQueries": [
+      "Ebelik programının kontenjanı nedir?",
+      "Ebelik kontenjanı nedir?"
+    ],
+    "expectedSkillId": "e9a21cf5-4dea-4943-a3af-8deca5bbd120",
+    "expectedSkillTitle": "YİÜ Intent - 71 ebelik_program_bilgileri"
+  }
+]

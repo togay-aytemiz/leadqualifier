@@ -108,7 +108,8 @@ async function defaultCompletion(args: Record<string, unknown>) {
 function systemPrompt(responseLanguage: MvpResponseLanguage) {
     return [
         'Rewrite the latest user message into one standalone query for matching approved Skills.',
-        'Your job is to infer what Skill the user is trying to invoke. Do not answer the question.',
+        'Your job is to normalize the user request, not to reinterpret it as the nearest available Skill. Do not answer the question.',
+        'Preserve the exact requested outcome, claim, comparison, prediction, or policy. Do not convert the request into a nearby Skill topic, broader category, softer question, or more answerable substitute.',
         'Use assistant behavior/scope instructions only to identify the active organization, assistant identity, domain scope, and boundaries.',
         'Do not copy long assistant instructions into the query. Do not treat those instructions as factual knowledge for the answer.',
         'Use the organization dictionary only to understand aliases, abbreviations, spelling variants, and shorthand. It is not factual evidence for the final answer.',

@@ -48,6 +48,9 @@ describe('rewriteDemoSkillQuery', () => {
         expect(request.messages[0]?.content).toContain(
             'Use assistant behavior/scope instructions only to identify the active organization'
         )
+        expect(request.messages[0]?.content).toContain(
+            'Do not convert the request into a nearby Skill topic'
+        )
     })
 
     it('passes assistant task instructions as scope context instead of answer evidence', async () => {

@@ -24,6 +24,51 @@ const candidates = [
 ]
 
 describe('verifyDemoSkillCandidates', () => {
+    it('uses GPT-5.5 none with Responses Structured Outputs by default', async () => {
+        const createResponse = vi.fn().mockResolvedValue({
+            output_text: JSON.stringify({
+                skill_id: 'skill-anesthesia',
+                coverage: 'direct',
+                confidence: 0.98,
+                reason: 'The response directly contains the requested Anestezi laboratory answer.',
+            }),
+            usage: {
+                input_tokens: 1200,
+                output_tokens: 80,
+                total_tokens: 1280,
+            },
+        })
+
+        const result = await verifyDemoSkillCandidates({
+            latestUserMessage: 'Anestezi laboratuvarı var mı?',
+            standaloneQuery: 'Anestezi programında laboratuvar var mı?',
+            subject: 'Anestezi programı',
+            facet: 'laboratuvar varlığı',
+            candidates,
+            createResponse,
+        })
+
+        expect(result?.match?.skill_id).toBe('skill-anesthesia')
+        expect(result?.model).toBe('gpt-5.5')
+        expect(result?.usage).toEqual({
+            inputTokens: 1200,
+            outputTokens: 80,
+            totalTokens: 1280,
+        })
+        expect(createResponse).toHaveBeenCalledWith(expect.objectContaining({
+            model: 'gpt-5.5',
+            reasoning: { effort: 'none' },
+            store: false,
+            text: {
+                format: expect.objectContaining({
+                    type: 'json_schema',
+                    strict: true,
+                }),
+            },
+        }))
+        expect(createResponse.mock.calls[0]?.[0]).not.toHaveProperty('temperature')
+    })
+
     it('returns the candidate selected for the same subject and facet', async () => {
         const createCompletion = vi.fn().mockResolvedValue({
             choices: [{
@@ -165,9 +210,11 @@ describe('verifyDemoSkillCandidates', () => {
         )
 
         expect(systemMessage).toContain('routing_description')
+        expect(systemMessage).toContain('standalone query may resolve references')
         expect(userPayload.candidates[1]).toMatchObject({
             routing_description: 'Anestezi programına özel laboratuvar ve uygulama olanakları sorularını kapsar; genel MYO sorularını kapsamaz.',
             coverage_facets: ['program_overview', 'laboratory'],
         })
     })
+
 })

@@ -1,5 +1,57 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Evaluation Update (2026-06-20):** The latest selector configuration was rerun on the exact same ordered YİÜ 100-question seed and completed `100/100` with zero errors: `34` Skill, `43` grounded RAG, `20` no-info, `2` refusals, and `1` identity route. Manual subject/facet review found all `34/34` Skill routes acceptable versus roughly `12/46` adjacent or non-answering Skills in the baseline. The remaining blocker is fallback RAG, which still accepts adjacent evidence for Psychology-program existence, meal pricing, romantic outcomes, and hospital claims. GPT-5.5 also timed out on `2/81` selector calls, both safely falling through to RAG. Do not run a disjoint 100 until the focused RAG red cases pass (`docs/evaluations/yiu-routing-random-100-gpt55-unique-candidates-review-2026-06-20.md`).
+
+- [x] Rerun and manually review the exact same ordered 100-question seed with unique Skill candidates and GPT-5.5.
+- [ ] Close the focused unsafe-RAG positives without adding a second selector, question-specific runtime rule, or broad threshold.
+- [ ] Add verified boundary coverage for Tıbbi Görüntüleme facts that are absent from the current program Skill catalog; do not infer a fee.
+- [ ] Run a disjoint random 100 only after the focused RAG red cases and selector-timeout probe pass.
+
+> **Implementation Update (2026-06-20):** Semantic Skill recall now returns top-X unique Skills instead of top-X embedding rows. `match_skills` ranks every enabled Skill by its best embedding, filters to one row per Skill, and only then applies `match_count`; the linked YİÜ RPC changed from `20` rows / `14` unique Skills to `20/20` unique Skills on the same broad-rank query. Selector inputs were frozen from the active `70`-Skill, `2545`-embedding corpus and replayed three times per case/config. `gpt-4.1-mini` produced `4/30` false Skill selections, while both GPT-5.5 variants were `30/30`; `gpt-5.5` with `reasoning.effort=none` won on p90 latency (`3.88s` versus `4.28s` for low) and is now the production selector through Responses Structured Outputs.
+
+- [x] Rank semantic embedding rows per Skill before applying the candidate limit.
+- [x] Apply and verify the linked Supabase migration with a live `20/20` unique-Skill RPC probe.
+- [x] Freeze ten focused selector payloads with unique candidate ids and exact Anestezi/Ebelik controls.
+- [x] Run three repeats on identical payloads for `gpt-4.1-mini`, `gpt-5.5 none`, and `gpt-5.5 low`.
+- [x] Move the single production selector to `gpt-5.5` none with Responses Structured Outputs; do not add another verifier or question-specific rule.
+- [x] Run the same-seed Public Demo HTTP gate against the current local selector configuration.
+
+> **Implementation Update (2026-06-19):** Public Demo Skill routing now uses positive-signal recall and one selector decision. `routing_description` was removed from embedding generation and remains available only to the selector; semantic embeddings retain the Skill title, positive triggers, coverage facets, and concise approved-response facts. The failed extractive quote and subject/facet token-overlap vetoes were rolled back, without adding a threshold, question-specific runtime rule, or extra verifier. The existing focused high-risk RAG verifier remains.
+
+- [x] Remove `routing_description` and its negative exclusions from semantic Skill embeddings.
+- [x] Keep `routing_description` and `coverage_facets` as context for the single LLM selector.
+- [x] Roll back the post-selector quote/token guards and the corresponding quote-bound RAG additions.
+- [x] Republish and verify the YİÜ Skill pack with `2545/2545` positive-only embeddings across `70` active Skills.
+- [x] Run the focused selector probe; retain Anestezi/Ebelik controls and document the two remaining wrong Skill decisions.
+- [x] Rerun the same 100-question seed after the focused final selector gate.
+- [ ] Run a disjoint random 100 only after the same-seed recall/precision/latency gate passes.
+
+> **Evaluation Update (2026-06-19):** The final positive-signal focused probe completed `10/10` with `4` Skill, `5` grounded RAG, and `1` no-info route at `10.78s` average / `13.85s` p90. Anestezi fee and Ebelik quota reached the correct program Skills; state-hospital internship, romantic-outcome, and laboratory-age questions no longer used adjacent Skills. The gate still failed because `Hastane değişebilir mi?` selected the program-change Skill and a broad success-rank question selected one Turkish Medicine Skill. An intermediate `gpt-5.4-mini` same-seed 100 produced `46` Skills but manual review found roughly `12/46` non-answering or adjacent Skill selections, so that model experiment was reverted. No final-config or disjoint 100 was started (`docs/evaluations/yiu-positive-signal-selector-review-2026-06-19.md`).
+
+> **Evaluation Update (2026-06-19):** The evidence-bound selector was rerun on the full same YİÜ 100-question seed before attempting a disjoint sample. The run completed `100/100` with zero runtime errors, but failed the precision/recall gate: Skill answers fell from `51` to `33`, no-info rose from `20` to `35`, average latency rose from `9.0s` to `12.6s`, and p90 rose from `14.7s` to `20.1s`. Known wrong-subject Skills were removed, but correct Anestezi/Ebelik quota Skills were rejected by `answer_quote_not_found`, verified Skill decisions fell from `36` to `18`, and risky RAG positives remained. The disjoint random 100 was intentionally not started (`docs/evaluations/yiu-routing-random-100-post-evidence-bound-review-2026-06-19T18-54-33-954Z.md`).
+
+- [x] Rerun the full same-seed random 100 after evidence-bound Skill/RAG selection.
+- [x] Stop before the disjoint random 100 when the same-seed precision/recall/latency gate fails.
+- [x] Restore the simpler selector contract by removing the failed quote/token post-verification vetoes.
+- [ ] Rerun the same seed and require explicit program-fact recovery plus acceptable false-no-info/p90 before testing a disjoint 100.
+
+> **Superseded Experiment (2026-06-19):** The extractive quote and token-overlap selector guards were evaluated and then rolled back after the full same-seed gate showed a material Skill-recall and latency regression. The evaluation artifacts remain as historical evidence for why the simpler contract was restored.
+
+> **Evaluation Update (2026-06-19):** A final `10/10` focused live probe kept Ebelik quota and Anestezi fee on their precise Skills while removing all reviewed broad/adjacent Skill selections for all-program ranks, hospital change, state-hospital internship, social/romantic outcomes, laboratory age, and hospital-project existence. Hospital ownership/project and registration-procurement inference fell to no-info. The remaining review item is the conditional RAG answer for state-hospital internship, whose evidence establishes general workplace approval but not universal program/state-hospital applicability (`docs/evaluations/yiu-selector-precision-probe-review-2026-06-19T18-43-24-764Z.md`).
+
+- [x] Evaluate direct subject/facet quote grounding on a focused and full same-seed run.
+- [x] Roll back the quote/token experiment after it failed the full rollout gate.
+- [x] Run a focused live probe over the reviewed wrong matches and positive program-fact controls.
+- [ ] Recheck state-hospital internship subject scope in the next full same-seed run.
+
+> **Evaluation Update (2026-06-19):** The full same-seed YİÜ random 100 was rerun after preserving Skill verifier outcomes and widening the verifier timeout. The run completed `100/100` with zero errors: `51` Skill answers, `26` grounded RAG answers, `20` no-info replies, `2` refusals, and `1` identity answer. Compared with the previous valid combined view, Skill routing increased from `29` to `51`, average latency fell from `11.6s` to `9.0s`, and the former Ebelik/Anestezi/Grafik Tasarım misses reached their program Skills. Diagnostics recorded `36` verified Skills, `15` exact Skills, and only `1` preserved verifier timeout. Manual route review still found over-broad Skill selections for an unspecified all-program ranking question, student-life small talk, hospital change, and state-hospital internship, plus adjacent-evidence RAG risks around hospital status/project claims (`docs/evaluations/yiu-routing-random-100-post-verifier-timeout-review-2026-06-19T17-00-06-710Z.md`).
+
+- [x] Rerun the complete same-seed YİÜ random 100 after the Skill verifier timeout/diagnostics fix.
+- [x] Confirm that explicit Ebelik, Anestezi, Grafik Tasarım, and program quota questions reach their Skills.
+- [x] Confirm terminal Skill outcomes and complete program facets remain visible on RAG fallback.
+- [x] Tighten Skill selection when the subject is missing or differs from the candidate Skill subject.
+- [x] Reject adjacent-evidence RAG claims for hospital ownership/status/project and unrelated procurement policy.
+
 > **Implementation Update (2026-06-19):** Public Demo Skill routing now keeps terminal verifier diagnostics when falling through to RAG. `ragFallback` is stored as a separate flag instead of overwriting outcomes such as `verification_timeout`, candidate verification uses the same `5000ms` default / `8000ms` cap as Skill rewriting, and compact candidate diagnostics now expose up to `16` coverage facets so fee, quota, base-score, and rank scope remains visible during eval review.
 
 - [x] Preserve terminal Skill verifier outcomes when the route falls through to RAG.
@@ -51,10 +103,10 @@
 - [ ] Persist fallback Skill candidate/verifier diagnostics and trace the Grafik Tasarım fee miss.
 - [ ] Tighten RAG evidence validation for hospital, facility, device-practice, and laboratory-existence claims.
 
-> **Implementation Update (2026-06-19):** Source-backed Skills now have internal `routing_description` and `coverage_facets` metadata so semantic matching can understand both what a Skill covers and what it should not cover without leaking source mechanics into customer-facing answers. Skill embeddings now include this routing scope, the Skill verifier receives it as internal matching context, and diagnostics expose compact scope/facet summaries for candidate review. The YİÜ generated/general Skill union was republished to production with `70` active Skills, `26` program fact Skills, and `2615/2615` verified embedding rows after applying migration `20260619072537_add_skill_routing_description.sql`.
+> **Implementation Update (2026-06-19):** Source-backed Skills retain internal `routing_description` and `coverage_facets` metadata without leaking source mechanics into customer-facing answers. Coverage facets remain positive semantic recall signals; `routing_description`, including exclusions, is selector-only context. Diagnostics continue to expose compact scope/facet summaries for candidate review.
 
 - [x] Add internal Skill routing descriptions and coverage facets to the database schema.
-- [x] Include Skill routing metadata in semantic embeddings, candidate verification, and routing diagnostics.
+- [x] Use positive coverage facets in semantic embeddings and keep routing descriptions in candidate verification/diagnostics only.
 - [x] Generate routing descriptions and coverage facets for all active YİÜ Skills, including explicit single-program scope boundaries.
 - [x] Republish and verify the YİÜ production Skill pack with refreshed routing-aware embeddings.
 
@@ -780,7 +832,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-06-19 (Fixed Public Demo Skill verifier timeout/fallback diagnostics after the YİÜ same-seed retry.)
+> **Last Updated:** 2026-06-20 (Recorded the same-seed 100 result: Skill precision passed manual review; focused RAG evidence safety remains the blocker.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.

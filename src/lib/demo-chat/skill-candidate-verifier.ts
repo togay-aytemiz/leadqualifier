@@ -12,9 +12,22 @@ type CompletionResult = {
     }
 }
 
+type ResponseResult = {
+    output_text?: string
+    usage?: {
+        input_tokens?: number
+        output_tokens?: number
+        total_tokens?: number
+    }
+}
+
 export type DemoSkillCandidateCreateCompletion = (
     input: Record<string, unknown>
 ) => Promise<CompletionResult>
+
+export type DemoSkillCandidateCreateResponse = (
+    input: Record<string, unknown>
+) => Promise<ResponseResult>
 
 export type DemoSkillCandidateVerificationResult = {
     decision: 'skill' | 'no_skill'
@@ -30,9 +43,26 @@ export type DemoSkillCandidateVerificationResult = {
     }
 }
 
-const DEFAULT_MODEL = 'gpt-4.1-mini'
+const DEFAULT_MODEL = 'gpt-5.5'
 const MAX_CANDIDATES = 20
 const MAX_TEXT_CHARS = 600
+
+const SELECTOR_OUTPUT_FORMAT = {
+    type: 'json_schema',
+    name: 'skill_selector_decision',
+    strict: true,
+    schema: {
+        type: 'object',
+        properties: {
+            skill_id: { type: ['string', 'null'] },
+            coverage: { type: 'string', enum: ['direct', 'partial', 'none'] },
+            confidence: { type: 'number', minimum: 0, maximum: 1 },
+            reason: { type: 'string' },
+        },
+        required: ['skill_id', 'coverage', 'confidence', 'reason'],
+        additionalProperties: false,
+    },
+} as const
 
 function normalizeText(value: unknown, maxLength: number) {
     return typeof value === 'string'
@@ -56,6 +86,16 @@ function normalizeUsage(usage: CompletionResult['usage']) {
     }
 }
 
+function normalizeResponseUsage(usage: ResponseResult['usage']) {
+    const inputTokens = usage?.input_tokens ?? 0
+    const outputTokens = usage?.output_tokens ?? 0
+    return {
+        inputTokens,
+        outputTokens,
+        totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
+    }
+}
+
 async function defaultCompletion(args: Record<string, unknown>) {
     const apiKey = process.env.OPENAI_API_KEY?.trim()
     if (!apiKey) throw new Error('Missing OPENAI_API_KEY for demo skill candidate verification')
@@ -63,26 +103,23 @@ async function defaultCompletion(args: Record<string, unknown>) {
     return client.chat.completions.create(args as never) as Promise<CompletionResult>
 }
 
+async function defaultResponse(args: Record<string, unknown>) {
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    if (!apiKey) throw new Error('Missing OPENAI_API_KEY for demo skill candidate verification')
+    const client = new OpenAI({ apiKey })
+    return client.responses.create(args as never) as Promise<ResponseResult>
+}
+
 function systemPrompt() {
     return [
-        'Select the best approved Skill for the latest user message.',
-        'A Skill is eligible only when the supplied Skill response itself directly answers the requested subject and facet.',
-        'Use routing_description and coverage_facets as internal scope hints for matching; do not treat them as customer-facing answer text.',
-        'Prefer a supplied Skill when its reusable intent answer directly covers the requested subject and facet, even if wording is not exact.',
-        'Compare meaning, requested fact family, and entity, not just shared words or broad topic similarity.',
-        'A matching subject with the wrong facet is NO_SKILL. A matching facet for the wrong program, department, service, or entity is NO_SKILL.',
-        'Do not substitute a parent or nearby entity for a more specific requested entity. A university-level answer does not answer a faculty, hospital, campus, department, program, dorm, event, or service question unless that exact entity is covered.',
-        'If the user asks a broad all-program, all-campus, all-price, all-quota, or university-wide question, do not select a single-program Skill unless its routing_description explicitly covers that broad set.',
-        'If routing_description or coverage_facets clearly exclude the requested subject or facet, return NO_SKILL.',
-        'If the Skill is only a nearby topic, broad background, or would require extra retrieval to answer the actual question, it is NO_SKILL.',
-        'If the user asks a specific detail and the Skill response does not contain that detail or a clear equivalent, it is NO_SKILL.',
-        'Do not reject a useful Skill merely because the user omitted the active organization name, year, or a narrower filter such as burs type. The Skill can answer generally when its response covers the family of facts.',
-        'If the user asks whether something exists, how many, where, how much, duration, quota, score/rank, registration, policy, contact, campus, curriculum, internship, or career information, select the Skill that answers that facet for that entity.',
-        'Do not choose the nearest candidate merely because candidates were supplied.',
-        'When none directly fits, return skill_id null. This is the normal safe result, not an error.',
+        'Select one supplied Skill only when its response_summary directly answers the latest user message.',
+        'The selected Skill must match the exact requested entity, scope, and facet and must contain the actual answer or a clear equivalent.',
+        'The standalone query may resolve references, but it must not broaden, soften, or replace the requested outcome.',
+        'routing_description and coverage_facets are scope context, not answer evidence.',
+        'Related topics, nearby entities, broader background, partial answers, and answers requiring retrieval must return skill_id null.',
+        'Broad all-program, all-campus, all-price, all-quota, or university-wide requests require a response_summary covering that broad set.',
+        'Do not choose the nearest candidate merely because candidates were supplied. Returning skill_id null is the normal File Search route.',
         'Do not answer the user question.',
-        'Return JSON only:',
-        '{"skill_id":"candidate-id or null","coverage":"direct|partial|none","confidence":0.0,"reason":"short reason"}',
     ].join('\n')
 }
 
@@ -94,48 +131,66 @@ export async function verifyDemoSkillCandidates(input: {
     candidates: SkillMatch[]
     model?: string
     createCompletion?: DemoSkillCandidateCreateCompletion
+    createResponse?: DemoSkillCandidateCreateResponse
 }): Promise<DemoSkillCandidateVerificationResult | null> {
     const candidates = input.candidates.slice(0, MAX_CANDIDATES)
     if (candidates.length === 0) return null
-    if (!input.createCompletion && !process.env.OPENAI_API_KEY?.trim()) return null
+    if (!input.createCompletion && !input.createResponse && !process.env.OPENAI_API_KEY?.trim()) return null
 
     const model = input.model?.trim() || DEFAULT_MODEL
-    const createCompletion = input.createCompletion ?? defaultCompletion
-    const completion = await createCompletion({
-        model,
-        temperature: 0,
-        max_tokens: 160,
-        response_format: { type: 'json_object' },
-        messages: [
-            { role: 'system', content: systemPrompt() },
-            {
-                role: 'user',
-                content: JSON.stringify({
-                    latest_user_message: normalizeText(input.latestUserMessage, MAX_TEXT_CHARS),
-                    standalone_query: normalizeText(input.standaloneQuery, MAX_TEXT_CHARS),
-                    subject: normalizeText(input.subject, 180) || null,
-                    facet: normalizeText(input.facet, 180) || null,
-                    candidates: candidates.map((candidate) => ({
-                        skill_id: candidate.skill_id,
-                        title: normalizeText(candidate.title, 220),
-                        trigger: normalizeText(candidate.trigger_text, 260),
-                        routing_description: normalizeText(
-                            candidate.routing_description,
-                            MAX_TEXT_CHARS
-                        ),
-                        coverage_facets: (candidate.coverage_facets ?? [])
-                            .map((facet) => normalizeText(facet, 80))
-                            .filter(Boolean)
-                            .slice(0, 14),
-                        response_summary: normalizeText(candidate.response_text, MAX_TEXT_CHARS),
-                        similarity: candidate.similarity,
-                    })),
-                }),
-            },
-        ],
+    const selectorPayload = JSON.stringify({
+        latest_user_message: normalizeText(input.latestUserMessage, MAX_TEXT_CHARS),
+        standalone_query: normalizeText(input.standaloneQuery, MAX_TEXT_CHARS),
+        subject: normalizeText(input.subject, 180) || null,
+        facet: normalizeText(input.facet, 180) || null,
+        candidates: candidates.map((candidate) => ({
+            skill_id: candidate.skill_id,
+            title: normalizeText(candidate.title, 220),
+            trigger: normalizeText(candidate.trigger_text, 260),
+            routing_description: normalizeText(
+                candidate.routing_description,
+                MAX_TEXT_CHARS
+            ),
+            coverage_facets: (candidate.coverage_facets ?? [])
+                .map((facet) => normalizeText(facet, 80))
+                .filter(Boolean)
+                .slice(0, 14),
+            response_summary: normalizeText(candidate.response_text, MAX_TEXT_CHARS),
+            similarity: candidate.similarity,
+        })),
     })
 
-    const payload = parseJsonObject(completion.choices?.[0]?.message?.content ?? '')
+    let rawContent = ''
+    let usage: DemoSkillCandidateVerificationResult['usage']
+    if (input.createCompletion) {
+        const completion = await input.createCompletion({
+            model,
+            temperature: 0,
+            max_tokens: 160,
+            response_format: { type: 'json_object' },
+            messages: [
+                { role: 'system', content: systemPrompt() },
+                { role: 'user', content: selectorPayload },
+            ],
+        })
+        rawContent = completion.choices?.[0]?.message?.content ?? ''
+        usage = normalizeUsage(completion.usage)
+    } else {
+        const createResponse = input.createResponse ?? defaultResponse
+        const response = await createResponse({
+            model,
+            instructions: systemPrompt(),
+            input: selectorPayload,
+            max_output_tokens: 400,
+            store: false,
+            text: { format: SELECTOR_OUTPUT_FORMAT },
+            ...(model === 'gpt-5.5' ? { reasoning: { effort: 'none' } } : {}),
+        })
+        rawContent = response.output_text ?? ''
+        usage = normalizeResponseUsage(response.usage)
+    }
+
+    const payload = parseJsonObject(rawContent)
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null
     const record = payload as Record<string, unknown>
     const rawSkillId = record.skill_id ?? record.skillId
@@ -146,8 +201,6 @@ export async function verifyDemoSkillCandidates(input: {
         : (skillId ? 'direct' : 'none')
     const confidence = normalizeConfidence(record.confidence)
     const reason = normalizeText(record.reason, 300) || 'No reason provided.'
-    const usage = normalizeUsage(completion.usage)
-
     if (!skillId || coverage !== 'direct') {
         return {
             decision: 'no_skill',

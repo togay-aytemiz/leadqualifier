@@ -1,6 +1,5 @@
 const RESPONSE_FACT_LINE_LIMIT = 14
 const RESPONSE_FACT_LINE_MAX_CHARS = 260
-const ROUTING_DESCRIPTION_MAX_CHARS = 700
 const COVERAGE_FACET_MAX_CHARS = 120
 
 function normalizeEmbeddingText(value: string) {
@@ -36,21 +35,13 @@ function buildResponseFactEmbeddingTexts(title: string, responseText: string | n
     })
 }
 
-function buildRoutingEmbeddingTexts(
+function buildCoverageFacetEmbeddingTexts(
     title: string,
-    routingDescription?: string | null,
     coverageFacets?: string[] | null
 ) {
     const normalizedTitle = normalizeEmbeddingText(title)
     const prefix = normalizedTitle ? `${normalizedTitle}: ` : ''
     const texts: string[] = []
-    const description = normalizeEmbeddingText(routingDescription ?? '')
-        .slice(0, ROUTING_DESCRIPTION_MAX_CHARS)
-        .trim()
-
-    if (description) {
-        texts.push(`${prefix}routing scope: ${description}`)
-    }
 
     for (const facet of coverageFacets ?? []) {
         const normalizedFacet = normalizeEmbeddingText(facet)
@@ -67,13 +58,13 @@ export function buildSkillEmbeddingTexts(
     title: string,
     triggerExamples: string[],
     responseText?: string | null,
-    routingDescription?: string | null,
+    _routingDescription?: string | null,
     coverageFacets?: string[] | null
 ): string[] {
     const candidates = [
         title,
         ...triggerExamples,
-        ...buildRoutingEmbeddingTexts(title, routingDescription, coverageFacets),
+        ...buildCoverageFacetEmbeddingTexts(title, coverageFacets),
         ...buildResponseFactEmbeddingTexts(title, responseText),
     ]
     const deduped = new Set<string>()
