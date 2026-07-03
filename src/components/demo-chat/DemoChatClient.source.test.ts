@@ -8,9 +8,9 @@ describe('DemoChatClient source guards', () => {
     it('keeps browser sessions isolated and posts only slug, session, message, and signed access to the demo API', () => {
         const source = fs.readFileSync(SOURCE_PATH, 'utf8')
 
-        expect(source).toContain("localStorage.getItem(storageKey)")
+        expect(source).toContain('safeLocalStorageGet(storageKey)')
         expect(source).toContain("qualy-demo-chat-messages:${slug}")
-        expect(source).toContain('localStorage.setItem(messageStorageKey')
+        expect(source).toContain('safeLocalStorageSet(messageStorageKey')
         expect(source).toContain('crypto.randomUUID()')
         expect(source).toContain("fetch(`/api/demo/${slug}/chat`")
         expect(source).toContain('accessToken')
@@ -23,7 +23,7 @@ describe('DemoChatClient source guards', () => {
         const source = fs.readFileSync(SOURCE_PATH, 'utf8')
 
         expect(source).toContain('handleResetConversation')
-        expect(source).toContain("localStorage.removeItem(messageStorageKey)")
+        expect(source).toContain('safeLocalStorageRemove(messageStorageKey)')
         expect(source).toContain("t('resetShort')")
         expect(source).toContain("t('resetConversation')")
     })
@@ -74,7 +74,8 @@ describe('DemoChatClient source guards', () => {
         expect(source).toContain('shrink-0 border-b')
         expect(source).toContain('flex-1 overflow-hidden')
         expect(source).toContain('overflow-y-auto')
-        expect(source).toContain('shrink-0 rounded-b-xl')
+        expect(source).toContain("'rounded-b-xl'")
+        expect(source).toContain("'rounded-none'")
     })
 
     it('keeps the demo disclaimer near the composer instead of repeating under each bot reply', () => {
@@ -114,6 +115,15 @@ describe('DemoChatClient source guards', () => {
         expect(source).toContain('toggleTheme')
         expect(source).toContain("t('themeToggleLight')")
         expect(source).toContain("t('themeToggleDark')")
+    })
+
+    it('uses the second embed header control to close the parent widget instead of toggling theme', () => {
+        const source = fs.readFileSync(SOURCE_PATH, 'utf8')
+
+        expect(source).toContain('handleCloseEmbedWidget')
+        expect(source).toContain("type: 'qualy-demo-widget-close'")
+        expect(source).toContain("t('closeWidget')")
+        expect(source).toContain('<X size={17} />')
     })
 
     it('renders assistant replies as plain answer text with a reveal animation instead of chat bubbles', () => {

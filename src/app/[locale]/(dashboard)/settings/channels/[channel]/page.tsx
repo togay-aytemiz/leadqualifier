@@ -8,7 +8,9 @@ import { getChannelCatalogEntry, type ChannelCardType } from '@/components/chann
 import { ChannelsOnboardingLockBanner } from '@/components/channels/ChannelsOnboardingLockBanner'
 import { InstagramOnboardingPage } from '@/components/channels/InstagramOnboardingPage'
 import { TelegramOnboardingPage } from '@/components/channels/TelegramOnboardingPage'
+import { WebOnboardingPage } from '@/components/channels/WebOnboardingPage'
 import { WhatsAppOnboardingPage } from '@/components/channels/WhatsAppOnboardingPage'
+import { getOrgAiSettings } from '@/lib/ai/settings'
 import { getChannels } from '@/lib/channels/actions'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
@@ -68,9 +70,10 @@ export default async function ChannelSetupPage({ params }: ChannelSetupPageProps
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 
-    const [channels, onboardingState] = await Promise.all([
+    const [channels, onboardingState, aiSettings] = await Promise.all([
         getChannels(organizationId),
-        getOrganizationOnboardingState(organizationId)
+        getOrganizationOnboardingState(organizationId),
+        getOrgAiSettings(organizationId, { locale })
     ])
     const selectedChannel = catalogEntry.type === 'messenger'
         ? undefined
@@ -145,6 +148,19 @@ export default async function ChannelSetupPage({ params }: ChannelSetupPageProps
                 <InstagramOnboardingPage
                     organizationId={organizationId}
                     channel={selectedChannel}
+                    isReadOnly={isReadOnly}
+                />
+            </ChannelsPageIntlProvider>
+        )
+    }
+
+    if (catalogEntry.type === 'web') {
+        return (
+            <ChannelsPageIntlProvider>
+                <WebOnboardingPage
+                    organizationId={organizationId}
+                    organizationName={orgContext?.activeOrganization?.name ?? tChannels('onboarding.web.fallbackOrganizationName')}
+                    botName={aiSettings.bot_name}
                     isReadOnly={isReadOnly}
                 />
             </ChannelsPageIntlProvider>

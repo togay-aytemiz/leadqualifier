@@ -829,10 +829,15 @@
     "subtitle": "Üniversite demo asistanı",
     "demoNoticeTitle": "Demo bilgilendirmesi",
     "demoNoticeBody": "Bu ekran YİÜ için hazırlanmış bir demo AI asistandır. Aday öğrenci, mevcut öğrenci ve idari personel senaryolarıyla soru sorabilirsiniz. Qualy hakkında bilgi almak için www.askqualy.com adresini ziyaret edebilirsiniz.",
+    "widgetPreviewKicker": "Qualy widget önizleme",
+    "widgetPreviewTitle": "Website chat widget test sayfası",
+    "widgetPreviewBody": "Bu sayfa müşteri sitesini simüle eder. Sağ alttaki butona basınca demo chat widget iframe içinde açılır.",
+    "widgetPreviewSlugLabel": "Demo slug",
     "placeholder": "Bir soru yazın",
     "send": "Mesaj gönder",
     "resetShort": "Yeniden başla",
     "resetConversation": "Konuşmayı sıfırla ve yeni demo oturumu başlat",
+    "closeWidget": "Widget'ı kapat",
     "themeToggleLight": "Açık temaya geç",
     "themeToggleDark": "Koyu temaya geç",
     "composerDisclaimer": "Bu demo bilgi amaçlıdır; canlı kullanım kurum süreçlerinize göre uyarlanabilir.",
@@ -864,6 +869,19 @@
     "maintenanceLogoAlt": "Qualy logosu",
     "maintenanceImageAlt": "Qualy demo bakım görseli"
   },
+  "webWidget": {
+    "defaultSubtitle": "AI asistan",
+    "emptyChatNotice": "Asistanın nasıl yanıt verdiğini görmek için bir soru yazın.",
+    "placeholder": "Bir soru yazın",
+    "send": "Mesaj gönder",
+    "resetConversation": "Konuşmayı sıfırla",
+    "closeWidget": "Widget'ı kapat",
+    "composerDisclaimer": "Bu ön izleme simülatör modundadır; mesajlar kaydedilmez.",
+    "thinking": "Cevap hazırlanıyor...",
+    "sendFailed": "Mesaj gönderilemedi. Lütfen tekrar deneyin.",
+    "emptyReply": "Şu anda net bir cevap hazırlayamadım. Lütfen başka bir soru deneyin.",
+    "imageAlt": "Yanıt görseli"
+  },
   "General": {
     "title": "Genel Ayarlar",
     "language": "Dil",
@@ -893,7 +911,8 @@
       "telegram": "Telegram",
       "whatsapp": "WhatsApp",
       "instagram": "Instagram",
-      "messenger": "Facebook Messenger"
+      "messenger": "Facebook Messenger",
+      "web": "Web"
     },
     "status": {
       "active": "Aktif",
@@ -926,6 +945,9 @@
         },
         "instagram": {
           "description": "Instagram DM mesajlaşmasını bağlayın; Qualy aynı gelen kutusunda AI ile cevap verip lead kalifikasyonu yapsın."
+        },
+        "web": {
+          "description": "Web sitenize Qualy chat widget'ı ekleyin; ziyaretçiler AI asistanla anında konuşup doğru yönlendirmeyi alsın."
         }
       }
     },
@@ -1096,6 +1118,50 @@
         "heading": "Messenger kurulumu",
         "subheading": "Messenger burada keşif için listeleniyor, ancak bu workspace'te onboarding henüz açık değil.",
         "body": "Messenger bağlantısı MVP'de hâlâ placeholder durumunda. Kanalı açmadan önce gerekli asset'leri ve müşteri giriş noktalarını anlamak için soldaki kaynağı inceleyin."
+      },
+      "web": {
+        "heading": "Website chat widget",
+        "subheading": "Kurum sitenize eklenecek canlı chat widget'ını hazırlayın, launcher metnini ve ikonunu özelleştirip script'i alın.",
+        "fallbackOrganizationName": "İşletmeniz",
+        "defaults": {
+          "subtitle": "AI asistan",
+          "footerText": "Bu ön izleme simülatör modundadır; mesajlar kaydedilmez."
+        },
+        "fields": {
+          "title": "Bot adı",
+          "subtitle": "Alt başlık",
+          "openLabel": "Başlatıcı metni",
+          "openLabelHelp": "Varsayılan başlatıcı metni işletme adından oluşturulur: {name}.",
+          "themeColor": "Tema rengi",
+          "themeColorSwatch": "{color} rengini seç",
+          "logoUpload": "Logo / ikon",
+          "logoUploadHelp": "PNG, JPG veya WebP yükleyin. En fazla 2 MB. Boş bırakılırsa başlatıcı içinde Q harfi görünür.",
+          "footerText": "Alt not",
+          "footerTextHelp": "Widget altındaki küçük bilgilendirme metni. Alt not kapalıysa gösterilmez."
+        },
+        "appearanceTitle": "Görünüm",
+        "toggles": {
+          "showLogo": "Logoyu göster",
+          "showLauncherText": "Başlatıcı metnini göster",
+          "showLauncherSubtitle": "Başlatıcı alt metnini göster",
+          "showHeaderSubtitle": "Üst alan alt başlığını göster",
+          "showFooter": "Alt notu göster"
+        },
+        "snippetTitle": "Siteye eklenecek script",
+        "snippetDescription": "Bu kodu web sitenizde body kapanışından önce veya tag manager içine ekleyin.",
+        "copy": "Script'i kopyala",
+        "copied": "Kopyalandı",
+        "previewTitle": "Önizleme",
+        "previewDescription": "Ayarlar değiştikçe widget önizlemesi yeniden yüklenir.",
+        "previewHostTitle": "Website önizlemesi",
+        "previewHostBody": "Bu alan sitenizdeki bir sayfayı simüle eder. Sağ alttaki launcher ile chat widget'ı açabilirsiniz.",
+        "logoUpload": "Logo yükle",
+        "logoUploading": "Yükleniyor...",
+        "logoUploaded": "Logo yüklendi.",
+        "logoFallbackMark": "Q",
+        "logoUploadFailed": "Logo yüklenemedi. Lütfen tekrar deneyin.",
+        "logoInvalidType": "Lütfen PNG, JPG veya WebP bir logo seçin.",
+        "logoFileTooLarge": "Lütfen 2 MB'tan küçük bir logo seçin."
       }
     },
     "templateTools": {

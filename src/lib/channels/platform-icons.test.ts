@@ -8,6 +8,7 @@ describe('getChannelPlatformIconSrc', () => {
         expect(getChannelPlatformIconSrc('whatsapp')).toBe('/whatsapp.svg')
         expect(getChannelPlatformIconSrc('instagram')).toBe('/instagram.svg')
         expect(getChannelPlatformIconSrc('messenger')).toBe('/messenger.svg')
+        expect(getChannelPlatformIconSrc('web')).toBe('/globe.svg')
     })
 })
 

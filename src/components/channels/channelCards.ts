@@ -12,7 +12,7 @@ export interface ChannelCardConfig {
 
 export function getChannelCardConfigs(channels: Channel[]): ChannelCardConfig[] {
     return getChannelCatalog().map((entry) => {
-        const channel = entry.type === 'messenger'
+        const channel = entry.type === 'messenger' || entry.type === 'web'
             ? undefined
             : channels.find((item) => item.type === entry.type)
         const isComingSoon = entry.onboardingSurface === 'placeholder'

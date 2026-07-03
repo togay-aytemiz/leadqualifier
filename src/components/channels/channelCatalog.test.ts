@@ -14,14 +14,16 @@ describe('channelCatalog', () => {
             'whatsapp',
             'instagram',
             'messenger',
-            'telegram'
+            'telegram',
+            'web'
         ])
 
         expect(catalog.map((entry) => entry.href)).toEqual([
             '/settings/channels/whatsapp',
             '/settings/channels/instagram',
             '/settings/channels/messenger',
-            '/settings/channels/telegram'
+            '/settings/channels/telegram',
+            '/settings/channels/web'
         ])
     })
 
@@ -30,6 +32,7 @@ describe('channelCatalog', () => {
         const telegram = getChannelCatalogEntry('telegram')
         const instagram = getChannelCatalogEntry('instagram')
         const messenger = getChannelCatalogEntry('messenger')
+        const web = getChannelCatalogEntry('web')
 
         expect(whatsapp?.badge).toBeUndefined()
         expect(whatsapp?.onboardingSurface).toBe('interactive')
@@ -40,6 +43,8 @@ describe('channelCatalog', () => {
         expect(instagram?.badge).toBeUndefined()
         expect(messenger?.onboardingSurface).toBe('placeholder')
         expect(messenger?.badge).toBe('comingSoon')
+        expect(web?.onboardingSurface).toBe('interactive')
+        expect(web?.resources).toEqual([])
     })
 
     it('builds stable detail hrefs by channel type', () => {
@@ -47,5 +52,6 @@ describe('channelCatalog', () => {
         expect(getChannelSetupHref('telegram')).toBe('/settings/channels/telegram')
         expect(getChannelSetupHref('messenger')).toBe('/settings/channels/messenger')
         expect(getChannelSetupHref('instagram')).toBe('/settings/channels/instagram')
+        expect(getChannelSetupHref('web')).toBe('/settings/channels/web')
     })
 })

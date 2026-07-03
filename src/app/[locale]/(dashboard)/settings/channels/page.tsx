@@ -42,7 +42,7 @@ export default async function ChannelsPage() {
         getChannels(organizationId),
         getOrganizationOnboardingState(organizationId)
     ])
-    const totalChannels = 4
+    const totalChannels = 5
     const connectedChannels = (channels || []).filter(channel => shouldCountChannelAsConnected(channel)).length
     const isChannelConnectionLocked = !isChannelConnectionPrerequisitesComplete(onboardingState.steps)
 

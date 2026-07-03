@@ -1,7 +1,7 @@
 'use client'
 
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Moon, RefreshCcw, Send, Sun } from 'lucide-react'
+import { Moon, RefreshCcw, Send, Sun, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { MessageRichText } from '@/components/inbox/messageRichText'
 
@@ -28,6 +28,7 @@ interface DemoChatClientProps {
     displayName: string
     accessToken: string
     logoUrl?: string | null
+    mode?: 'page' | 'embed'
 }
 
 function createSessionId() {
@@ -65,6 +66,30 @@ function parseStoredMessages(value: string | null): DemoChatMessage[] {
             .slice(-MAX_STORED_MESSAGES)
     } catch {
         return []
+    }
+}
+
+function safeLocalStorageGet(key: string) {
+    try {
+        return window.localStorage.getItem(key)
+    } catch {
+        return null
+    }
+}
+
+function safeLocalStorageSet(key: string, value: string) {
+    try {
+        window.localStorage.setItem(key, value)
+    } catch {
+        // Browser storage is a convenience for the public demo, not a hard dependency.
+    }
+}
+
+function safeLocalStorageRemove(key: string) {
+    try {
+        window.localStorage.removeItem(key)
+    } catch {
+        // Browser storage is a convenience for the public demo, not a hard dependency.
     }
 }
 
@@ -112,7 +137,7 @@ function readDemoChatReplyPayload(data: unknown) {
     }
 }
 
-export function DemoChatClient({ slug, displayName, accessToken, logoUrl }: DemoChatClientProps) {
+export function DemoChatClient({ slug, displayName, accessToken, logoUrl, mode = 'page' }: DemoChatClientProps) {
     const t = useTranslations('demoChat')
     const [sessionId, setSessionId] = useState('')
     const [messages, setMessages] = useState<DemoChatMessage[]>(() => [])
@@ -139,41 +164,34 @@ export function DemoChatClient({ slug, displayName, accessToken, logoUrl }: Demo
     }, [t])
     const currentThinkingMessage = thinkingMessages[thinkingIndex % thinkingMessages.length] ?? t('thinking')
     const isDark = theme === 'dark'
+    const isEmbed = mode === 'embed'
     const demoSourceLinkLabel = useCallback((index: number, total: number) => (
         total > 1 ? t('sourceLinkLabelNumbered', { number: index + 1 }) : t('sourceLinkLabel')
     ), [t])
 
     useEffect(() => {
-        try {
-            const existingSessionId = localStorage.getItem(storageKey)
-            const nextSessionId = existingSessionId || createSessionId()
-            localStorage.setItem(storageKey, nextSessionId)
-            setSessionId(nextSessionId)
-            setMessages(parseStoredMessages(localStorage.getItem(messageStorageKey)))
-        } catch {
-            setSessionId(createSessionId())
-            setMessages([])
-        } finally {
-            setHasLoadedBrowserState(true)
-        }
+        const existingSessionId = safeLocalStorageGet(storageKey)
+        const nextSessionId = existingSessionId || createSessionId()
+        safeLocalStorageSet(storageKey, nextSessionId)
+        setSessionId(nextSessionId)
+        setMessages(parseStoredMessages(safeLocalStorageGet(messageStorageKey)))
+        setHasLoadedBrowserState(true)
     }, [messageStorageKey, storageKey])
 
     useEffect(() => {
         if (!hasLoadedBrowserState) return
 
-        try {
-            localStorage.setItem(messageStorageKey, JSON.stringify(messages.slice(-MAX_STORED_MESSAGES)))
-        } catch {
-            // The demo should keep working even when browser storage is unavailable.
-        }
+        safeLocalStorageSet(messageStorageKey, JSON.stringify(messages.slice(-MAX_STORED_MESSAGES)))
     }, [hasLoadedBrowserState, messageStorageKey, messages])
 
     useEffect(() => {
-        const storedTheme = localStorage.getItem(THEME_STORAGE_KEY)
+        if (isEmbed) return
+
+        const storedTheme = safeLocalStorageGet(THEME_STORAGE_KEY)
         if (storedTheme === 'light' || storedTheme === 'dark') {
             setTheme(storedTheme)
         }
-    }, [])
+    }, [isEmbed])
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
@@ -214,9 +232,15 @@ export function DemoChatClient({ slug, displayName, accessToken, logoUrl }: Demo
     const toggleTheme = () => {
         setTheme((currentTheme) => {
             const nextTheme = currentTheme === 'dark' ? 'light' : 'dark'
-            localStorage.setItem(THEME_STORAGE_KEY, nextTheme)
+            safeLocalStorageSet(THEME_STORAGE_KEY, nextTheme)
             return nextTheme
         })
+    }
+
+    const handleCloseEmbedWidget = () => {
+        if (!isEmbed || window.parent === window) return
+
+        window.parent.postMessage({ type: 'qualy-demo-widget-close' }, window.location.origin)
     }
 
     const handleResetConversation = () => {
@@ -224,12 +248,8 @@ export function DemoChatClient({ slug, displayName, accessToken, logoUrl }: Demo
 
         const nextSessionId = createSessionId()
 
-        try {
-            localStorage.setItem(storageKey, nextSessionId)
-            localStorage.removeItem(messageStorageKey)
-        } catch {
-            // Browser storage is a convenience for the public demo, not a hard dependency.
-        }
+        safeLocalStorageSet(storageKey, nextSessionId)
+        safeLocalStorageRemove(messageStorageKey)
 
         setSessionId(nextSessionId)
         setMessages([])
@@ -327,7 +347,9 @@ export function DemoChatClient({ slug, displayName, accessToken, logoUrl }: Demo
     return (
         <main
             className={`flex h-dvh overflow-hidden flex-col transition-colors duration-300 ${
-                isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-950'
+                isEmbed
+                    ? isDark ? 'bg-slate-950 text-slate-100' : 'bg-white text-slate-950'
+                    : isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-950'
             }`}
         >
             <header
@@ -335,9 +357,13 @@ export function DemoChatClient({ slug, displayName, accessToken, logoUrl }: Demo
                     isDark ? 'border-white/10 bg-slate-950/95' : 'border-slate-200 bg-white'
                 }`}
             >
-                <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-3 py-3 sm:px-4">
+                <div className={`mx-auto flex w-full items-center gap-3 px-3 py-3 sm:px-4 ${
+                    isEmbed ? 'max-w-none' : 'max-w-3xl'
+                }`}>
                     <span
-                        className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border text-base font-semibold shadow-sm transition-colors duration-300 sm:h-14 sm:w-14 ${
+                        className={`flex shrink-0 items-center justify-center overflow-hidden rounded-xl border text-base font-semibold shadow-sm transition-colors duration-300 ${
+                            isEmbed ? 'h-10 w-10' : 'h-12 w-12 sm:h-14 sm:w-14'
+                        } ${
                             isDark
                                 ? 'border-white/15 bg-white text-slate-950'
                                 : 'border-slate-200 bg-white text-slate-900'
@@ -364,34 +390,56 @@ export function DemoChatClient({ slug, displayName, accessToken, logoUrl }: Demo
                         disabled={isSending || !hasLoadedBrowserState}
                         aria-label={t('resetConversation')}
                         title={t('resetConversation')}
-                        className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-xs font-medium transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${
+                        className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border text-xs font-medium transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${
+                            isEmbed ? 'w-10 px-0' : 'px-3'
+                        } ${
                             isDark
                                 ? 'border-white/15 bg-white/10 text-slate-100 hover:bg-white/15'
                                 : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white'
                         }`}
                     >
                         <RefreshCcw size={15} />
-                        <span className="hidden sm:inline">{t('resetShort')}</span>
+                        <span className={isEmbed ? 'sr-only' : 'hidden sm:inline'}>{t('resetShort')}</span>
                     </button>
-                    <button
-                        type="button"
-                        onClick={toggleTheme}
-                        aria-label={isDark ? t('themeToggleLight') : t('themeToggleDark')}
-                        title={isDark ? t('themeToggleLight') : t('themeToggleDark')}
-                        className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition-all duration-200 hover:-translate-y-0.5 ${
-                            isDark
-                                ? 'border-white/15 bg-white/10 text-slate-100 hover:bg-white/15'
-                                : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white'
-                        }`}
-                    >
-                        {isDark ? <Sun size={17} /> : <Moon size={17} />}
-                    </button>
+                    {isEmbed ? (
+                        <button
+                            type="button"
+                            onClick={handleCloseEmbedWidget}
+                            aria-label={t('closeWidget')}
+                            title={t('closeWidget')}
+                            className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition-all duration-200 hover:-translate-y-0.5 ${
+                                isDark
+                                    ? 'border-white/15 bg-white/10 text-slate-100 hover:bg-white/15'
+                                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white'
+                            }`}
+                        >
+                            <X size={17} />
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={toggleTheme}
+                            aria-label={isDark ? t('themeToggleLight') : t('themeToggleDark')}
+                            title={isDark ? t('themeToggleLight') : t('themeToggleDark')}
+                            className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition-all duration-200 hover:-translate-y-0.5 ${
+                                isDark
+                                    ? 'border-white/15 bg-white/10 text-slate-100 hover:bg-white/15'
+                                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white'
+                            }`}
+                        >
+                            {isDark ? <Sun size={17} /> : <Moon size={17} />}
+                        </button>
+                    )}
                 </div>
             </header>
 
-            <section className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 overflow-hidden flex-col px-3 py-3 sm:px-4 sm:py-4">
+            <section className={`mx-auto flex min-h-0 w-full flex-1 overflow-hidden flex-col ${
+                isEmbed ? 'max-w-none px-0 py-0' : 'max-w-3xl px-3 py-3 sm:px-4 sm:py-4'
+            }`}>
                 <div
-                    className={`min-h-0 flex-1 space-y-3 overflow-y-auto rounded-t-xl p-3 shadow-sm transition-colors duration-300 sm:p-4 ${
+                    className={`min-h-0 flex-1 space-y-3 overflow-y-auto p-3 shadow-sm transition-colors duration-300 sm:p-4 ${
+                        isEmbed ? 'rounded-none' : 'rounded-t-xl'
+                    } ${
                         isDark ? 'bg-slate-900' : 'bg-white'
                     }`}
                 >
@@ -471,7 +519,9 @@ export function DemoChatClient({ slug, displayName, accessToken, logoUrl }: Demo
 
                 <form
                     onSubmit={handleSubmit}
-                    className={`shrink-0 rounded-b-xl border-t p-3 shadow-sm transition-colors duration-300 ${
+                    className={`shrink-0 border-t p-3 shadow-sm transition-colors duration-300 ${
+                        isEmbed ? 'rounded-none' : 'rounded-b-xl'
+                    } ${
                         isDark ? 'border-white/10 bg-slate-900' : 'border-slate-200 bg-white'
                     }`}
                 >

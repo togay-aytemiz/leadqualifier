@@ -1,6 +1,8 @@
 # WhatsApp AI Qualy — Roadmap
 
-> Last Updated: 2026-07-03
+> Last Updated: 2026-07-04
+
+> **Web Widget Simulator Decoupling (2026-07-04):** Settings > Channels > Web now generates an organization-scoped `/embed/web/[organizationId]` widget instead of a Public Demo widget. The preview uses configured title/subtitle/logo values, keeps messages in memory only, and calls the simulator response path so questions are answered from the active organization's Skills and Knowledge Base without YİÜ/demo branding or persisted demo transcripts.
 
 > **Inbound Queue Readiness (2026-07-03):** WhatsApp and Instagram webhooks now acknowledge verified inbound events quickly by writing them to a shared `inbound_message_jobs` queue. A protected internal processor endpoint drains the queue with bounded concurrency, retries transient AI/provider failures, and preserves the existing shared AI pipeline for actual replies. This is the preferred launch path for short-lived high-volume admissions/preference periods.
 
@@ -12,8 +14,14 @@
 
 > **Planned Web Chat Channel (2026-07-03):** Add a Qualy-owned embeddable website chat channel for institutions that want the same Skills and Knowledge Base assistant on their public website. The channel should appear in Settings > Channels, generate a copyable script/embed code from the UI, enforce allowed domains, and persist conversations into the same Inbox/usage pipeline as other channels. The first implementation should use a Qualy-built React widget with controlled animations and shared rich-text rendering, not a third-party chat service or third-party bot brain.
 
-- [ ] Add a Web Chat channel card to Settings > Channels with TR/EN copy and setup status.
-- [ ] Generate a per-channel website embed snippet in the UI for admins to copy.
+- [x] Add a public demo embed page, local preview host page, copyable script endpoint, full-height desktop panel, and mobile-safe widget layout so selected demo slugs can be previewed as a website chat widget before the full Web Chat channel is built.
+- [x] Add a Web Chat channel card to Settings > Channels with TR/EN product copy and a UI-only setup screen for website snippet generation.
+- [x] Generate a website embed snippet in the UI for admins to copy, with no visible demo slug field.
+- [x] Default Web widget title from AI Settings bot name, generate Turkish launcher text from the active organization name, store uploaded launcher logos in Supabase Storage through signed uploads, and widen the setup/script/preview columns for easier use.
+- [x] Decouple the UI-only Web widget from Public Demo Chat so the preview uses organization-scoped simulator answers and does not load demo branding or stored demo transcripts.
+- [x] Add UI-only Web widget appearance controls for theme color, logo visibility, launcher/header text visibility, and editable footer note.
+- [x] Polish Web widget appearance controls so logo visibility hides both uploaded and fallback marks, footer note defaults stay localized, and Turkish labels avoid English UI terms.
+- [x] Ensure copied Web widget snippets use the public Qualy app origin instead of localhost while keeping local preview functional.
 - [ ] Build a lightweight Qualy-owned launcher/panel widget with open/close animation, typing state, mobile layout, and source-link rendering.
 - [ ] Back the widget with a generalized web-chat API that reuses the organization's Skills, Knowledge Base, safety boundaries, usage metering, and Inbox persistence.
 - [ ] Add allowed-domain controls so the embed only runs on approved customer websites.

@@ -1,12 +1,13 @@
 import type { Channel, ConversationPlatform } from '@/types/database'
 
-export type ChannelPlatformIconType = Channel['type'] | 'messenger'
+export type ChannelPlatformIconType = Channel['type'] | 'messenger' | 'web'
 
 const CHANNEL_PLATFORM_ICON_SOURCES: Record<ChannelPlatformIconType, string> = {
     telegram: '/Telegram.svg',
     whatsapp: '/whatsapp.svg',
     instagram: '/instagram.svg',
-    messenger: '/messenger.svg'
+    messenger: '/messenger.svg',
+    web: '/globe.svg'
 }
 
 export function getChannelPlatformIconSrc(platform: ChannelPlatformIconType) {

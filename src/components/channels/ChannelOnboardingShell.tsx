@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl'
 import { MetaProviderBadge } from '@/components/channels/MetaProviderBadge'
 import { getChannelPlatformIconSrc, type ChannelPlatformIconType } from '@/lib/channels/platform-icons'
 import { PageHeader } from '@/design'
+import { cn } from '@/lib/utils'
 
 interface ChannelOnboardingShellResource {
     label: string
@@ -27,6 +28,7 @@ interface ChannelOnboardingShellProps {
     banner?: React.ReactNode
     children: React.ReactNode
     onBack?: () => void
+    contentClassName?: string
 }
 
 function isMetaProductChannel(channelType: ChannelPlatformIconType) {
@@ -40,7 +42,8 @@ export function ChannelOnboardingShell({
     backLabel,
     banner,
     children,
-    onBack
+    onBack,
+    contentClassName
 }: ChannelOnboardingShellProps) {
     const t = useTranslations('Channels')
 
@@ -49,7 +52,7 @@ export function ChannelOnboardingShell({
             <PageHeader title={pageTitle} />
 
             <div className="flex-1 overflow-auto bg-[#f6f7f9] p-4 lg:p-6">
-                <div className="w-full max-w-4xl">
+                <div className={cn('w-full max-w-4xl', contentClassName)}>
                     {banner && <div className="mb-4">{banner}</div>}
 
                     {onBack ? (

@@ -829,10 +829,15 @@
     "subtitle": "University demo assistant",
     "demoNoticeTitle": "Demo note",
     "demoNoticeBody": "This screen is a demo AI assistant prepared for YIU. You can ask questions as a prospective student, current student, or administrative user. To learn more about Qualy, visit www.askqualy.com.",
+    "widgetPreviewKicker": "Qualy widget preview",
+    "widgetPreviewTitle": "Website chat widget test page",
+    "widgetPreviewBody": "This page simulates a customer website. Press the button in the bottom-right corner to open the demo chat widget in an iframe.",
+    "widgetPreviewSlugLabel": "Demo slug",
     "placeholder": "Ask a question",
     "send": "Send message",
     "resetShort": "Start over",
     "resetConversation": "Reset this conversation and start a new demo session",
+    "closeWidget": "Close widget",
     "themeToggleLight": "Switch to light mode",
     "themeToggleDark": "Switch to dark mode",
     "composerDisclaimer": "This demo is informational; live use can be tailored to your institution's workflows.",
@@ -864,6 +869,19 @@
     "maintenanceLogoAlt": "Qualy logo",
     "maintenanceImageAlt": "Qualy demo maintenance visual"
   },
+  "webWidget": {
+    "defaultSubtitle": "AI assistant",
+    "emptyChatNotice": "Ask a question to test how the assistant responds.",
+    "placeholder": "Ask a question",
+    "send": "Send message",
+    "resetConversation": "Reset conversation",
+    "closeWidget": "Close widget",
+    "composerDisclaimer": "This preview runs in simulator mode; messages are not saved.",
+    "thinking": "Preparing an answer...",
+    "sendFailed": "The message could not be sent. Please try again.",
+    "emptyReply": "I could not prepare a clear answer right now. Please try another question.",
+    "imageAlt": "Response visual"
+  },
   "General": {
     "title": "General Settings",
     "language": "Language",
@@ -893,7 +911,8 @@
       "telegram": "Telegram",
       "whatsapp": "WhatsApp",
       "instagram": "Instagram",
-      "messenger": "Facebook Messenger"
+      "messenger": "Facebook Messenger",
+      "web": "Web"
     },
     "status": {
       "active": "Active",
@@ -926,6 +945,9 @@
         },
         "instagram": {
           "description": "Connect Instagram direct messages so Qualy can reply with AI and qualify leads in the same inbox."
+        },
+        "web": {
+          "description": "Add the Qualy chat widget to your website so visitors can talk to the AI assistant instantly and get routed to the right next step."
         }
       }
     },
@@ -1096,6 +1118,50 @@
         "heading": "Messenger onboarding",
         "subheading": "Messenger is listed here for discovery, but onboarding is not open on this workspace yet.",
         "body": "Messenger connect is still a placeholder in MVP. Use the resource on the left to understand the asset requirements and customer entry points before we open the channel."
+      },
+      "web": {
+        "heading": "Website chat widget",
+        "subheading": "Prepare the live chat widget for your website, customize the launcher copy and icon, then copy the script.",
+        "fallbackOrganizationName": "Your business",
+        "defaults": {
+          "subtitle": "AI assistant",
+          "footerText": "This preview runs in simulator mode; messages are not saved."
+        },
+        "fields": {
+          "title": "Bot name",
+          "subtitle": "Subtitle",
+          "openLabel": "Launcher text",
+          "openLabelHelp": "The default launcher text is generated from your business name: {name}.",
+          "themeColor": "Theme color",
+          "themeColorSwatch": "Select {color}",
+          "logoUpload": "Logo / icon",
+          "logoUploadHelp": "Upload a PNG, JPG, or WebP image up to 2 MB. Leave empty to show the Q fallback in the launcher.",
+          "footerText": "Footer note",
+          "footerTextHelp": "Small note under the widget composer. It is hidden when the footer is turned off."
+        },
+        "appearanceTitle": "Appearance",
+        "toggles": {
+          "showLogo": "Show logo",
+          "showLauncherText": "Show launcher text",
+          "showLauncherSubtitle": "Show launcher subtitle",
+          "showHeaderSubtitle": "Show header subtitle",
+          "showFooter": "Show footer note"
+        },
+        "snippetTitle": "Script to add to the site",
+        "snippetDescription": "Add this code before the closing body tag or through the website tag manager.",
+        "copy": "Copy script",
+        "copied": "Copied",
+        "previewTitle": "Preview",
+        "previewDescription": "The widget preview reloads as settings change.",
+        "previewHostTitle": "Website preview",
+        "previewHostBody": "This area simulates a page on your website. Open the chat widget from the launcher in the bottom-right corner.",
+        "logoUpload": "Upload logo",
+        "logoUploading": "Uploading...",
+        "logoUploaded": "Logo uploaded.",
+        "logoFallbackMark": "Q",
+        "logoUploadFailed": "Failed to upload logo. Please try again.",
+        "logoInvalidType": "Please choose a PNG, JPG, or WebP logo.",
+        "logoFileTooLarge": "Please choose a logo smaller than 2 MB."
       }
     },
     "templateTools": {

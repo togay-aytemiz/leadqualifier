@@ -4,7 +4,7 @@ import {
     WHATSAPP_OVERVIEW_URL
 } from '@/components/channels/whatsappOnboarding'
 
-export type ChannelCardType = Channel['type'] | 'messenger'
+export type ChannelCardType = Channel['type'] | 'messenger' | 'web'
 export type ChannelCardTone = 'emerald' | 'sky' | 'indigo' | 'sunset'
 export type ChannelCardBadge = 'popular' | 'comingSoon'
 export type ChannelOnboardingSurface = 'interactive' | 'placeholder'
@@ -80,6 +80,13 @@ const CHANNEL_CATALOG: ChannelCatalogEntry[] = [
                 href: 'https://core.telegram.org/bots/tutorial'
             }
         ]
+    },
+    {
+        type: 'web',
+        href: '/settings/channels/web',
+        tone: 'sky',
+        onboardingSurface: 'interactive',
+        resources: []
     }
 ]
 
