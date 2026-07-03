@@ -1,7 +1,9 @@
-import { after, NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Json } from '@/types/database'
 import { WhatsAppClient } from '@/lib/whatsapp/client'
+import type { InboundMessageJob } from '@/lib/channels/inbound-job-queue'
+import { enqueueInboundMessageJob } from '@/lib/channels/inbound-job-queue'
 import {
     isOutboundImageMessage,
     normalizeOutboundMessage,
@@ -101,26 +103,6 @@ function toErrorMessage(error: unknown) {
     return typeof error === 'string' ? error : 'Unknown error'
 }
 
-function scheduleWhatsAppWebhookProcessing(tasks: Array<() => Promise<void>>) {
-    if (tasks.length === 0) return
-
-    const runTasks = async () => {
-        for (const task of tasks) {
-            try {
-                await task()
-            } catch (error) {
-                console.error('WhatsApp Webhook: Deferred event processing failed', error)
-            }
-        }
-    }
-
-    try {
-        after(runTasks)
-    } catch {
-        void runTasks()
-    }
-}
-
 async function markWhatsAppChannelWebhookVerified(
     supabase: { from: (table: string) => unknown },
     channel: WhatsAppChannelRecord
@@ -148,6 +130,182 @@ async function markWhatsAppChannelWebhookVerified(
         ...channel,
         config: nextConfig
     } as WhatsAppChannelRecord
+}
+
+export async function processWhatsAppInboundJob(input: {
+    supabase: any
+    job: InboundMessageJob
+}) {
+    const event = (input.job.payload as { event?: ReturnType<typeof extractWhatsAppInboundMessages>[number] }).event
+    if (!event) return
+
+    const { data: channelData } = await input.supabase
+        .from('channels')
+        .select('id, organization_id, config')
+        .eq('id', input.job.channel_id)
+        .eq('type', 'whatsapp')
+        .eq('status', 'active')
+        .maybeSingle()
+
+    const channel = channelData as WhatsAppChannelRecord | null
+    if (!channel) {
+        console.warn('WhatsApp Webhook: Queued channel not found', input.job.channel_id)
+        return
+    }
+
+    const accessToken = readConfigString(channel.config, 'permanent_access_token')
+    if (!accessToken) {
+        console.warn('WhatsApp Webhook: Missing permanent access token for queued job')
+        return
+    }
+
+    const client = new WhatsAppClient(accessToken)
+    const sendOutboundForEvent = async (message: OutboundMessageInput) => {
+        if (isOutboundImageMessage(message)) {
+            await client.sendImage({
+                phoneNumberId: event.phoneNumberId,
+                to: event.contactPhone,
+                imageUrl: message.imageUrl,
+                caption: message.caption ?? undefined
+            })
+            return
+        }
+
+        const normalized = normalizeOutboundMessage(message)
+        if (normalized.replyButtons && normalized.replyButtons.length > 0) {
+            try {
+                await client.sendReplyButtons({
+                    phoneNumberId: event.phoneNumberId,
+                    to: event.contactPhone,
+                    text: normalized.content,
+                    buttons: normalized.replyButtons
+                })
+                return
+            } catch (error) {
+                console.warn('WhatsApp Webhook: Interactive reply-button send failed, falling back to plain text', {
+                    organization_id: channel.organization_id,
+                    phone_number_id: event.phoneNumberId,
+                    contact_phone: event.contactPhone,
+                    inbound_message_id: event.messageId,
+                    error: error instanceof Error ? error.message : String(error)
+                })
+            }
+        }
+
+        await client.sendText({
+            phoneNumberId: event.phoneNumberId,
+            to: event.contactPhone,
+            text: normalized.content
+        })
+    }
+
+    const baseMetadata = {
+        whatsapp_message_id: event.messageId,
+        whatsapp_timestamp: event.timestamp,
+        phone_number_id: event.phoneNumberId
+    }
+
+    if (event.kind === 'text') {
+        await processInboundAiPipeline({
+            supabase: input.supabase,
+            organizationId: channel.organization_id,
+            platform: 'whatsapp',
+            source: 'whatsapp',
+            contactId: event.contactPhone,
+            contactName: event.contactName,
+            text: event.text,
+            inboundMessageId: event.messageId,
+            inboundMessageIdMetadataKey: 'whatsapp_message_id',
+            inboundMessageMetadata: {
+                ...baseMetadata,
+                whatsapp_message_type: 'text'
+            },
+            sendOutbound: sendOutboundForEvent,
+            logPrefix: 'WhatsApp Webhook'
+        })
+        return
+    }
+
+    if (event.kind === 'interactive') {
+        const skillActionSelection = parseSkillActionButtonId(event.buttonReplyId)
+        await processInboundAiPipeline({
+            supabase: input.supabase,
+            organizationId: channel.organization_id,
+            platform: 'whatsapp',
+            source: 'whatsapp',
+            contactId: event.contactPhone,
+            contactName: event.contactName,
+            text: event.buttonReplyTitle ?? event.buttonReplyId,
+            inboundMessageId: event.messageId,
+            inboundMessageIdMetadataKey: 'whatsapp_message_id',
+            inboundMessageMetadata: {
+                ...baseMetadata,
+                whatsapp_message_type: 'interactive',
+                whatsapp_interactive_type: 'button_reply',
+                whatsapp_button_reply_id: event.buttonReplyId,
+                whatsapp_button_reply_title: event.buttonReplyTitle
+            },
+            inboundActionSelection: skillActionSelection
+                ? {
+                    kind: 'skill_action',
+                    sourceSkillId: skillActionSelection.sourceSkillId,
+                    actionId: skillActionSelection.actionId,
+                    buttonTitle: event.buttonReplyTitle
+                }
+                : undefined,
+            sendOutbound: sendOutboundForEvent,
+            logPrefix: 'WhatsApp Webhook'
+        })
+        return
+    }
+
+    const mediaStorageResult = await storeInboundMedia({
+        supabase: input.supabase,
+        client,
+        channel,
+        event
+    })
+    const caption = event.caption?.trim() || null
+    const messageText = caption ?? resolveWhatsAppMediaPlaceholder(event.mediaType)
+    const skipAutomation = caption === null
+
+    await processInboundAiPipeline({
+        supabase: input.supabase,
+        organizationId: channel.organization_id,
+        platform: 'whatsapp',
+        source: 'whatsapp',
+        contactId: event.contactPhone,
+        contactName: event.contactName,
+        text: messageText,
+        inboundMessageId: event.messageId,
+        inboundMessageIdMetadataKey: 'whatsapp_message_id',
+        inboundMessageMetadata: {
+            ...baseMetadata,
+            whatsapp_message_type: event.mediaType,
+            whatsapp_media_type: event.mediaType,
+            whatsapp_media_id: event.mediaId,
+            whatsapp_media_mime_type: mediaStorageResult.mimeType,
+            whatsapp_media_sha256: mediaStorageResult.sha256,
+            whatsapp_media_caption: caption,
+            whatsapp_media_filename: mediaStorageResult.filename,
+            whatsapp_is_media_placeholder: skipAutomation,
+            whatsapp_media: {
+                type: event.mediaType,
+                media_id: event.mediaId,
+                mime_type: mediaStorageResult.mimeType,
+                sha256: mediaStorageResult.sha256,
+                caption,
+                filename: mediaStorageResult.filename,
+                storage_path: mediaStorageResult.storagePath,
+                storage_url: mediaStorageResult.storageUrl,
+                download_status: mediaStorageResult.downloadStatus,
+                download_error: mediaStorageResult.downloadError
+            }
+        },
+        skipAutomation,
+        sendOutbound: sendOutboundForEvent,
+        logPrefix: 'WhatsApp Webhook'
+    })
 }
 
 async function storeInboundMedia(args: {
@@ -317,12 +475,9 @@ export async function POST(req: NextRequest) {
     )
 
     const channelCache = new Map<string, WhatsAppChannelRecord>()
-    const clientCache = new Map<string, WhatsAppClient>()
-    const processingTasks: Array<() => Promise<void>> = []
 
     for (const event of events) {
         let channel = channelCache.get(event.phoneNumberId)
-        let client = clientCache.get(event.phoneNumberId)
 
         if (!channel) {
             const { data } = await supabase
@@ -356,168 +511,20 @@ export async function POST(req: NextRequest) {
                 continue
             }
 
-            client = new WhatsAppClient(accessToken)
             channelCache.set(event.phoneNumberId, channel)
-            clientCache.set(event.phoneNumberId, client)
         }
 
-        if (!channel || !client) continue
+        if (!channel) continue
 
-        const sendOutboundForEvent = async (message: OutboundMessageInput) => {
-            if (isOutboundImageMessage(message)) {
-                await client.sendImage({
-                    phoneNumberId: event.phoneNumberId,
-                    to: event.contactPhone,
-                    imageUrl: message.imageUrl,
-                    caption: message.caption ?? undefined
-                })
-                return
-            }
-
-            const normalized = normalizeOutboundMessage(message)
-            if (normalized.replyButtons && normalized.replyButtons.length > 0) {
-                try {
-                    await client.sendReplyButtons({
-                        phoneNumberId: event.phoneNumberId,
-                        to: event.contactPhone,
-                        text: normalized.content,
-                        buttons: normalized.replyButtons
-                    })
-                    return
-                } catch (error) {
-                    console.warn('WhatsApp Webhook: Interactive reply-button send failed, falling back to plain text', {
-                        organization_id: channel.organization_id,
-                        phone_number_id: event.phoneNumberId,
-                        contact_phone: event.contactPhone,
-                        inbound_message_id: event.messageId,
-                        error: error instanceof Error ? error.message : String(error)
-                    })
-                }
-            }
-
-            await client.sendText({
-                phoneNumberId: event.phoneNumberId,
-                to: event.contactPhone,
-                text: normalized.content
-            })
-        }
-
-        const baseMetadata = {
-            whatsapp_message_id: event.messageId,
-            whatsapp_timestamp: event.timestamp,
-            phone_number_id: event.phoneNumberId
-        }
-
-        if (event.kind === 'text') {
-            processingTasks.push(async () => {
-                await processInboundAiPipeline({
-                    supabase,
-                    organizationId: channel.organization_id,
-                    platform: 'whatsapp',
-                    source: 'whatsapp',
-                    contactId: event.contactPhone,
-                    contactName: event.contactName,
-                    text: event.text,
-                    inboundMessageId: event.messageId,
-                    inboundMessageIdMetadataKey: 'whatsapp_message_id',
-                    inboundMessageMetadata: {
-                        ...baseMetadata,
-                        whatsapp_message_type: 'text'
-                    },
-                    sendOutbound: sendOutboundForEvent,
-                    logPrefix: 'WhatsApp Webhook'
-                })
-            })
-            continue
-        }
-
-        if (event.kind === 'interactive') {
-            const skillActionSelection = parseSkillActionButtonId(event.buttonReplyId)
-            processingTasks.push(async () => {
-                await processInboundAiPipeline({
-                    supabase,
-                    organizationId: channel.organization_id,
-                    platform: 'whatsapp',
-                    source: 'whatsapp',
-                    contactId: event.contactPhone,
-                    contactName: event.contactName,
-                    text: event.buttonReplyTitle ?? event.buttonReplyId,
-                    inboundMessageId: event.messageId,
-                    inboundMessageIdMetadataKey: 'whatsapp_message_id',
-                    inboundMessageMetadata: {
-                        ...baseMetadata,
-                        whatsapp_message_type: 'interactive',
-                        whatsapp_interactive_type: 'button_reply',
-                        whatsapp_button_reply_id: event.buttonReplyId,
-                        whatsapp_button_reply_title: event.buttonReplyTitle
-                    },
-                    inboundActionSelection: skillActionSelection
-                        ? {
-                            kind: 'skill_action',
-                            sourceSkillId: skillActionSelection.sourceSkillId,
-                            actionId: skillActionSelection.actionId,
-                            buttonTitle: event.buttonReplyTitle
-                        }
-                        : undefined,
-                    sendOutbound: sendOutboundForEvent,
-                    logPrefix: 'WhatsApp Webhook'
-                })
-            })
-            continue
-        }
-
-        processingTasks.push(async () => {
-            const mediaStorageResult = await storeInboundMedia({
-                supabase,
-                client,
-                channel,
-                event
-            })
-            const caption = event.caption?.trim() || null
-            const messageText = caption ?? resolveWhatsAppMediaPlaceholder(event.mediaType)
-            const skipAutomation = caption === null
-
-            await processInboundAiPipeline({
-                supabase,
-                organizationId: channel.organization_id,
-                platform: 'whatsapp',
-                source: 'whatsapp',
-                contactId: event.contactPhone,
-                contactName: event.contactName,
-                text: messageText,
-                inboundMessageId: event.messageId,
-                inboundMessageIdMetadataKey: 'whatsapp_message_id',
-                inboundMessageMetadata: {
-                    ...baseMetadata,
-                    whatsapp_message_type: event.mediaType,
-                    whatsapp_media_type: event.mediaType,
-                    whatsapp_media_id: event.mediaId,
-                    whatsapp_media_mime_type: mediaStorageResult.mimeType,
-                    whatsapp_media_sha256: mediaStorageResult.sha256,
-                    whatsapp_media_caption: caption,
-                    whatsapp_media_filename: mediaStorageResult.filename,
-                    whatsapp_is_media_placeholder: skipAutomation,
-                    whatsapp_media: {
-                        type: event.mediaType,
-                        media_id: event.mediaId,
-                        mime_type: mediaStorageResult.mimeType,
-                        sha256: mediaStorageResult.sha256,
-                        caption,
-                        filename: mediaStorageResult.filename,
-                        storage_path: mediaStorageResult.storagePath,
-                        storage_url: mediaStorageResult.storageUrl,
-                        download_status: mediaStorageResult.downloadStatus,
-                        download_error: mediaStorageResult.downloadError
-                    }
-                },
-                skipAutomation,
-                sendOutbound: sendOutboundForEvent,
-                logPrefix: 'WhatsApp Webhook'
-            })
+        await enqueueInboundMessageJob({
+            supabase,
+            source: 'whatsapp',
+            organizationId: channel.organization_id,
+            channelId: channel.id,
+            providerMessageId: event.messageId,
+            payload: { event }
         })
     }
-
-    scheduleWhatsAppWebhookProcessing(processingTasks)
 
     return NextResponse.json({ ok: true })
 }

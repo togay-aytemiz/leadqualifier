@@ -8,6 +8,7 @@ const {
     downloadMediaMock,
     extractWhatsAppInboundMessagesMock,
     getMediaMetadataMock,
+    enqueueInboundMessageJobMock,
     isValidMetaSignatureMock,
     processInboundAiPipelineMock,
     sendReplyButtonsMock,
@@ -25,6 +26,7 @@ const {
     downloadMediaMock: vi.fn(),
     extractWhatsAppInboundMessagesMock: vi.fn(),
     getMediaMetadataMock: vi.fn(),
+    enqueueInboundMessageJobMock: vi.fn(),
     isValidMetaSignatureMock: vi.fn(),
     processInboundAiPipelineMock: vi.fn(),
     sendReplyButtonsMock: vi.fn(),
@@ -54,6 +56,10 @@ vi.mock('@/lib/whatsapp/webhook', () => ({
 
 vi.mock('@/lib/channels/inbound-ai-pipeline', () => ({
     processInboundAiPipeline: processInboundAiPipelineMock
+}))
+
+vi.mock('@/lib/channels/inbound-job-queue', () => ({
+    enqueueInboundMessageJob: enqueueInboundMessageJobMock
 }))
 
 vi.mock('@/lib/whatsapp/client', () => ({
@@ -144,6 +150,7 @@ describe('WhatsApp webhook route', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         processInboundAiPipelineMock.mockReset()
+        enqueueInboundMessageJobMock.mockResolvedValue({ queued: true, duplicate: false })
         afterCallbacks.length = 0
         process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
         process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key'
@@ -279,9 +286,6 @@ describe('WhatsApp webhook route', () => {
             ...event
         }])
         isValidMetaSignatureMock.mockReturnValue(true)
-        processInboundAiPipelineMock.mockImplementationOnce(async (input: { sendOutbound: (text: string) => Promise<void> }) => {
-            await input.sendOutbound('Bot reply')
-        })
 
         const req = new NextRequest('http://localhost/api/webhooks/whatsapp', {
             method: 'POST',
@@ -296,9 +300,7 @@ describe('WhatsApp webhook route', () => {
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({ ok: true })
-        await flushAfterCallbacks()
         expect(selectMock).toHaveBeenCalledWith('id, organization_id, config')
-        expect(whatsAppCtorMock).toHaveBeenCalledWith('token-1')
         expect(updateMock).toHaveBeenCalledWith({
             config: expect.objectContaining({
                 phone_number_id: 'phone-1',
@@ -308,21 +310,22 @@ describe('WhatsApp webhook route', () => {
             })
         })
         expect(updateEqMock).toHaveBeenCalledWith('id', 'channel-1')
-        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(
+        expect(enqueueInboundMessageJobMock).toHaveBeenCalledWith(
             expect.objectContaining({
-                organizationId: 'org-1',
-                platform: 'whatsapp',
                 source: 'whatsapp',
-                contactId: '905551112233',
-                text: 'Merhaba',
-                inboundMessageId: 'wamid-1'
+                organizationId: 'org-1',
+                channelId: 'channel-1',
+                providerMessageId: 'wamid-1',
+                payload: {
+                    event: expect.objectContaining({
+                        kind: 'text',
+                        text: 'Merhaba'
+                    })
+                }
             })
         )
-        expect(sendTextMock).toHaveBeenCalledWith({
-            phoneNumberId: 'phone-1',
-            to: '905551112233',
-            text: 'Bot reply'
-        })
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+        expect(whatsAppCtorMock).not.toHaveBeenCalled()
     })
 
     it('acknowledges valid POST before running the AI pipeline', async () => {
@@ -369,7 +372,13 @@ describe('WhatsApp webhook route', () => {
         ])
 
         expect(result).not.toBe('timeout')
-        expect(afterMock).toHaveBeenCalledTimes(1)
+        expect(enqueueInboundMessageJobMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                source: 'whatsapp',
+                providerMessageId: 'wamid-1'
+            })
+        )
+        expect(afterMock).not.toHaveBeenCalled()
         expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
     })
 
@@ -412,28 +421,13 @@ describe('WhatsApp webhook route', () => {
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({ ok: true })
-        await flushAfterCallbacks()
-        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(
+        expect(enqueueInboundMessageJobMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 organizationId: 'org-1',
-                platform: 'whatsapp',
                 source: 'whatsapp',
-                contactId: '905551112233',
-                text: 'Randevu Al',
-                inboundMessageId: 'wamid-interactive-1',
-                inboundActionSelection: {
-                    kind: 'skill_action',
-                    sourceSkillId: 'skill-source-1',
-                    actionId: 'action-1',
-                    buttonTitle: 'Randevu Al'
-                },
-                inboundMessageMetadata: expect.objectContaining({
-                    whatsapp_message_type: 'interactive',
-                    whatsapp_interactive_type: 'button_reply',
-                    whatsapp_button_reply_id: 'skill_action:skill-source-1:action-1',
-                    whatsapp_button_reply_title: 'Randevu Al'
-                }),
-                sendOutbound: expect.any(Function)
+                channelId: 'channel-1',
+                providerMessageId: 'wamid-interactive-1',
+                payload: { event }
             })
         )
     })
@@ -486,16 +480,10 @@ describe('WhatsApp webhook route', () => {
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({ ok: true })
-        await flushAfterCallbacks()
-        expect(sendReplyButtonsMock).toHaveBeenCalledWith({
-            phoneNumberId: 'phone-1',
-            to: '905551112233',
-            text: 'Bot reply',
-            buttons: [
-                { id: 'skill_action:skill-1:action-1', title: 'Randevu Al' },
-                { id: 'skill_action:skill-1:action-2', title: 'Instagram' }
-            ]
-        })
+        expect(enqueueInboundMessageJobMock).toHaveBeenCalledWith(expect.objectContaining({
+            providerMessageId: 'wamid-1'
+        }))
+        expect(sendReplyButtonsMock).not.toHaveBeenCalled()
         expect(sendTextMock).not.toHaveBeenCalled()
     })
 
@@ -547,13 +535,11 @@ describe('WhatsApp webhook route', () => {
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({ ok: true })
-        await flushAfterCallbacks()
-        expect(sendReplyButtonsMock).toHaveBeenCalledTimes(1)
-        expect(sendTextMock).toHaveBeenCalledWith({
-            phoneNumberId: 'phone-1',
-            to: '905551112233',
-            text: 'Bot reply'
-        })
+        expect(enqueueInboundMessageJobMock).toHaveBeenCalledWith(expect.objectContaining({
+            providerMessageId: 'wamid-1'
+        }))
+        expect(sendReplyButtonsMock).not.toHaveBeenCalled()
+        expect(sendTextMock).not.toHaveBeenCalled()
     })
 
     it('stores inbound image media and persists placeholder message without auto-reply when caption is missing', async () => {
@@ -619,28 +605,14 @@ describe('WhatsApp webhook route', () => {
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({ ok: true })
-        await flushAfterCallbacks()
-        expect(getMediaMetadataMock).toHaveBeenCalledWith('media-1')
-        expect(downloadMediaMock).toHaveBeenCalledWith('https://graph.example.com/media-1')
-        expect(storageFromMock).toHaveBeenCalledWith('whatsapp-media')
-        expect(storageUploadMock).toHaveBeenCalledTimes(1)
-        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(
-            expect.objectContaining({
-                text: '[WhatsApp image]',
-                skipAutomation: true,
-                inboundMessageId: 'wamid-media-1',
-                inboundMessageMetadata: expect.objectContaining({
-                    whatsapp_media_type: 'image',
-                    whatsapp_is_media_placeholder: true,
-                    whatsapp_media: expect.objectContaining({
-                        type: 'image',
-                        media_id: 'media-1',
-                        storage_url: 'https://cdn.example.com/whatsapp-media/image-1.jpg',
-                        download_status: 'stored'
-                    })
-                })
-            })
-        )
+        expect(enqueueInboundMessageJobMock).toHaveBeenCalledWith(expect.objectContaining({
+            providerMessageId: 'wamid-media-1',
+            payload: { event }
+        }))
+        expect(getMediaMetadataMock).not.toHaveBeenCalled()
+        expect(downloadMediaMock).not.toHaveBeenCalled()
+        expect(storageUploadMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
         expect(sendTextMock).not.toHaveBeenCalled()
     })
 })

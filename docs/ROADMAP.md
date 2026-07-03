@@ -1,5 +1,23 @@
 # WhatsApp AI Qualy — Roadmap
 
+> Last Updated: 2026-07-03
+
+> **Inbound Queue Readiness (2026-07-03):** WhatsApp and Instagram webhooks now acknowledge verified inbound events quickly by writing them to a shared `inbound_message_jobs` queue. A protected internal processor endpoint drains the queue with bounded concurrency, retries transient AI/provider failures, and preserves the existing shared AI pipeline for actual replies. This is the preferred launch path for short-lived high-volume admissions/preference periods.
+
+- [x] Add a shared inbound message job table for webhook-backed channels.
+- [x] Queue WhatsApp inbound text, interactive, and media events before AI processing.
+- [x] Queue Instagram inbound events before AI processing while keeping outbound echo persistence synchronous.
+- [x] Add a protected internal processor endpoint for bounded job execution and retries.
+- [ ] Configure production scheduling or monitoring to call `/api/internal/inbound-jobs/process` with `INBOUND_JOBS_PROCESS_TOKEN`.
+
+> **Planned Web Chat Channel (2026-07-03):** Add a Qualy-owned embeddable website chat channel for institutions that want the same Skills and Knowledge Base assistant on their public website. The channel should appear in Settings > Channels, generate a copyable script/embed code from the UI, enforce allowed domains, and persist conversations into the same Inbox/usage pipeline as other channels. The first implementation should use a Qualy-built React widget with controlled animations and shared rich-text rendering, not a third-party chat service or third-party bot brain.
+
+- [ ] Add a Web Chat channel card to Settings > Channels with TR/EN copy and setup status.
+- [ ] Generate a per-channel website embed snippet in the UI for admins to copy.
+- [ ] Build a lightweight Qualy-owned launcher/panel widget with open/close animation, typing state, mobile layout, and source-link rendering.
+- [ ] Back the widget with a generalized web-chat API that reuses the organization's Skills, Knowledge Base, safety boundaries, usage metering, and Inbox persistence.
+- [ ] Add allowed-domain controls so the embed only runs on approved customer websites.
+
 > **Disjoint Evaluation Update (2026-06-20):** A deterministic 100-question sample was selected from the 408 rows remaining after excluding every row in the prior 100; verified overlap is zero. A separate 20-case suite now exercises realistic under-specified prospective-student messages with slot-only short replies in the same conversation. The first production run is invalid for full-system scoring because OpenAI returned `429 insufficient_quota` on all `79` File Search paths and all `20` clarification first turns. The `20` Skill replies produced `19/20` correct domain matches, `13/20` fully useful answers, `6/20` safe partial answers, and one wrong assumption; the identity reply was correct. The harness now separates `rag_pipeline_error` from factual `rag_no_info`. A healthy rerun and an explicit clarification contract remain open (`docs/evaluations/yiu-disjoint-100-and-clarification-codex-review-2026-06-20.md`).
 
 - [x] Add deterministic exclusion support and prove zero overlap with the prior 100-question artifact.

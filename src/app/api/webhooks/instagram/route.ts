@@ -7,6 +7,8 @@ import { InstagramClient } from '@/lib/instagram/client'
 import { extractInstagramInboundEvents, isValidMetaSignature } from '@/lib/instagram/webhook'
 import { isOutboundImageMessage, normalizeOutboundMessage } from '@/lib/channels/outbound-message'
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
+import type { InboundMessageJob } from '@/lib/channels/inbound-job-queue'
+import { enqueueInboundMessageJob } from '@/lib/channels/inbound-job-queue'
 import { resolveMetaOrigin } from '@/lib/channels/meta-origin'
 import { resolveMetaInstagramConnectionCandidate } from '@/lib/channels/meta-oauth'
 
@@ -104,6 +106,25 @@ function buildInstagramImageProxyUrl(req: NextRequest, sourceUrl: string) {
     forwardedHost: req.headers.get('x-forwarded-host'),
     forwardedProto: req.headers.get('x-forwarded-proto'),
     requestOrigin: req.nextUrl.origin,
+  })
+  const proxyUrl = new URL('/api/media/instagram-skill-image', origin)
+  proxyUrl.searchParams.set('source', sourceUrl)
+  return proxyUrl.toString()
+}
+
+function buildInstagramImageProxyUrlFromMeta(meta: {
+  appUrl?: string | null
+  siteUrl?: string | null
+  forwardedHost?: string | null
+  forwardedProto?: string | null
+  requestOrigin?: string | null
+}, sourceUrl: string) {
+  const origin = resolveMetaOrigin({
+    appUrl: meta.appUrl ?? process.env.NEXT_PUBLIC_APP_URL,
+    siteUrl: meta.siteUrl ?? process.env.NEXT_PUBLIC_SITE_URL,
+    forwardedHost: meta.forwardedHost ?? null,
+    forwardedProto: meta.forwardedProto ?? null,
+    requestOrigin: meta.requestOrigin ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost',
   })
   const proxyUrl = new URL('/api/media/instagram-skill-image', origin)
   proxyUrl.searchParams.set('source', sourceUrl)
@@ -497,6 +518,132 @@ async function resolveInstagramBusinessIdentity(params: {
   } satisfies InstagramBusinessIdentity
 }
 
+export async function processInstagramInboundJob(input: {
+  supabase: any
+  job: InboundMessageJob
+}) {
+  const payload = input.job.payload as {
+    event?: ReturnType<typeof extractInstagramInboundEvents>[number]
+    contactIdentity?: InstagramContactIdentity
+    requestMeta?: {
+      appUrl?: string | null
+      siteUrl?: string | null
+      forwardedHost?: string | null
+      forwardedProto?: string | null
+      requestOrigin?: string | null
+    }
+  }
+  const event = payload.event
+  const contactIdentity = payload.contactIdentity
+  if (!event || !contactIdentity) return
+
+  const { data: channelData } = await input.supabase
+    .from('channels')
+    .select('id, organization_id, config')
+    .eq('id', input.job.channel_id)
+    .eq('type', 'instagram')
+    .eq('status', 'active')
+    .maybeSingle()
+
+  const channel = channelData as InstagramChannelRecord | null
+  if (!channel) {
+    console.warn('Instagram Webhook: Queued channel not found', input.job.channel_id)
+    return
+  }
+
+  const pageAccessToken = readConfigString(channel.config, 'page_access_token')
+  if (!pageAccessToken) {
+    console.warn('Instagram Webhook: Missing page access token for queued job')
+    return
+  }
+
+  const client = new InstagramClient(pageAccessToken)
+  const messageMetadata = {
+    outbound_channel: 'instagram',
+    instagram_message_id: event.messageId,
+    instagram_timestamp: event.timestamp,
+    instagram_business_account_id: event.instagramBusinessAccountId,
+    instagram_event_source: event.eventSource,
+    instagram_event_type: event.eventType,
+    instagram_message_direction: event.direction,
+    instagram_contact_name: contactIdentity.contactName,
+    instagram_contact_username: contactIdentity.username,
+    instagram_contact_avatar_url: contactIdentity.avatarUrl,
+    ...(event.debugMessage
+      ? {
+          instagram_message_debug: event.debugMessage,
+        }
+      : {}),
+    ...(event.reaction
+      ? {
+          instagram_reaction_action: event.reaction.action,
+          instagram_reaction_emoji: event.reaction.emoji,
+          instagram_reaction_target_message_id: event.reaction.targetMessageId,
+        }
+      : {}),
+    ...(event.media
+      ? {
+          instagram_media_type: event.media.type,
+          instagram_media_original_type: event.media.originalType,
+          instagram_media_preview_kind: event.media.previewKind ?? null,
+          instagram_is_media_placeholder: !readTrimmedString(event.media.caption),
+          instagram_media: {
+            type: event.media.type,
+            original_type: event.media.originalType,
+            preview_kind: event.media.previewKind ?? null,
+            mime_type: event.media.mimeType,
+            caption: event.media.caption,
+            filename: null,
+            storage_path: null,
+            storage_url: event.media.url,
+            download_status: event.media.url ? 'remote' : 'missing',
+          },
+        }
+      : {}),
+  }
+
+  await processInboundAiPipeline({
+    supabase: input.supabase,
+    organizationId: channel.organization_id,
+    platform: 'instagram',
+    source: 'instagram',
+    contactId: event.contactId,
+    contactName: contactIdentity.contactName,
+    contactAvatarUrl: contactIdentity.avatarUrl,
+    text: event.text,
+    inboundMessageId: event.messageId,
+    inboundMessageIdMetadataKey: 'instagram_message_id',
+    inboundMessageMetadata: messageMetadata,
+    skipAutomation: event.skipAutomation,
+    sendOutbound: async (content) => {
+      if (isOutboundImageMessage(content)) {
+        const imageUrl = shouldProxyInstagramImage(content.imageUrl, content.mimeType)
+          ? buildInstagramImageProxyUrlFromMeta(payload.requestMeta ?? {}, content.imageUrl)
+          : content.imageUrl
+        const response = await client.sendImage({
+          instagramBusinessAccountId: event.instagramBusinessAccountId,
+          to: event.contactId,
+          imageUrl,
+        })
+        return {
+          providerMessageId: readInstagramSendMessageId(response),
+        }
+      }
+
+      const normalized = normalizeOutboundMessage(content)
+      const response = await client.sendText({
+        instagramBusinessAccountId: event.instagramBusinessAccountId,
+        to: event.contactId,
+        text: normalized.content,
+      })
+      return {
+        providerMessageId: readInstagramSendMessageId(response),
+      }
+    },
+    logPrefix: 'Instagram Webhook',
+  })
+}
+
 export async function GET(req: NextRequest) {
   const mode = req.nextUrl.searchParams.get('hub.mode')
   const token = req.nextUrl.searchParams.get('hub.verify_token')
@@ -752,45 +899,23 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    await processInboundAiPipeline({
+    await enqueueInboundMessageJob({
       supabase,
-      organizationId: channel.organization_id,
-      platform: 'instagram',
       source: 'instagram',
-      contactId: event.contactId,
-      contactName: contactIdentity.contactName,
-      contactAvatarUrl: contactIdentity.avatarUrl,
-      text: event.text,
-      inboundMessageId: event.messageId,
-      inboundMessageIdMetadataKey: 'instagram_message_id',
-      inboundMessageMetadata: messageMetadata,
-      skipAutomation: event.skipAutomation,
-      sendOutbound: async (content) => {
-        if (isOutboundImageMessage(content)) {
-          const imageUrl = shouldProxyInstagramImage(content.imageUrl, content.mimeType)
-            ? buildInstagramImageProxyUrl(req, content.imageUrl)
-            : content.imageUrl
-          const response = await client.sendImage({
-            instagramBusinessAccountId: event.instagramBusinessAccountId,
-            to: event.contactId,
-            imageUrl,
-          })
-          return {
-            providerMessageId: readInstagramSendMessageId(response),
-          }
+      organizationId: channel.organization_id,
+      channelId: channel.id,
+      providerMessageId: event.messageId,
+      payload: {
+        event,
+        contactIdentity,
+        requestMeta: {
+          appUrl: process.env.NEXT_PUBLIC_APP_URL ?? null,
+          siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? null,
+          forwardedHost: req.headers.get('x-forwarded-host'),
+          forwardedProto: req.headers.get('x-forwarded-proto'),
+          requestOrigin: req.nextUrl.origin,
         }
-
-        const normalized = normalizeOutboundMessage(content)
-        const response = await client.sendText({
-          instagramBusinessAccountId: event.instagramBusinessAccountId,
-          to: event.contactId,
-          text: normalized.content,
-        })
-        return {
-          providerMessageId: readInstagramSendMessageId(response),
-        }
-      },
-      logPrefix: 'Instagram Webhook',
+      }
     })
   }
 

@@ -6,6 +6,7 @@ const {
     extractInstagramInboundEventsMock,
     getBusinessAccountMock,
     getUserProfileMock,
+    enqueueInboundMessageJobMock,
     instagramCtorMock,
     isValidMetaSignatureMock,
     processInboundAiPipelineMock,
@@ -17,6 +18,7 @@ const {
     extractInstagramInboundEventsMock: vi.fn(),
     getBusinessAccountMock: vi.fn(),
     getUserProfileMock: vi.fn(),
+    enqueueInboundMessageJobMock: vi.fn(),
     instagramCtorMock: vi.fn(),
     isValidMetaSignatureMock: vi.fn(),
     processInboundAiPipelineMock: vi.fn(),
@@ -36,6 +38,10 @@ vi.mock('@/lib/instagram/webhook', () => ({
 
 vi.mock('@/lib/channels/inbound-ai-pipeline', () => ({
     processInboundAiPipeline: processInboundAiPipelineMock
+}))
+
+vi.mock('@/lib/channels/inbound-job-queue', () => ({
+    enqueueInboundMessageJob: enqueueInboundMessageJobMock
 }))
 
 vi.mock('@/lib/channels/meta-oauth', () => ({
@@ -454,6 +460,7 @@ function createInstagramOutboundEmptyDuplicateSupabaseMock() {
 describe('Instagram webhook route', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        enqueueInboundMessageJobMock.mockResolvedValue({ queued: true, duplicate: false })
         process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
         process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key'
     })
@@ -550,7 +557,7 @@ describe('Instagram webhook route', () => {
         expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
     })
 
-    it('routes page-id based instagram webhook events into the shared inbound pipeline', async () => {
+    it('queues page-id based instagram webhook events for shared inbound processing', async () => {
         const event = {
             instagramBusinessAccountId: 'page-1',
             contactId: 'ig-user-1',
@@ -615,23 +622,30 @@ describe('Instagram webhook route', () => {
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({ ok: true })
         expect(orMaybeSingleMock).toHaveBeenCalled()
-        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+        expect(enqueueInboundMessageJobMock).toHaveBeenCalledWith(expect.objectContaining({
             organizationId: 'org-1',
-            platform: 'instagram',
             source: 'instagram',
-            contactId: 'ig-user-1',
-            inboundMessageId: 'ig-mid-1',
-            inboundMessageMetadata: expect.objectContaining({
-                instagram_message_id: 'ig-mid-1',
-                instagram_message_debug: {
+            channelId: 'channel-ig-1',
+            providerMessageId: 'ig-mid-1',
+            payload: expect.objectContaining({
+                event: expect.objectContaining({
+                    messageId: 'ig-mid-1',
+                    debugMessage: {
                     mid: 'ig-mid-1',
                     is_unsupported: true,
                     attachments: [{
                         type: 'ig_story'
                     }]
+                    }
+                }),
+                contactIdentity: {
+                    contactName: 'ayse',
+                    username: 'ayse',
+                    avatarUrl: null
                 }
             })
         }))
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
         expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({
             config: expect.objectContaining({
                 webhook_status: 'verified',
@@ -696,24 +710,12 @@ describe('Instagram webhook route', () => {
         const res = await POST(req)
 
         expect(res.status).toBe(200)
-        expect(processInboundAiPipelineMock).toHaveBeenCalledTimes(1)
-
-        const pipelineInput = processInboundAiPipelineMock.mock.calls[0]?.[0]
-        await expect(pipelineInput.sendOutbound('Bot reply')).resolves.toEqual({
-            providerMessageId: 'ig-outbound-text-1'
-        })
-        await expect(pipelineInput.sendOutbound({
-            type: 'image',
-            imageUrl: 'https://example.supabase.co/storage/v1/object/public/skill-images/org-1/skill-image.webp',
-            mimeType: 'image/webp'
-        })).resolves.toEqual({
-            providerMessageId: 'ig-outbound-image-1'
-        })
-        expect(sendImageMock).toHaveBeenCalledWith({
-            instagramBusinessAccountId: 'page-1',
-            to: 'ig-user-1',
-            imageUrl: 'http://localhost/api/media/instagram-skill-image?source=https%3A%2F%2Fexample.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fskill-images%2Forg-1%2Fskill-image.webp'
-        })
+        expect(enqueueInboundMessageJobMock).toHaveBeenCalledWith(expect.objectContaining({
+            providerMessageId: 'ig-mid-1'
+        }))
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+        expect(sendTextMock).not.toHaveBeenCalled()
+        expect(sendImageMock).not.toHaveBeenCalled()
     })
 
     it('normalizes alternate instagram send response ids for outbound callbacks', async () => {
@@ -772,17 +774,10 @@ describe('Instagram webhook route', () => {
         const res = await POST(req)
 
         expect(res.status).toBe(200)
-        const pipelineInput = processInboundAiPipelineMock.mock.calls[0]?.[0]
-        await expect(pipelineInput.sendOutbound('Bot reply')).resolves.toEqual({
-            providerMessageId: 'ig-outbound-text-alt-1'
-        })
-        await expect(pipelineInput.sendOutbound({
-            type: 'image',
-            imageUrl: 'https://cdn.example.com/skill-image.jpg',
-            mimeType: 'image/jpeg'
-        })).resolves.toEqual({
-            providerMessageId: 'ig-outbound-image-alt-1'
-        })
+        expect(enqueueInboundMessageJobMock).toHaveBeenCalledWith(expect.objectContaining({
+            providerMessageId: 'ig-mid-1'
+        }))
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
     })
 
     it('persists structured instagram reaction metadata into inbound message metadata', async () => {
@@ -844,15 +839,20 @@ describe('Instagram webhook route', () => {
         const res = await POST(req)
 
         expect(res.status).toBe(200)
-        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
-            inboundMessageMetadata: expect.objectContaining({
-                instagram_message_id: 'ig-reaction-1',
-                instagram_event_type: 'reaction',
-                instagram_reaction_action: 'react',
-                instagram_reaction_emoji: '❤️',
-                instagram_reaction_target_message_id: 'ig-mid-outbound-1'
+        expect(enqueueInboundMessageJobMock).toHaveBeenCalledWith(expect.objectContaining({
+            providerMessageId: 'ig-reaction-1',
+            payload: expect.objectContaining({
+                event: expect.objectContaining({
+                    eventType: 'reaction',
+                    reaction: {
+                        action: 'react',
+                        emoji: '❤️',
+                        targetMessageId: 'ig-mid-outbound-1'
+                    }
+                })
             })
         }))
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
     })
 
     it('persists direct-instagram business echo messages as outbound inbox messages', async () => {

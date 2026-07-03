@@ -6,8 +6,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added a shared inbound message job queue and protected processor endpoint for webhook-backed channels. WhatsApp and Instagram now enqueue verified inbound events and return quickly, while `/api/internal/inbound-jobs/process` drains queued jobs with bounded concurrency and retry/failed status tracking (`supabase/migrations/00125_inbound_message_jobs.sql`, `src/lib/channels/inbound-job-queue.ts`, `src/app/api/internal/inbound-jobs/process/route.ts`, `src/app/api/webhooks/whatsapp/route.ts`, `src/app/api/webhooks/instagram/route.ts`).
+
 ### Changed
 
+- Changed WhatsApp and Instagram webhook processing so expensive AI reply generation no longer runs inside the webhook request. Inbound social events are persisted to `inbound_message_jobs`; outbound Instagram echo persistence remains synchronous so Inbox visibility is preserved.
 - Changed Public Demo ambiguity handling so the existing query rewriter's `needsClarification` decision returns one short clarification immediately, persists the missing slots, and avoids semantic retrieval, the GPT-5.5 selector, and File Search. A slot-only next turn skips raw exact matching and is combined with the original requested facet through conversation history; no new router, threshold, verifier, migration, or File Search status was added (`src/lib/demo-chat/skill-query-rewriter.ts`, `src/app/api/demo/[slug]/chat/route.ts`).
 - Documented the same-seed OpenAI cost change from approximately `$4.49` to `$9.96` per 100 questions. The 2.22x increase is driven primarily by moving the million-token RAG context from GPT-4.1-mini to GPT-5.5, not the 3.7% token-count increase; evaluation policy now requires a 20-case smoke before full 100-question runs (`docs/evaluations/yiu-openai-cost-comparison-2026-06-20.md`).
 
@@ -65,6 +70,8 @@
 - Fixed organization-specific File Search results being discarded by a second heuristic layer that could misclassify the active university's own fee chunks as `other_organization` or `audience_mismatch`.
 
 ### Added
+
+- Added a planned Web Chat channel backlog item: Settings > Channels should expose a copyable website embed snippet, backed by a Qualy-owned animated widget that reuses the organization's Skills, Knowledge Base, safety boundaries, usage metering, and Inbox persistence instead of delegating the bot brain to a third-party chat service (`docs/ROADMAP.md`, `docs/PRD.md`).
 
 - Added a reproducible 20-case YİÜ one-step File Search gate covering ten directly supported questions plus ten bounded/unsupported adjacent-evidence cases, including deterministic status scoring, forbidden-positive checks, latency/token reporting, and retained File Search results for audit (`scripts/knowledge/yiu-one-step-file-search-focused-eval.ts`, `scripts/knowledge/fixtures/yiu-one-step-file-search-focused-cases.json`).
 
